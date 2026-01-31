@@ -24,9 +24,20 @@ Supabase uses new key naming conventions:
 - Next.js 15 (App Router)
 - Supabase (Auth, Database, Storage)
 - Resend (Inbound email webhooks)
-- Vercel AI SDK with Anthropic Claude
+- Vercel AI Gateway (Claude via `gateway('anthropic/claude-sonnet-4')`)
 - React-PDF for itinerary generation
 - Tailwind CSS
+
+## Vercel AI Gateway
+
+This project uses Vercel AI Gateway for AI model access. Key points:
+
+- **No API key needed** - Vercel handles authentication via OIDC when deployed
+- **Model format**: Use `gateway('anthropic/claude-sonnet-4')` from the `ai` package
+- **Local development**: Run `vercel dev` for automatic token refresh
+- **Observability**: Usage tracked in Vercel dashboard
+
+See `src/lib/ai/extract-travel-data.ts` for implementation.
 
 ## Key Flows
 

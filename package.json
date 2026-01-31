@@ -9,7 +9,6 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^3.0.31",
     "@react-email/components": "^1.0.6",
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/ssr": "^0.8.0",

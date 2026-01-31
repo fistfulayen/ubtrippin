@@ -1,5 +1,4 @@
-import { generateText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { generateText, gateway } from 'ai'
 import {
   TRAVEL_EXTRACTION_SYSTEM_PROMPT,
   buildExtractionPrompt,
@@ -38,7 +37,7 @@ export async function extractTravelData(
   const prompt = buildExtractionPrompt(subject, body, attachmentText)
 
   const { text } = await generateText({
-    model: anthropic('claude-sonnet-4-20250514'),
+    model: gateway('anthropic/claude-sonnet-4'),
     system: TRAVEL_EXTRACTION_SYSTEM_PROMPT,
     prompt,
   })
