@@ -2,6 +2,10 @@
 
 Travel email-to-itinerary web app using Next.js, Supabase, Resend, and AI extraction.
 
+**Live URL**: https://www.ubtrippin.xyz/
+**Inbound Email**: trips@ubtrippin.xyz
+**Resend Webhook**: https://www.ubtrippin.xyz/api/webhooks/resend
+
 ## Supabase Configuration
 
 ### API Keys (as of 2025+)
