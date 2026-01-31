@@ -16,12 +16,12 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#ebe3c8' }}>
+    <div className="min-h-screen" style={{ background: '#ede6cf' }}>
       {/* Floating Sign In */}
       <div className="fixed top-8 right-8 z-50">
         <Link
           href="/login"
-          className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#2a2419] text-[#ebe3c8] hover:bg-[#3d3429] transition-colors border-2 border-[#2a2419] font-medium shadow-lg"
+          className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#2a2419] text-[#ede6cf] hover:bg-[#3d3429] transition-colors border-2 border-[#2a2419] font-medium shadow-lg"
         >
           Sign in
         </Link>
@@ -54,7 +54,7 @@ export default async function HomePage() {
           <div className="mt-12">
             <Link
               href="/login"
-              className="inline-flex items-center gap-4 px-10 py-5 text-lg tracking-wide uppercase bg-[#2a2419] text-[#ebe3c8] hover:bg-[#3d3429] transition-all font-medium shadow-2xl hover:scale-105 border-2 border-[#2a2419] cta-button"
+              className="inline-flex items-center gap-4 px-10 py-5 text-lg tracking-wide uppercase bg-[#2a2419] text-[#ede6cf] hover:bg-[#3d3429] transition-all font-medium shadow-2xl hover:scale-105 border-2 border-[#2a2419] cta-button"
             >
               <Image
                 src="/airplane_icon.png"
