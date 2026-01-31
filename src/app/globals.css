@@ -1,8 +1,9 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@200;300;400;500&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Lora:wght@400;500;600&family=Work+Sans:wght@300;400;500;600&display=swap');
 
 @theme inline {
-  --font-sans: 'Inter', var(--font-inter);
+  --font-sans: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
   --color-amber-50: oklch(0.987 0.022 90.27);
   --color-amber-100: oklch(0.962 0.059 95.62);
   --color-amber-500: oklch(0.769 0.188 70.08);
@@ -12,97 +13,73 @@
 }
 
 :root {
-  --background: #fffbf5;
-  --foreground: #1a1a1a;
+  --background: #f4ead5;
+  --foreground: #2a2419;
+  --accent: #544836;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom scrollbar */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Custom scrollbar - match vintage paper aesthetic */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
+  background: #ebe1cb;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
+  background: #a89878;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: #8d7d5f;
 }
 
-/* Icon color treatments - tint hand-drawn black icons to warm amber/orange */
-.icon-tint-amber {
-  filter: brightness(0) saturate(100%) invert(52%) sepia(68%) saturate(540%) hue-rotate(352deg) brightness(96%) contrast(87%);
-  transition: all 0.3s ease;
+/* Subtle entrance animations */
+.hero-title {
+  animation: fade-in 1.2s ease-out;
 }
 
-.icon-tint-white {
-  filter: brightness(0) invert(1);
-}
-
-/* Subtle animations and hover states */
-.logo-hero {
-  animation: fade-in-up 1s ease-out;
-}
-
-.feature-card {
+.feature-step {
   animation: fade-in-up 0.8s ease-out backwards;
   transition: transform 0.3s ease;
 }
 
-.feature-card:hover .icon-tint-amber {
-  filter: brightness(0) saturate(100%) invert(42%) sepia(78%) saturate(640%) hue-rotate(352deg) brightness(100%) contrast(92%);
-  transform: scale(1.08);
+.feature-step:hover {
+  transform: translateY(-8px);
 }
 
-.cta-button {
-  animation: fade-in-up 1.2s ease-out backwards;
+/* Stagger animations for feature steps */
+.feature-step:nth-child(1) {
+  animation-delay: 0.1s;
 }
 
-.booking-tag {
-  animation: fade-in 1s ease-out backwards;
-}
-
-/* Stagger animations for feature cards */
-.feature-card:nth-child(1) {
+.feature-step:nth-child(2) {
   animation-delay: 0.2s;
 }
 
-.feature-card:nth-child(2) {
+.feature-step:nth-child(3) {
   animation-delay: 0.3s;
 }
-
-.feature-card:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-/* Stagger animations for booking tags */
-.booking-tag:nth-child(1) { animation-delay: 0.5s; }
-.booking-tag:nth-child(2) { animation-delay: 0.6s; }
-.booking-tag:nth-child(3) { animation-delay: 0.7s; }
-.booking-tag:nth-child(4) { animation-delay: 0.8s; }
-.booking-tag:nth-child(5) { animation-delay: 0.9s; }
-.booking-tag:nth-child(6) { animation-delay: 1s; }
 
 /* Keyframe animations */
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(30px);
   }
   to {
     opacity: 1;
@@ -117,4 +94,24 @@ body {
   to {
     opacity: 1;
   }
+}
+
+/* Add subtle texture overlay for depth */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(42, 36, 25, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+body > * {
+  position: relative;
+  z-index: 2;
 }

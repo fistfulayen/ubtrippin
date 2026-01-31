@@ -16,52 +16,49 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#fffbf5] via-amber-50/30 to-orange-50/40">
-      {/* Floating Sign In */}
-      <div className="fixed top-6 right-6 z-50">
-        <Link
-          href="/login"
-          className="rounded-full bg-white/90 backdrop-blur-sm px-6 py-2.5 text-sm font-medium text-amber-900 hover:bg-white transition-all shadow-lg shadow-amber-900/5 border border-amber-100/50"
-        >
-          Sign in
-        </Link>
-      </div>
-
-      {/* Hero */}
-      <main className="mx-auto max-w-5xl px-6 py-20 sm:py-32">
-        {/* Logo - BIG and CENTERED */}
-        <div className="text-center mb-16 logo-hero">
+    <div className="min-h-screen" style={{ background: '#f4ead5' }}>
+      {/* Header with Logo and Sign In */}
+      <header className="max-w-7xl mx-auto px-6 py-8">
+        <div className="flex items-center justify-between">
           <Image
             src="/ubtrippin_logo.png"
             alt="UBTRIPPIN"
-            width={480}
-            height={120}
-            className="mx-auto w-full max-w-md sm:max-w-lg"
+            width={400}
+            height={100}
+            className="w-auto h-20 sm:h-24"
             priority
           />
+          <Link
+            href="/login"
+            className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#2a2419] text-[#f4ead5] hover:bg-[#3d3429] transition-colors border-2 border-[#2a2419] font-medium"
+          >
+            Sign in
+          </Link>
         </div>
+      </header>
 
-        {/* Headline */}
-        <div className="text-center mb-20">
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-light tracking-tight text-gray-900 leading-tight mb-6">
+      {/* Hero */}
+      <main className="max-w-6xl mx-auto px-6 py-16 sm:py-24">
+        <div className="text-center mb-24">
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-serif text-[#2a2419] leading-tight mb-8 tracking-tight hero-title">
             Turn your booking emails<br />
-            <span className="text-amber-700 font-normal">into beautiful itineraries</span>
+            into beautiful itineraries
           </h1>
-          <p className="mx-auto mt-8 max-w-2xl text-lg sm:text-xl text-gray-600 leading-relaxed font-light">
+          <p className="mx-auto mt-8 max-w-2xl text-xl sm:text-2xl text-[#544836] leading-relaxed font-light">
             Forward your flight confirmations, hotel reservations, and travel bookings—we&apos;ll
             organize everything into a clean timeline you can share or download.
           </p>
-          <div className="mt-12">
+          <div className="mt-14">
             <Link
               href="/login"
-              className="inline-flex items-center gap-3 rounded-full bg-amber-600 px-8 py-4 text-lg font-medium text-white hover:bg-amber-700 transition-all shadow-xl shadow-amber-600/25 hover:shadow-2xl hover:shadow-amber-600/30 hover:scale-105 cta-button"
+              className="inline-flex items-center gap-4 px-10 py-5 text-lg tracking-wide uppercase bg-[#2a2419] text-[#f4ead5] hover:bg-[#3d3429] transition-all font-medium shadow-2xl hover:shadow-3xl hover:scale-105 border-2 border-[#2a2419]"
             >
               <Image
                 src="/airplane_icon.png"
                 alt=""
-                width={24}
-                height={24}
-                className="w-6 h-6 icon-tint-white"
+                width={32}
+                height={32}
+                className="w-8 h-8 object-contain"
               />
               Get started
             </Link>
@@ -69,65 +66,65 @@ export default async function HomePage() {
         </div>
 
         {/* How it works */}
-        <div className="mt-32">
-          <h2 className="text-center text-3xl font-light text-gray-900 mb-16">
+        <div className="mt-40">
+          <h2 className="text-center text-4xl font-serif text-[#2a2419] mb-20 tracking-tight">
             How it works
           </h2>
-          <div className="grid gap-12 md:grid-cols-3">
+          <div className="grid gap-16 md:grid-cols-3">
             {/* Step 1 */}
-            <div className="text-center feature-card">
-              <div className="inline-flex mb-6">
+            <div className="text-center feature-step">
+              <div className="inline-flex mb-8">
                 <Image
                   src="/evelope_icon.png"
                   alt=""
-                  width={72}
-                  height={72}
-                  className="w-16 h-16 sm:w-18 sm:h-18 icon-tint-amber"
+                  width={120}
+                  height={120}
+                  className="w-28 h-28 object-contain"
                 />
               </div>
-              <h3 className="text-xl font-medium text-gray-900 mb-3">
+              <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
                 Forward your emails
               </h3>
-              <p className="text-gray-600 leading-relaxed font-light">
+              <p className="text-[#544836] leading-relaxed text-lg">
                 Send your booking confirmations to your dedicated email address. We accept flights,
                 hotels, trains, car rentals, and more.
               </p>
             </div>
 
             {/* Step 2 */}
-            <div className="text-center feature-card">
-              <div className="inline-flex mb-6">
+            <div className="text-center feature-step">
+              <div className="inline-flex mb-8">
                 <Image
                   src="/calendar_icon.png"
                   alt=""
-                  width={72}
-                  height={72}
-                  className="w-16 h-16 sm:w-18 sm:h-18 icon-tint-amber"
+                  width={120}
+                  height={120}
+                  className="w-28 h-28 object-contain"
                 />
               </div>
-              <h3 className="text-xl font-medium text-gray-900 mb-3">
+              <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
                 AI organizes everything
               </h3>
-              <p className="text-gray-600 leading-relaxed font-light">
+              <p className="text-[#544836] leading-relaxed text-lg">
                 Our AI extracts key details like dates, times, confirmation codes, and automatically groups them into trips.
               </p>
             </div>
 
             {/* Step 3 */}
-            <div className="text-center feature-card">
-              <div className="inline-flex mb-6">
+            <div className="text-center feature-step">
+              <div className="inline-flex mb-8">
                 <Image
                   src="/file_download_icon.png"
                   alt=""
-                  width={72}
-                  height={72}
-                  className="w-16 h-16 sm:w-18 sm:h-18 icon-tint-amber"
+                  width={120}
+                  height={120}
+                  className="w-28 h-28 object-contain"
                 />
               </div>
-              <h3 className="text-xl font-medium text-gray-900 mb-3">
+              <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
                 View & download
               </h3>
-              <p className="text-gray-600 leading-relaxed font-light">
+              <p className="text-[#544836] leading-relaxed text-lg">
                 Access your trips anytime with a beautiful timeline view. Download PDF itineraries to share or print.
               </p>
             </div>
@@ -135,16 +132,16 @@ export default async function HomePage() {
         </div>
 
         {/* Supported booking types */}
-        <div className="mt-32 text-center">
-          <h2 className="text-xl font-light text-gray-700 mb-8">
+        <div className="mt-40 text-center">
+          <h2 className="text-xl uppercase tracking-widest text-[#544836] mb-10 font-medium">
             Supports all major booking types
           </h2>
-          <div className="flex flex-wrap items-center justify-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-4">
             {['Flights', 'Hotels', 'Trains', 'Car Rentals', 'Restaurants', 'Activities'].map(
               (type) => (
                 <span
                   key={type}
-                  className="rounded-full bg-amber-100/60 px-5 py-2 text-sm font-light text-amber-900 border border-amber-200/50 booking-tag"
+                  className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#ebe1cb] text-[#2a2419] border border-[#d4c9b0] font-medium"
                 >
                   {type}
                 </span>
@@ -155,8 +152,8 @@ export default async function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-amber-200/30 py-12 mt-32">
-        <div className="mx-auto max-w-7xl px-6 text-center text-sm text-gray-500 font-light">
+      <footer className="border-t-2 border-[#d4c9b0] py-12 mt-32">
+        <div className="max-w-7xl mx-auto px-6 text-center text-sm tracking-wide uppercase text-[#544836]">
           <p>&copy; {new Date().getFullYear()} UBTRIPPIN. All rights reserved.</p>
         </div>
       </footer>
