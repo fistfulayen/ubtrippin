@@ -16,49 +16,52 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#f4ead5' }}>
-      {/* Header with Logo and Sign In */}
-      <header className="max-w-7xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between">
+    <div className="min-h-screen" style={{ background: '#f5ecd7' }}>
+      {/* Floating Sign In */}
+      <div className="fixed top-8 right-8 z-50">
+        <Link
+          href="/login"
+          className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#2a2419] text-[#f5ecd7] hover:bg-[#3d3429] transition-colors border-2 border-[#2a2419] font-medium shadow-lg"
+        >
+          Sign in
+        </Link>
+      </div>
+
+      {/* Hero with Giant Logo */}
+      <main className="max-w-7xl mx-auto px-6">
+        {/* LARGE CENTERED LOGO */}
+        <div className="pt-16 pb-12 text-center">
           <Image
             src="/ubtrippin_logo.png"
             alt="UBTRIPPIN"
-            width={400}
-            height={100}
-            className="w-auto h-20 sm:h-24"
+            width={800}
+            height={200}
+            className="mx-auto w-full max-w-3xl blend-multiply"
             priority
           />
-          <Link
-            href="/login"
-            className="px-6 py-2.5 text-sm tracking-wide uppercase bg-[#2a2419] text-[#f4ead5] hover:bg-[#3d3429] transition-colors border-2 border-[#2a2419] font-medium"
-          >
-            Sign in
-          </Link>
         </div>
-      </header>
 
-      {/* Hero */}
-      <main className="max-w-6xl mx-auto px-6 py-16 sm:py-24">
-        <div className="text-center mb-24">
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-serif text-[#2a2419] leading-tight mb-8 tracking-tight hero-title">
+        {/* Headline */}
+        <div className="text-center mb-20 max-w-5xl mx-auto">
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-serif text-[#2a2419] leading-tight mb-10 tracking-tight hero-title">
             Turn your booking emails<br />
             into beautiful itineraries
           </h1>
-          <p className="mx-auto mt-8 max-w-2xl text-xl sm:text-2xl text-[#544836] leading-relaxed font-light">
+          <p className="mx-auto mt-8 max-w-3xl text-xl sm:text-2xl text-[#544836] leading-relaxed font-light">
             Forward your flight confirmations, hotel reservations, and travel bookings—we&apos;ll
             organize everything into a clean timeline you can share or download.
           </p>
-          <div className="mt-14">
+          <div className="mt-12">
             <Link
               href="/login"
-              className="inline-flex items-center gap-4 px-10 py-5 text-lg tracking-wide uppercase bg-[#2a2419] text-[#f4ead5] hover:bg-[#3d3429] transition-all font-medium shadow-2xl hover:shadow-3xl hover:scale-105 border-2 border-[#2a2419]"
+              className="inline-flex items-center gap-4 px-10 py-5 text-lg tracking-wide uppercase bg-[#2a2419] text-[#f5ecd7] hover:bg-[#3d3429] transition-all font-medium shadow-2xl hover:scale-105 border-2 border-[#2a2419] cta-button"
             >
               <Image
                 src="/airplane_icon.png"
                 alt=""
                 width={32}
                 height={32}
-                className="w-8 h-8 object-contain"
+                className="w-8 h-8 object-contain blend-multiply-icon"
               />
               Get started
             </Link>
@@ -66,20 +69,20 @@ export default async function HomePage() {
         </div>
 
         {/* How it works */}
-        <div className="mt-40">
+        <div className="mt-32 pb-20">
           <h2 className="text-center text-4xl font-serif text-[#2a2419] mb-20 tracking-tight">
             How it works
           </h2>
-          <div className="grid gap-16 md:grid-cols-3">
+          <div className="grid gap-20 md:grid-cols-3 max-w-6xl mx-auto">
             {/* Step 1 */}
             <div className="text-center feature-step">
               <div className="inline-flex mb-8">
                 <Image
                   src="/evelope_icon.png"
                   alt=""
-                  width={120}
-                  height={120}
-                  className="w-28 h-28 object-contain"
+                  width={140}
+                  height={140}
+                  className="w-32 h-32 sm:w-36 sm:h-36 object-contain blend-multiply"
                 />
               </div>
               <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
@@ -97,9 +100,9 @@ export default async function HomePage() {
                 <Image
                   src="/calendar_icon.png"
                   alt=""
-                  width={120}
-                  height={120}
-                  className="w-28 h-28 object-contain"
+                  width={140}
+                  height={140}
+                  className="w-32 h-32 sm:w-36 sm:h-36 object-contain blend-multiply"
                 />
               </div>
               <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
@@ -116,9 +119,9 @@ export default async function HomePage() {
                 <Image
                   src="/file_download_icon.png"
                   alt=""
-                  width={120}
-                  height={120}
-                  className="w-28 h-28 object-contain"
+                  width={140}
+                  height={140}
+                  className="w-32 h-32 sm:w-36 sm:h-36 object-contain blend-multiply"
                 />
               </div>
               <h3 className="text-2xl font-serif text-[#2a2419] mb-4">
@@ -132,7 +135,7 @@ export default async function HomePage() {
         </div>
 
         {/* Supported booking types */}
-        <div className="mt-40 text-center">
+        <div className="mt-32 pb-20 text-center">
           <h2 className="text-xl uppercase tracking-widest text-[#544836] mb-10 font-medium">
             Supports all major booking types
           </h2>
@@ -152,7 +155,7 @@ export default async function HomePage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t-2 border-[#d4c9b0] py-12 mt-32">
+      <footer className="border-t-2 border-[#d4c9b0] py-12 mt-20">
         <div className="max-w-7xl mx-auto px-6 text-center text-sm tracking-wide uppercase text-[#544836]">
           <p>&copy; {new Date().getFullYear()} UBTRIPPIN. All rights reserved.</p>
         </div>
