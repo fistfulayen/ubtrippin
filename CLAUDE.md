@@ -4,9 +4,20 @@ Travel email-to-itinerary web app using Next.js, Supabase, Resend, and AI extrac
 
 ## Supabase Configuration
 
-- **Important**: Supabase uses "Secret Key" (not "Service Role Key") for server-side operations that bypass RLS
-- Environment variable: `SUPABASE_SECRET_KEY` (not `SUPABASE_SERVICE_ROLE_KEY`)
-- The secret key is found in Supabase Dashboard → Project Settings → API → `service_role` (labeled as secret)
+### API Keys (as of 2025+)
+
+Supabase uses new key naming conventions:
+
+- **Publishable Key** (`sb_publishable_...`) - Replaces the old "anon" key
+  - Safe for client-side use, respects RLS
+  - Environment variable: `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+
+- **Secret Key** (`sb_secret_...`) - Replaces the old "service_role" key
+  - Server-side only, bypasses RLS
+  - Environment variable: `SUPABASE_SECRET_KEY`
+  - Found in Supabase Dashboard → Project Settings → API
+
+**Important**: Never use "anon key" or "service role key" terminology - use "publishable key" and "secret key" respectively.
 
 ## Tech Stack
 
