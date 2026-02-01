@@ -70,6 +70,52 @@ const AIRLINE_DOMAINS: Record<string, string> = {
   'virgin australia': 'virginaustralia.com',
 }
 
+// IATA airline codes to domains
+const AIRLINE_CODES: Record<string, string> = {
+  'ua': 'united.com',
+  'dl': 'delta.com',
+  'aa': 'aa.com',
+  'wn': 'southwest.com',
+  'b6': 'jetblue.com',
+  'as': 'alaskaair.com',
+  'nk': 'spirit.com',
+  'f9': 'flyfrontier.com',
+  'ha': 'hawaiianairlines.com',
+  'ba': 'britishairways.com',
+  'lh': 'lufthansa.com',
+  'af': 'airfrance.com',
+  'kl': 'klm.com',
+  'fr': 'ryanair.com',
+  'u2': 'easyjet.com',
+  'lx': 'swiss.com',
+  'ib': 'iberia.com',
+  'tp': 'flytap.com',
+  'sk': 'flysas.com',
+  'ay': 'finnair.com',
+  'os': 'austrian.com',
+  'ei': 'aerlingus.com',
+  'vy': 'vueling.com',
+  'ek': 'emirates.com',
+  'qr': 'qatarairways.com',
+  'ey': 'etihad.com',
+  'sq': 'singaporeair.com',
+  'cx': 'cathaypacific.com',
+  'nh': 'ana.co.jp',
+  'jl': 'jal.co.jp',
+  'ke': 'koreanair.com',
+  'oz': 'flyasiana.com',
+  'tg': 'thaiairways.com',
+  'mh': 'malaysiaairlines.com',
+  'qf': 'qantas.com',
+  'ac': 'aircanada.com',
+  'ws': 'westjet.com',
+  'la': 'latam.com',
+  'av': 'avianca.com',
+  'nz': 'airnewzealand.com',
+  'vs': 'virginatlantic.com',
+  'va': 'virginaustralia.com',
+}
+
 /**
  * Returns a Clearbit logo URL for an airline.
  * Returns null if the airline is not recognized.
@@ -77,8 +123,32 @@ const AIRLINE_DOMAINS: Record<string, string> = {
 export function getAirlineLogoUrl(airlineName: string): string | null {
   if (!airlineName) return null
 
-  const normalizedName = airlineName.toLowerCase().trim()
-  const domain = AIRLINE_DOMAINS[normalizedName]
+  // Normalize: lowercase, remove spaces, trim
+  const normalized = airlineName.toLowerCase().trim()
+
+  // Try exact match first
+  let domain = AIRLINE_DOMAINS[normalized]
+
+  // Try without spaces (e.g., "AirFrance" -> "airfrance")
+  if (!domain) {
+    const noSpaces = normalized.replace(/\s+/g, '')
+    domain = AIRLINE_DOMAINS[noSpaces]
+  }
+
+  // Try adding space before "air" or "airlines" (e.g., "airfrance" -> "air france")
+  if (!domain) {
+    const withSpace = normalized
+      .replace(/^air(?!lines)/, 'air ')
+      .replace(/airlines$/, ' airlines')
+      .replace(/\s+/g, ' ')
+      .trim()
+    domain = AIRLINE_DOMAINS[withSpace]
+  }
+
+  // Try IATA code (first 2 chars of flight number often)
+  if (!domain && normalized.length === 2) {
+    domain = AIRLINE_CODES[normalized]
+  }
 
   if (!domain) return null
 

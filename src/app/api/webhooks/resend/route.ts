@@ -185,58 +185,81 @@ export async function POST(request: NextRequest) {
         .select('id, title, start_date, end_date, primary_location')
         .eq('user_id', userId)
 
-      // Process each extracted item
+      // Process extracted items - all items from same email go to same trip
       const createdItems: { tripId: string; itemId: string }[] = []
       const tripsToUpdate = new Map<string, { items: typeof extractionResult.items }>()
 
+      // Determine trip assignment using the first item, then use same trip for all
+      let emailTripId: string | null = null
+
       for (const item of extractionResult.items) {
-        // Determine trip assignment
-        const assignment = assignToTrip(item, existingTrips || [])
+        let tripId: string | null = emailTripId
 
-        let tripId = assignment.tripId
-
-        // Create new trip if needed
+        // Only determine assignment for first item - all others go to same trip
         if (!tripId) {
-          const { data: newTrip, error: tripError } = await supabase
-            .from('trips')
-            .insert({
-              user_id: userId,
-              title: assignment.tripTitle || 'Untitled Trip',
-              start_date: item.start_date,
-              end_date: item.end_date,
-              primary_location: item.end_location || item.start_location,
-              travelers: item.traveler_names || [],
-            })
-            .select()
-            .single()
+          const assignment = assignToTrip(item, existingTrips || [])
+          tripId = assignment.tripId
 
-          if (tripError) {
-            console.error('Failed to create trip:', tripError)
-            continue
-          }
+          // Create new trip if needed
+          if (!tripId) {
+            // Use all items to determine best trip title and location
+            const primaryLocation = getPrimaryLocation(extractionResult.items)
+            const allTravelers = collectTravelerNames(extractionResult.items)
 
-          tripId = newTrip.id
+            const { data: newTrip, error: tripError } = await supabase
+              .from('trips')
+              .insert({
+                user_id: userId,
+                title: assignment.tripTitle || 'Untitled Trip',
+                start_date: item.start_date,
+                end_date: item.end_date,
+                primary_location: primaryLocation || item.end_location || item.start_location,
+                travelers: allTravelers.length > 0 ? allTravelers : (item.traveler_names || []),
+              })
+              .select()
+              .single()
 
-          // Fetch and set cover image for the new trip
-          const location = item.end_location || item.start_location
-          if (location) {
-            const coverImageUrl = await getDestinationImageUrl(location)
-            if (coverImageUrl) {
-              await supabase
-                .from('trips')
-                .update({ cover_image_url: coverImageUrl })
-                .eq('id', newTrip.id)
+            if (tripError) {
+              console.error('Failed to create trip:', tripError)
+              continue
             }
+
+            tripId = newTrip.id
+
+            // Fetch and set cover image for the new trip
+            // Clean location for better Unsplash results
+            const location = primaryLocation || item.end_location || item.start_location
+            if (location) {
+              // Remove airport codes and clean up for search
+              const cleanLocation = location
+                .replace(/\([A-Z]{3}\)/g, '')
+                .replace(/^[A-Z]{3}\s*[-–]\s*/g, '')
+                .replace(/,?\s*[A-Z]{2,3}$/g, '') // Remove state/country codes at end
+                .trim()
+
+              if (cleanLocation) {
+                const coverImageUrl = await getDestinationImageUrl(cleanLocation)
+                if (coverImageUrl) {
+                  await supabase
+                    .from('trips')
+                    .update({ cover_image_url: coverImageUrl })
+                    .eq('id', newTrip.id)
+                }
+              }
+            }
+
+            // Add to existing trips for future emails
+            existingTrips?.push({
+              id: newTrip.id,
+              title: newTrip.title,
+              start_date: newTrip.start_date,
+              end_date: newTrip.end_date,
+              primary_location: newTrip.primary_location,
+            })
           }
 
-          // Add to existing trips for subsequent items
-          existingTrips?.push({
-            id: newTrip.id,
-            title: newTrip.title,
-            start_date: newTrip.start_date,
-            end_date: newTrip.end_date,
-            primary_location: newTrip.primary_location,
-          })
+          // Remember this trip for all subsequent items from this email
+          emailTripId = tripId
         }
 
         // Track items per trip for date updates
