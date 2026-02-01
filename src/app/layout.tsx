@@ -10,6 +10,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "UBTRIPPIN - Turn Booking Emails into Beautiful Itineraries",
   description: "Forward your travel confirmation emails and get organized trip timelines with downloadable PDFs.",
+  icons: {
+    icon: '/favicon.ico',
+  },
   openGraph: {
     title: "UBTRIPPIN",
     description: "Turn Booking Emails into Beautiful Itineraries",
