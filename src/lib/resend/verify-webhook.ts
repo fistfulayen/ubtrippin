@@ -1,5 +1,6 @@
 import { Webhook } from 'svix'
 
+// Webhook payload - only contains metadata, NOT email body
 export interface ResendEmailPayload {
   type: 'email.received'
   created_at: string
@@ -8,18 +9,41 @@ export interface ResendEmailPayload {
     from: string
     to: string[]
     subject: string
-    text?: string
-    html?: string
+    // Note: text/html are NOT included in webhook - must fetch via API
     attachments?: Array<{
+      id: string
       filename: string
       content_type: string
-      content: string // base64 encoded
+      content_disposition: string
+      content_id?: string
     }>
-    headers?: Record<string, string>
-    spf?: { result: string }
-    dkim?: { result: string }
-    dmarc?: { result: string }
+    message_id?: string
+    bcc?: string[]
+    cc?: string[]
   }
+}
+
+// Full email content from resend.emails.receiving.get()
+export interface ResendReceivedEmail {
+  id: string
+  from: string
+  to: string[]
+  subject: string
+  text: string | null
+  html: string | null
+  headers: Record<string, string>
+  attachments: Array<{
+    id: string
+    filename: string
+    size: number
+    content_type: string
+    content_id: string
+    content_disposition: string
+  }>
+  raw?: {
+    download_url: string
+    expires_at: string
+  } | null
 }
 
 export function verifyWebhookSignature(

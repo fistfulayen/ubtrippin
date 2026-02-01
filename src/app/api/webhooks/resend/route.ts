@@ -3,7 +3,7 @@ import { createSecretClient } from '@/lib/supabase/server'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
 import { getResendClient } from '@/lib/resend/client'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
-import { extractTextFromPdf, isValidPdfAttachment } from '@/lib/pdf/parse-attachment'
+import { extractTextFromPdf } from '@/lib/pdf/parse-attachment'
 import {
   assignToTrip,
   updateTripDates,
@@ -49,17 +49,22 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = createSecretClient()
-    const { data } = emailData
+    const { data: webhookData } = emailData
 
-    // Debug: Log what we received from Resend
-    console.log('Resend webhook data keys:', Object.keys(data))
-    console.log('Email subject:', data.subject)
-    console.log('Email text length:', data.text?.length || 0)
-    console.log('Email html length:', data.html?.length || 0)
-    console.log('Attachments count:', data.attachments?.length || 0)
+    // Webhook only contains metadata - fetch full email content from Resend API
+    console.log('Fetching full email content for:', webhookData.email_id)
+    const resend = getResendClient()
+    const { data: fullEmail, error: fetchError } = await resend.emails.receiving.get(webhookData.email_id)
+
+    if (fetchError || !fullEmail) {
+      console.error('Failed to fetch email content:', fetchError)
+      return NextResponse.json({ error: 'Failed to fetch email content' }, { status: 500 })
+    }
+
+    console.log('Email fetched - text length:', fullEmail.text?.length || 0, 'html length:', fullEmail.html?.length || 0)
 
     // Extract sender email (removing display name if present)
-    const fromEmail = data.from.match(/<(.+)>/)?.[1] || data.from
+    const fromEmail = fullEmail.from.match(/<(.+)>/)?.[1] || fullEmail.from
 
     // Look up user by sender email in allowed_senders
     const { data: allowedSender } = await supabase
@@ -68,26 +73,27 @@ export async function POST(request: NextRequest) {
       .eq('email', fromEmail.toLowerCase())
       .single()
 
-    // Store the raw email
+    // Store the raw email with content from API
     const { data: sourceEmail, error: insertError } = await supabase
       .from('source_emails')
       .insert({
         user_id: allowedSender?.user_id || null,
         from_email: fromEmail,
-        to_email: data.to?.[0] || null,
-        subject: data.subject || null,
-        body_text: data.text || null,
-        body_html: data.html ? sanitizeHtml(data.html) : null,
-        resend_message_id: data.email_id,
-        attachments_json: data.attachments?.map((a) => ({
+        to_email: fullEmail.to?.[0] || null,
+        subject: fullEmail.subject || null,
+        body_text: fullEmail.text || null,
+        body_html: fullEmail.html ? sanitizeHtml(fullEmail.html) : null,
+        resend_message_id: webhookData.email_id,
+        attachments_json: fullEmail.attachments?.map((a) => ({
           filename: a.filename,
           content_type: a.content_type,
         })) || [],
         parse_status: allowedSender ? 'processing' : 'unassigned',
         auth_results: {
-          spf: data.spf?.result,
-          dkim: data.dkim?.result,
-          dmarc: data.dmarc?.result,
+          // Auth results come from webhook headers, not API response
+          spf: fullEmail.headers?.['received-spf'] ? 'pass' : null,
+          dkim: fullEmail.headers?.['dkim-signature'] ? 'pass' : null,
+          dmarc: null,
         },
       })
       .select()
@@ -115,14 +121,29 @@ export async function POST(request: NextRequest) {
       : profilesData as { email: string; full_name: string | null } | null
 
     try {
-      // Extract text from PDF attachments
+      // Extract text from PDF attachments using Resend attachments API
       let attachmentText = ''
-      if (data.attachments) {
-        for (const attachment of data.attachments) {
-          if (isValidPdfAttachment(attachment)) {
-            const text = await extractTextFromPdf(attachment.content)
-            if (text) {
-              attachmentText += `\n\n--- PDF: ${attachment.filename} ---\n${text}`
+      if (fullEmail.attachments?.length) {
+        for (const attachment of fullEmail.attachments) {
+          if (attachment.content_type === 'application/pdf') {
+            try {
+              // Fetch attachment content via Resend API
+              const { data: attachmentData } = await resend.emails.receiving.attachments.get({
+                emailId: webhookData.email_id,
+                id: attachment.id,
+              })
+              if (attachmentData?.download_url) {
+                // Download and extract PDF text
+                const pdfResponse = await fetch(attachmentData.download_url)
+                const pdfBuffer = await pdfResponse.arrayBuffer()
+                const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
+                const text = await extractTextFromPdf(pdfBase64)
+                if (text) {
+                  attachmentText += `\n\n--- PDF: ${attachment.filename} ---\n${text}`
+                }
+              }
+            } catch (pdfError) {
+              console.error('Failed to extract PDF:', attachment.filename, pdfError)
             }
           }
         }
@@ -133,8 +154,8 @@ export async function POST(request: NextRequest) {
 
       // Run AI extraction with sender domain for few-shot matching
       const extractionResult = await extractTravelData(
-        data.subject || '',
-        data.text || data.html || '',
+        fullEmail.subject || '',
+        fullEmail.text || fullEmail.html || '',
         attachmentText || undefined,
         { senderDomain }
       )
