@@ -109,3 +109,52 @@ export function buildExtractionPrompt(
 
   return prompt
 }
+
+export interface ExtractionExample {
+  email_subject: string | null
+  email_body_snippet: string
+  attachment_text_snippet: string | null
+  corrected_extraction: Record<string, unknown>
+  provider_pattern: string | null
+  item_kind: string | null
+}
+
+/**
+ * Build an enhanced system prompt with few-shot examples from user corrections.
+ * This enables the model to learn from previous mistakes and extract more accurately.
+ */
+export function buildSystemPromptWithExamples(
+  basePrompt: string,
+  examples: ExtractionExample[]
+): string {
+  if (!examples.length) return basePrompt
+
+  const examplesSection = examples.map((ex, i) => {
+    let input = `Subject: ${ex.email_subject || '(no subject)'}\n${ex.email_body_snippet}`
+    if (ex.attachment_text_snippet) {
+      input += `\n\nPDF attachment content:\n${ex.attachment_text_snippet}`
+    }
+
+    return `### Example ${i + 1}${ex.item_kind ? ` (${ex.item_kind})` : ''}${ex.provider_pattern ? ` from ${ex.provider_pattern}` : ''}
+
+Input email:
+"""
+${input}
+"""
+
+Correct extraction:
+\`\`\`json
+${JSON.stringify(ex.corrected_extraction, null, 2)}
+\`\`\``
+  }).join('\n\n---\n\n')
+
+  return `${basePrompt}
+
+## Learning Examples
+These examples show correct extractions from similar emails. Follow these patterns carefully, especially for fields like confirmation codes, flight numbers, times, and locations:
+
+${examplesSection}
+
+---
+Now extract from the provided email using these learned patterns. Pay special attention to details that were captured in the examples above.`
+}

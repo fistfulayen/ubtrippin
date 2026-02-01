@@ -186,6 +186,7 @@ export interface Database {
           subject: string | null
           body_text: string | null
           body_html: string | null
+          attachment_text: string | null
           received_at: string
           resend_message_id: string | null
           raw_storage_path: string | null
@@ -205,6 +206,7 @@ export interface Database {
           subject?: string | null
           body_text?: string | null
           body_html?: string | null
+          attachment_text?: string | null
           received_at?: string
           resend_message_id?: string | null
           raw_storage_path?: string | null
@@ -224,6 +226,7 @@ export interface Database {
           subject?: string | null
           body_text?: string | null
           body_html?: string | null
+          attachment_text?: string | null
           received_at?: string
           resend_message_id?: string | null
           raw_storage_path?: string | null
@@ -288,6 +291,82 @@ export interface Database {
           generated_at?: string
         }
       }
+      extraction_examples: {
+        Row: {
+          id: string
+          user_id: string | null
+          source_email_id: string | null
+          email_subject: string | null
+          email_body_snippet: string
+          attachment_text_snippet: string | null
+          corrected_extraction: Json
+          provider_pattern: string | null
+          item_kind: string | null
+          is_global: boolean
+          usage_count: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          source_email_id?: string | null
+          email_subject?: string | null
+          email_body_snippet: string
+          attachment_text_snippet?: string | null
+          corrected_extraction: Json
+          provider_pattern?: string | null
+          item_kind?: string | null
+          is_global?: boolean
+          usage_count?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          source_email_id?: string | null
+          email_subject?: string | null
+          email_body_snippet?: string
+          attachment_text_snippet?: string | null
+          corrected_extraction?: Json
+          provider_pattern?: string | null
+          item_kind?: string | null
+          is_global?: boolean
+          usage_count?: number
+          created_at?: string
+        }
+      }
+      extraction_corrections: {
+        Row: {
+          id: string
+          user_id: string
+          source_email_id: string
+          field_path: string
+          original_value: Json | null
+          corrected_value: Json
+          correction_type: 'added' | 'modified' | 'removed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source_email_id: string
+          field_path: string
+          original_value?: Json | null
+          corrected_value: Json
+          correction_type: 'added' | 'modified' | 'removed'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          source_email_id?: string
+          field_path?: string
+          original_value?: Json | null
+          corrected_value?: Json
+          correction_type?: 'added' | 'modified' | 'removed'
+          created_at?: string
+        }
+      }
     }
   }
 }
@@ -300,6 +379,8 @@ export type TripItem = Database['public']['Tables']['trip_items']['Row']
 export type SourceEmail = Database['public']['Tables']['source_emails']['Row']
 export type AuditLog = Database['public']['Tables']['audit_logs']['Row']
 export type TripPdf = Database['public']['Tables']['trip_pdfs']['Row']
+export type ExtractionExample = Database['public']['Tables']['extraction_examples']['Row']
+export type ExtractionCorrection = Database['public']['Tables']['extraction_corrections']['Row']
 
 // Trip with items for display
 export interface TripWithItems extends Trip {

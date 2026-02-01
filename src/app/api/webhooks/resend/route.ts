@@ -121,18 +121,23 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Run AI extraction
+      // Extract sender domain for example matching
+      const senderDomain = fromEmail.split('@')[1]?.toLowerCase()
+
+      // Run AI extraction with sender domain for few-shot matching
       const extractionResult = await extractTravelData(
         data.subject || '',
         data.text || data.html || '',
-        attachmentText || undefined
+        attachmentText || undefined,
+        { senderDomain }
       )
 
-      // Update source email with extraction result
+      // Update source email with extraction result and attachment text
       await supabase
         .from('source_emails')
         .update({
           extracted_json: extractionResult,
+          attachment_text: attachmentText || null,
           parse_status: extractionResult.items.length > 0 ? 'completed' : 'failed',
           parse_error: extractionResult.items.length === 0 ? 'No travel items found' : null,
         })

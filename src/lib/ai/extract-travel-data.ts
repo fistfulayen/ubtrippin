@@ -2,7 +2,9 @@ import { generateText, gateway } from 'ai'
 import {
   TRAVEL_EXTRACTION_SYSTEM_PROMPT,
   buildExtractionPrompt,
+  buildSystemPromptWithExamples,
 } from './prompts'
+import { selectExamples } from './example-selection'
 import type { TripItemKind, TripItemStatus } from '@/types/database'
 
 export interface ExtractedItem {
@@ -29,16 +31,34 @@ export interface ExtractionResult {
   items: ExtractedItem[]
 }
 
+export interface ExtractTravelDataOptions {
+  senderDomain?: string
+}
+
 export async function extractTravelData(
   subject: string,
   body: string,
-  attachmentText?: string
+  attachmentText?: string,
+  options?: ExtractTravelDataOptions
 ): Promise<ExtractionResult> {
+  // Select relevant few-shot examples based on sender domain
+  const examples = await selectExamples(options?.senderDomain)
+
+  if (examples.length > 0) {
+    console.log(`Using ${examples.length} extraction examples for ${options?.senderDomain || 'unknown domain'}`)
+  }
+
+  // Build enhanced prompt with examples
+  const systemPrompt = buildSystemPromptWithExamples(
+    TRAVEL_EXTRACTION_SYSTEM_PROMPT,
+    examples
+  )
+
   const prompt = buildExtractionPrompt(subject, body, attachmentText)
 
   const { text } = await generateText({
     model: gateway('anthropic/claude-sonnet-4'),
-    system: TRAVEL_EXTRACTION_SYSTEM_PROMPT,
+    system: systemPrompt,
     prompt,
   })
 
