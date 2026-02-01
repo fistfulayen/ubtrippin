@@ -37,8 +37,7 @@ body {
 }
 
 .blend-multiply-icon {
-  mix-blend-mode: multiply;
-  filter: invert(1);
+  filter: invert(1) brightness(2);
 }
 
 /* Custom scrollbar - match vintage paper aesthetic */
