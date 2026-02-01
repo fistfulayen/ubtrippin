@@ -59,9 +59,9 @@ export default async function HomePage() {
               <Image
                 src="/airplane_icon.png"
                 alt=""
-                width={32}
-                height={32}
-                className="w-8 h-8 object-contain blend-multiply-icon"
+                width={48}
+                height={48}
+                className="w-12 h-12 object-contain blend-multiply-icon"
               />
               Get started
             </Link>
