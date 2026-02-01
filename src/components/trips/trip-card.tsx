@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
@@ -18,10 +19,22 @@ export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps
     <Link href={`/trips/${trip.id}`}>
       <Card
         className={cn(
-          'group cursor-pointer transition-all hover:shadow-md hover:border-amber-200',
+          'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-amber-200',
           isPast && 'opacity-75'
         )}
       >
+        {/* Cover image */}
+        <div className="relative h-36 w-full bg-gradient-to-br from-amber-100 to-orange-100">
+          {trip.cover_image_url && (
+            <Image
+              src={trip.cover_image_url}
+              alt={trip.title}
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            />
+          )}
+        </div>
         <CardContent className="p-4">
           {/* Header with title and review badge */}
           <div className="flex items-start justify-between gap-2">

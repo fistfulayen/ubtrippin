@@ -34,7 +34,14 @@ import {
   Clock,
   Hash,
 } from 'lucide-react'
-import type { TripItem, Trip, FlightDetails, HotelDetails } from '@/types/database'
+import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
+import {
+  FlightDetailsView,
+  HotelDetailsView,
+  TrainDetailsView,
+  CarDetailsView,
+  GenericDetailsView,
+} from './item-details'
 
 interface TripItemCardProps {
   item: TripItem
@@ -233,19 +240,22 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
               </button>
 
               {expanded && (
-                <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
-                  <dl className="grid grid-cols-2 gap-2">
-                    {Object.entries(details)
-                      .filter(([, v]) => v !== null && v !== undefined && v !== '')
-                      .map(([key, value]) => (
-                        <div key={key}>
-                          <dt className="text-xs text-gray-500 capitalize">
-                            {key.replace(/_/g, ' ')}
-                          </dt>
-                          <dd className="font-medium text-gray-900">{String(value)}</dd>
-                        </div>
-                      ))}
-                  </dl>
+                <div className="mt-3">
+                  {item.kind === 'flight' && (
+                    <FlightDetailsView details={details as FlightDetails} />
+                  )}
+                  {item.kind === 'hotel' && (
+                    <HotelDetailsView details={details as HotelDetails} />
+                  )}
+                  {item.kind === 'train' && (
+                    <TrainDetailsView details={details as TrainDetails} />
+                  )}
+                  {item.kind === 'car' && (
+                    <CarDetailsView details={details as CarRentalDetails} />
+                  )}
+                  {!['flight', 'hotel', 'train', 'car'].includes(item.kind) && (
+                    <GenericDetailsView details={details as Record<string, Json>} />
+                  )}
                 </div>
               )}
             </>

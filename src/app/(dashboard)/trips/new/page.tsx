@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { fetchAndSetCoverImage } from './actions'
 
 export default function NewTripPage() {
   const router = useRouter()
@@ -61,6 +62,11 @@ export default function NewTripPage() {
       setError(insertError.message)
       setLoading(false)
       return
+    }
+
+    // Fetch cover image in the background (don't block navigation)
+    if (primary_location) {
+      fetchAndSetCoverImage(data.id, primary_location)
     }
 
     router.push(`/trips/${data.id}`)

@@ -1,0 +1,5 @@
+export { FlightDetailsView } from './flight-details'
+export { HotelDetailsView } from './hotel-details'
+export { TrainDetailsView } from './train-details'
+export { CarDetailsView } from './car-details'
+export { GenericDetailsView } from './generic-details'

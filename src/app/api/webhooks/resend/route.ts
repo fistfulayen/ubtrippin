@@ -10,6 +10,7 @@ import {
   getPrimaryLocation,
   collectTravelerNames,
 } from '@/lib/trips/assignment'
+import { getDestinationImageUrl } from '@/lib/images/unsplash'
 import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
@@ -215,6 +216,18 @@ export async function POST(request: NextRequest) {
           }
 
           tripId = newTrip.id
+
+          // Fetch and set cover image for the new trip
+          const location = item.end_location || item.start_location
+          if (location) {
+            const coverImageUrl = await getDestinationImageUrl(location)
+            if (coverImageUrl) {
+              await supabase
+                .from('trips')
+                .update({ cover_image_url: coverImageUrl })
+                .eq('id', newTrip.id)
+            }
+          }
 
           // Add to existing trips for subsequent items
           existingTrips?.push({
