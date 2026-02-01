@@ -1,14 +1,11 @@
-import * as pdfParseModule from 'pdf-parse'
-
-// Handle both ESM and CJS exports
-const pdfParse = (pdfParseModule as { default?: typeof pdfParseModule }).default || pdfParseModule
+import { extractText, getDocumentProxy } from 'unpdf'
 
 export async function extractTextFromPdf(base64Content: string): Promise<string> {
   try {
     const buffer = Buffer.from(base64Content, 'base64')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = await (pdfParse as any)(buffer)
-    return data.text
+    const pdf = await getDocumentProxy(new Uint8Array(buffer))
+    const { text } = await extractText(pdf, { mergePages: true })
+    return text
   } catch (error) {
     console.error('Failed to parse PDF:', error)
     return ''
