@@ -51,6 +51,13 @@ export async function POST(request: NextRequest) {
     const supabase = createSecretClient()
     const { data } = emailData
 
+    // Debug: Log what we received from Resend
+    console.log('Resend webhook data keys:', Object.keys(data))
+    console.log('Email subject:', data.subject)
+    console.log('Email text length:', data.text?.length || 0)
+    console.log('Email html length:', data.html?.length || 0)
+    console.log('Attachments count:', data.attachments?.length || 0)
+
     // Extract sender email (removing display name if present)
     const fromEmail = data.from.match(/<(.+)>/)?.[1] || data.from
 
