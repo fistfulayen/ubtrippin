@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSecretClient } from '@/lib/supabase/server'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
+
+// Force dynamic rendering - webhooks must never be cached/static
+export const dynamic = 'force-dynamic'
 import { getResendClient } from '@/lib/resend/client'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
 import { extractTextFromPdf, isValidPdfAttachment } from '@/lib/pdf/parse-attachment'
