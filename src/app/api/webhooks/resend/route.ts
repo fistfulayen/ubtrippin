@@ -227,18 +227,19 @@ export async function POST(request: NextRequest) {
             tripId = newTrip.id
 
             // Fetch and set cover image for the new trip
-            // Clean location for better Unsplash results
             const location = primaryLocation || item.end_location || item.start_location
+            console.log('Fetching cover image for location:', location)
             if (location) {
-              // Remove airport codes and clean up for search
+              // Clean location for better Unsplash results - remove airport codes
               const cleanLocation = location
-                .replace(/\([A-Z]{3}\)/g, '')
-                .replace(/^[A-Z]{3}\s*[-–]\s*/g, '')
-                .replace(/,?\s*[A-Z]{2,3}$/g, '') // Remove state/country codes at end
+                .replace(/\s*\([A-Z]{3}\)\s*/g, ' ') // Remove (SFO) style codes
+                .replace(/^[A-Z]{3}\s*[-–]\s*/, '') // Remove "SFO - " prefix
                 .trim()
 
+              console.log('Cleaned location:', cleanLocation)
               if (cleanLocation) {
                 const coverImageUrl = await getDestinationImageUrl(cleanLocation)
+                console.log('Cover image URL:', coverImageUrl)
                 if (coverImageUrl) {
                   await supabase
                     .from('trips')

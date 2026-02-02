@@ -13,6 +13,9 @@ interface UnsplashSearchResult {
  * Returns null if no image is found or on error.
  */
 export async function getDestinationImageUrl(location: string): Promise<string | null> {
+  console.log('getDestinationImageUrl called with:', location)
+  console.log('UNSPLASH_ACCESS_KEY configured:', !!UNSPLASH_ACCESS_KEY)
+
   if (!UNSPLASH_ACCESS_KEY) {
     console.warn('UNSPLASH_ACCESS_KEY not configured')
     return null

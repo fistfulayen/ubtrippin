@@ -24,6 +24,7 @@ const AIRLINE_DOMAINS: Record<string, string> = {
   'british airways': 'britishairways.com',
   'lufthansa': 'lufthansa.com',
   'air france': 'airfrance.com',
+  'airfrance': 'airfrance.com',
   'klm': 'klm.com',
   'ryanair': 'ryanair.com',
   'easyjet': 'easyjet.com',

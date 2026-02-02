@@ -35,6 +35,11 @@ export function FlightDetailsView({ details }: FlightDetailsViewProps) {
   const seatInfo = [cabin_class, seat].filter(Boolean).join(' · ')
   const logoUrl = airline ? getAirlineLogoUrl(airline) : null
 
+  // Debug logging
+  if (typeof window !== 'undefined') {
+    console.log('Flight details - airline:', airline, 'logoUrl:', logoUrl)
+  }
+
   return (
     <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-slate-50 to-gray-100 p-4">
       {/* Header row */}
