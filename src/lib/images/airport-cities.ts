@@ -153,9 +153,13 @@ export const AIRPORT_TO_CITY: Record<string, string> = {
   LOS: 'Lagos',
 }
 
+// Runtime cache for AI-resolved airport codes (persists for the lifetime of the process)
+const aiResolvedCodes: Record<string, string> = {}
+
 /**
  * Converts a location string to a city name suitable for image search.
  * Handles airport codes, "City (CODE)" format, and plain city names.
+ * Synchronous version - uses only static mapping.
  */
 export function locationToCity(location: string): string {
   if (!location) return ''
@@ -164,7 +168,7 @@ export function locationToCity(location: string): string {
 
   // Check if it's a pure airport code (3 uppercase letters)
   if (/^[A-Z]{3}$/.test(trimmed)) {
-    return AIRPORT_TO_CITY[trimmed] || trimmed
+    return AIRPORT_TO_CITY[trimmed] || aiResolvedCodes[trimmed] || trimmed
   }
 
   // Check for "City (CODE)" or "CODE - City" patterns
@@ -175,7 +179,7 @@ export function locationToCity(location: string): string {
     if (cityPart.length > 3 && !/^[A-Z]{3}$/.test(cityPart)) {
       return cityPart
     }
-    return AIRPORT_TO_CITY[codeInParens[2]] || cityPart
+    return AIRPORT_TO_CITY[codeInParens[2]] || aiResolvedCodes[codeInParens[2]] || cityPart
   }
 
   const codePrefix = trimmed.match(/^([A-Z]{3})\s*[-–]\s*(.+)$/)
@@ -184,15 +188,77 @@ export function locationToCity(location: string): string {
     if (cityPart.length > 3) {
       return cityPart
     }
-    return AIRPORT_TO_CITY[codePrefix[1]] || cityPart
+    return AIRPORT_TO_CITY[codePrefix[1]] || aiResolvedCodes[codePrefix[1]] || cityPart
   }
 
   // If it looks like an airport code at the start, try to map it
   const startsWithCode = trimmed.match(/^([A-Z]{3})\b/)
-  if (startsWithCode && AIRPORT_TO_CITY[startsWithCode[1]]) {
-    return AIRPORT_TO_CITY[startsWithCode[1]]
+  if (startsWithCode) {
+    const code = startsWithCode[1]
+    if (AIRPORT_TO_CITY[code]) return AIRPORT_TO_CITY[code]
+    if (aiResolvedCodes[code]) return aiResolvedCodes[code]
   }
 
   // Return as-is (already a city name)
   return trimmed
+}
+
+/**
+ * Async version that falls back to AI for unknown airport codes.
+ * Uses Vercel AI Gateway to resolve unknown codes.
+ */
+export async function locationToCityAsync(location: string): Promise<string> {
+  if (!location) return ''
+
+  const trimmed = location.trim()
+
+  // Check if it's a pure airport code (3 uppercase letters)
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    // Check static mapping first
+    if (AIRPORT_TO_CITY[trimmed]) {
+      return AIRPORT_TO_CITY[trimmed]
+    }
+    // Check runtime cache
+    if (aiResolvedCodes[trimmed]) {
+      return aiResolvedCodes[trimmed]
+    }
+    // Fall back to AI
+    const resolved = await resolveAirportCodeWithAI(trimmed)
+    if (resolved && resolved !== trimmed) {
+      aiResolvedCodes[trimmed] = resolved
+      console.log(`AI resolved airport code: ${trimmed} → ${resolved}`)
+      return resolved
+    }
+    return trimmed
+  }
+
+  // For other formats, use the sync version (already handles city names)
+  return locationToCity(location)
+}
+
+/**
+ * Uses AI to resolve an unknown airport code to a city name.
+ */
+async function resolveAirportCodeWithAI(code: string): Promise<string | null> {
+  try {
+    // Dynamic import to avoid loading AI dependencies unless needed
+    const { generateText, gateway } = await import('ai')
+
+    const { text } = await generateText({
+      model: gateway('anthropic/claude-sonnet-4'),
+      prompt: `What city is the airport with IATA code "${code}" located in? Reply with ONLY the city name, nothing else. If you don't know, reply with just the code "${code}".`,
+    })
+
+    const cityName = text.trim()
+    
+    // Validate the response - should be a reasonable city name
+    if (cityName && cityName.length > 1 && cityName.length < 50 && cityName !== code) {
+      return cityName
+    }
+    
+    return null
+  } catch (error) {
+    console.error(`Failed to resolve airport code ${code} with AI:`, error)
+    return null
+  }
 }

@@ -11,7 +11,7 @@ import {
   collectTravelerNames,
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
-import { locationToCity } from '@/lib/images/airport-cities'
+import { locationToCityAsync } from '@/lib/images/airport-cities'
 import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
@@ -207,9 +207,9 @@ export async function POST(request: NextRequest) {
             const primaryLocation = getPrimaryLocation(extractionResult.items)
             const allTravelers = collectTravelerNames(extractionResult.items)
 
-            // Convert airport codes to city names for better display
+            // Convert airport codes to city names for better display (with AI fallback)
             const rawLocation = primaryLocation || item.end_location || item.start_location
-            const cityLocation = rawLocation ? locationToCity(rawLocation) : null
+            const cityLocation = rawLocation ? await locationToCityAsync(rawLocation) : null
 
             const { data: newTrip, error: tripError } = await supabase
               .from('trips')
@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
         )
 
         const rawNewLocation = getPrimaryLocation(items) || trip.primary_location
-        const newLocation = rawNewLocation ? locationToCity(rawNewLocation) : null
+        const newLocation = rawNewLocation ? await locationToCityAsync(rawNewLocation) : null
         const newTravelers = collectTravelerNames(items)
 
         // Merge travelers with existing
