@@ -11,6 +11,7 @@ import {
   collectTravelerNames,
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
+import { locationToCity } from '@/lib/images/airport-cities'
 import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
@@ -206,6 +207,10 @@ export async function POST(request: NextRequest) {
             const primaryLocation = getPrimaryLocation(extractionResult.items)
             const allTravelers = collectTravelerNames(extractionResult.items)
 
+            // Convert airport codes to city names for better display
+            const rawLocation = primaryLocation || item.end_location || item.start_location
+            const cityLocation = rawLocation ? locationToCity(rawLocation) : null
+
             const { data: newTrip, error: tripError } = await supabase
               .from('trips')
               .insert({
@@ -213,7 +218,7 @@ export async function POST(request: NextRequest) {
                 title: assignment.tripTitle || 'Untitled Trip',
                 start_date: item.start_date,
                 end_date: item.end_date,
-                primary_location: primaryLocation || item.end_location || item.start_location,
+                primary_location: cityLocation,
                 travelers: allTravelers.length > 0 ? allTravelers : (item.traveler_names || []),
               })
               .select()
@@ -315,7 +320,8 @@ export async function POST(request: NextRequest) {
           { start_date: trip.start_date, end_date: trip.end_date }
         )
 
-        const newLocation = getPrimaryLocation(items) || trip.primary_location
+        const rawNewLocation = getPrimaryLocation(items) || trip.primary_location
+        const newLocation = rawNewLocation ? locationToCity(rawNewLocation) : null
         const newTravelers = collectTravelerNames(items)
 
         // Merge travelers with existing
