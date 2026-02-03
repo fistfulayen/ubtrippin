@@ -1,0 +1,53 @@
+# ubtrippin Docker Compose
+# Local development with security isolation
+
+services:
+  ubtrippin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # Runtime secrets (not baked into image)
+      - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SVIX_WEBHOOK_SECRET=${SVIX_WEBHOOK_SECRET}
+    # Security: Read-only filesystem
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Security: Drop all capabilities
+    cap_drop:
+      - ALL
+    # Security: No new privileges
+    security_opt:
+      - no-new-privileges:true
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    # Restart policy
+    restart: unless-stopped
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: Add network isolation
+networks:
+  default:
+    driver: bridge

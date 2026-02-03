@@ -1,0 +1,36 @@
+# Dependencies
+node_modules
+
+# Build output
+.next
+out
+
+# Environment files (never copy secrets into image)
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+README.md
+CLAUDE.md
+.claude
+*.log
