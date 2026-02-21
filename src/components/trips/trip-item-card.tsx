@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { formatTime, cn } from '@/lib/utils'
+import { formatTime, getLocalTimes, cn } from '@/lib/utils'
 import {
   Plane,
   Building,
@@ -149,13 +149,18 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
 
               {/* Time and location */}
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                {item.start_ts && (
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    {formatTime(item.start_ts)}
-                    {item.end_ts && ` - ${formatTime(item.end_ts)}`}
-                  </span>
-                )}
+                {(() => {
+                  const det = item.details_json as Record<string, unknown> | null
+                  if (!item.start_ts && !det?.departure_local_time && !det?.check_in_time) return null
+                  const [start, end] = getLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
+                  return (
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {start}
+                      {end && ` - ${end}`}
+                    </span>
+                  )
+                })()}
 
                 {item.start_location && (
                   <span className="flex items-center gap-1">

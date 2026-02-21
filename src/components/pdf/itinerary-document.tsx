@@ -144,20 +144,22 @@ function formatDate(dateStr: string): string {
 
 function formatTime(dateStr: string | null): string {
   if (!dateStr) return ''
-  // Extract local time directly from ISO string to preserve timezone
+  // If plain HH:MM, return as-is
+  if (/^\d{1,2}:\d{2}$/.test(dateStr)) return dateStr
+  // Extract local time from ISO string
   const timeMatch = dateStr.match(/T(\d{2}):(\d{2})/)
   if (timeMatch) {
-    const hours = parseInt(timeMatch[1], 10)
-    const minutes = timeMatch[2]
-    return `${hours}:${minutes}`
+    return `${parseInt(timeMatch[1], 10)}:${timeMatch[2]}`
   }
-  // Fallback
   const date = new Date(dateStr)
-  return date.toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function getItemLocalTimes(item: { start_ts: string | null; end_ts: string | null; details: Record<string, unknown> | null }): [string, string] {
+  const details = item.details || {}
+  const startTime = (details.departure_local_time as string) || (details.check_in_time as string) || formatTime(item.start_ts)
+  const endTime = (details.arrival_local_time as string) || (details.check_out_time as string) || formatTime(item.end_ts)
+  return [startTime || '', endTime || '']
 }
 
 function formatDateRange(start: string | null, end: string | null): string {
@@ -278,12 +280,17 @@ export function ItineraryDocument({ trip, items }: ItineraryDocumentProps) {
                   </Text>
 
                   {/* Time */}
-                  {item.start_ts && (
-                    <Text style={styles.itemDetail}>
-                      {formatTime(item.start_ts)}
-                      {item.end_ts && ` - ${formatTime(item.end_ts)}`}
-                    </Text>
-                  )}
+                  {(() => {
+                    const det = item.details_json as Record<string, unknown> | null
+                    if (!item.start_ts && !det?.departure_local_time) return null
+                    const [start, end] = getItemLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
+                    return (
+                      <Text style={styles.itemDetail}>
+                        {start}
+                        {end && ` - ${end}`}
+                      </Text>
+                    )
+                  })()}
 
                   {/* Location */}
                   {(item.start_location || item.end_location) && (

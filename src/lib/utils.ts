@@ -17,23 +17,28 @@ export function formatDate(date: string | Date | null | undefined): string {
 }
 
 /**
- * Format a timestamp for display, preserving the LOCAL time from the original ISO string.
+ * Format a timestamp for display in local time.
  * 
  * Travel times should always display in local time (departure in departure city's time,
- * arrival in arrival city's time). ISO 8601 strings with timezone offsets like
- * "2026-03-15T22:30:00+01:00" encode this correctly — but JS Date converts everything
- * to UTC internally, losing the local time. So we parse the local time directly from
- * the string instead.
+ * arrival in arrival city's time). However, Supabase `timestamptz` columns convert 
+ * everything to UTC on storage, discarding the original timezone offset.
+ * 
+ * Preferred approach: pass a local time string (HH:MM) from the item's details 
+ * (e.g., details.departure_local_time). Falls back to parsing the ISO string.
  * 
  * Uses 24-hour format for consistency with international travel.
  */
 export function formatTime(date: string | Date | null | undefined): string {
   if (!date) return ''
   
-  // If it's a string, try to extract local time directly from ISO format
-  // This preserves the local time regardless of server timezone
   if (typeof date === 'string') {
-    // Match ISO 8601: ...THH:MM:SS or ...THH:MM
+    // If it's already a plain HH:MM local time, return as-is
+    if (/^\d{1,2}:\d{2}$/.test(date)) {
+      return date
+    }
+    
+    // Try to extract local time from ISO format with offset
+    // e.g., "2026-03-15T22:30:00+01:00" → "22:30"
     const timeMatch = date.match(/T(\d{2}):(\d{2})/)
     if (timeMatch) {
       const hours = parseInt(timeMatch[1], 10)
@@ -49,6 +54,26 @@ export function formatTime(date: string | Date | null | undefined): string {
     minute: '2-digit',
     hour12: false,
   })
+}
+
+/**
+ * Get the best display time for a trip item, preferring local times from details.
+ * Returns [startTime, endTime] as formatted strings.
+ */
+export function getLocalTimes(
+  item: { start_ts: string | null; end_ts: string | null; details: Record<string, unknown> | null }
+): [string, string] {
+  const details = item.details || {}
+  
+  const startTime = (details.departure_local_time as string) 
+    || (details.check_in_time as string)
+    || formatTime(item.start_ts)
+  
+  const endTime = (details.arrival_local_time as string)
+    || (details.check_out_time as string) 
+    || formatTime(item.end_ts)
+  
+  return [startTime || '', endTime || '']
 }
 
 export function formatDateTime(date: string | Date | null | undefined): string {
