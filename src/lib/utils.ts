@@ -16,13 +16,38 @@ export function formatDate(date: string | Date | null | undefined): string {
   })
 }
 
+/**
+ * Format a timestamp for display, preserving the LOCAL time from the original ISO string.
+ * 
+ * Travel times should always display in local time (departure in departure city's time,
+ * arrival in arrival city's time). ISO 8601 strings with timezone offsets like
+ * "2026-03-15T22:30:00+01:00" encode this correctly — but JS Date converts everything
+ * to UTC internally, losing the local time. So we parse the local time directly from
+ * the string instead.
+ * 
+ * Uses 24-hour format for consistency with international travel.
+ */
 export function formatTime(date: string | Date | null | undefined): string {
   if (!date) return ''
+  
+  // If it's a string, try to extract local time directly from ISO format
+  // This preserves the local time regardless of server timezone
+  if (typeof date === 'string') {
+    // Match ISO 8601: ...THH:MM:SS or ...THH:MM
+    const timeMatch = date.match(/T(\d{2}):(\d{2})/)
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1], 10)
+      const minutes = timeMatch[2]
+      return `${hours}:${minutes}`
+    }
+  }
+  
+  // Fallback for Date objects or non-ISO strings
   const d = new Date(date)
   return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true,
+    hour12: false,
   })
 }
 

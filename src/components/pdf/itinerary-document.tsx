@@ -144,11 +144,19 @@ function formatDate(dateStr: string): string {
 
 function formatTime(dateStr: string | null): string {
   if (!dateStr) return ''
+  // Extract local time directly from ISO string to preserve timezone
+  const timeMatch = dateStr.match(/T(\d{2}):(\d{2})/)
+  if (timeMatch) {
+    const hours = parseInt(timeMatch[1], 10)
+    const minutes = timeMatch[2]
+    return `${hours}:${minutes}`
+  }
+  // Fallback
   const date = new Date(dateStr)
   return date.toLocaleTimeString('en-US', {
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
-    hour12: true,
+    hour12: false,
   })
 }
 
