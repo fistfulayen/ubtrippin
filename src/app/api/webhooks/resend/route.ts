@@ -53,6 +53,38 @@ export async function POST(request: NextRequest) {
     const supabase = createSecretClient()
     const { data: webhookData } = emailData
 
+    // Route non-trips emails: forward hello@, privacy@, etc. to admin inbox
+    const FORWARD_ADDRESSES: Record<string, string> = {
+      'hello@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
+      'privacy@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
+      'support@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
+      'security@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
+    }
+
+    // Check if this email should be forwarded instead of processed
+    const toAddress = webhookData.to?.[0]?.toLowerCase() || ''
+    if (FORWARD_ADDRESSES[toAddress]) {
+      try {
+        console.log(`Forwarding email to ${toAddress} → ${FORWARD_ADDRESSES[toAddress]}`)
+        const resendForward = getResendClient()
+        
+        // Fetch the full email to forward it
+        const { data: fwdEmail } = await resendForward.emails.receiving.get(webhookData.email_id)
+        if (fwdEmail) {
+          await resendForward.emails.send({
+            from: `UBT Forwarded <trips@ubtrippin.xyz>`,
+            to: FORWARD_ADDRESSES[toAddress],
+            subject: `[${toAddress.split('@')[0]}@] ${fwdEmail.subject || '(no subject)'}`,
+            text: `Forwarded from: ${fwdEmail.from}\nTo: ${toAddress}\n\n${fwdEmail.text || fwdEmail.html || '(no content)'}`,
+          })
+        }
+        return NextResponse.json({ message: 'Email forwarded', to: toAddress })
+      } catch (fwdError) {
+        console.error('Failed to forward email:', fwdError)
+        // Fall through to normal processing as backup
+      }
+    }
+
     // Webhook only contains metadata - fetch full email content from Resend API
     console.log('Fetching full email content for:', webhookData.email_id)
     const resend = getResendClient()
