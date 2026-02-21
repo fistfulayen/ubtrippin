@@ -1,0 +1,130 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: npm audit (high + critical)
+        run: npm audit --audit-level=high
+        continue-on-error: false
+
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  typecheck:
+    name: Type Safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: TypeScript strict check
+        run: npx tsc --noEmit
+
+  security-lint:
+    name: Security Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: Check for dangerous patterns
+        run: |
+          echo "=== Checking for dangerous patterns ==="
+          
+          # Check for dangerouslySetInnerHTML without sanitization
+          DANGEROUS_HTML=$(grep -rn "dangerouslySetInnerHTML" src/ --include="*.tsx" --include="*.ts" || true)
+          if [ -n "$DANGEROUS_HTML" ]; then
+            echo "⚠️  dangerouslySetInnerHTML found (verify sanitization):"
+            echo "$DANGEROUS_HTML"
+          fi
+          
+          # Check for eval or Function constructor
+          EVAL_USAGE=$(grep -rn "eval(" src/ --include="*.ts" --include="*.tsx" || true)
+          FUNC_USAGE=$(grep -rn "new Function(" src/ --include="*.ts" --include="*.tsx" || true)
+          if [ -n "$EVAL_USAGE" ] || [ -n "$FUNC_USAGE" ]; then
+            echo "🔴 eval() or Function() constructor found — this is a security risk:"
+            echo "$EVAL_USAGE"
+            echo "$FUNC_USAGE"
+            exit 1
+          fi
+          
+          # Check for hardcoded secrets (basic patterns)
+          SECRETS=$(grep -rn "sk-[a-zA-Z0-9]\{20,\}\|password\s*=\s*['\"][^'\"]\+['\"]\|api_key\s*=\s*['\"][^'\"]\+['\"]" src/ --include="*.ts" --include="*.tsx" || true)
+          if [ -n "$SECRETS" ]; then
+            echo "🔴 Potential hardcoded secrets found:"
+            echo "$SECRETS"
+            exit 1
+          fi
+          
+          # Check service role key not exposed to client
+          SERVICE_ROLE=$(grep -rn "SUPABASE_SERVICE_ROLE_KEY" src/ --include="*.ts" --include="*.tsx" | grep -v "process.env" | grep -v "server" || true)
+          if [ -n "$SERVICE_ROLE" ]; then
+            echo "🔴 Service role key may be exposed to client:"
+            echo "$SERVICE_ROLE"
+            exit 1
+          fi
+          
+          echo "✅ No critical security patterns found"
+
+  env-check:
+    name: Environment Safety
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify no secrets in committed files
+        run: |
+          # Check .env files aren't committed
+          if [ -f ".env" ] || [ -f ".env.local" ] || [ -f ".env.production" ]; then
+            echo "🔴 Environment file committed to repo!"
+            exit 1
+          fi
+          
+          # Verify .gitignore includes env files
+          if ! grep -q ".env.local" .gitignore 2>/dev/null; then
+            echo "🔴 .env.local not in .gitignore!"
+            exit 1
+          fi
+          
+          # Verify .env.example doesn't contain real values
+          if [ -f ".env.example" ]; then
+            REAL_VALUES=$(grep -E "^[A-Z_]+=.{20,}" .env.example | grep -v "your_" | grep -v "xxx" | grep -v "placeholder" || true)
+            if [ -n "$REAL_VALUES" ]; then
+              echo "⚠️  .env.example may contain real values:"
+              echo "$REAL_VALUES"
+            fi
+          fi
+          
+          echo "✅ Environment safety checks passed"
