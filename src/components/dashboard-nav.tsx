@@ -38,10 +38,10 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           {/* Logo */}
           <Link href="/trips" className="flex items-center gap-2">
             <Image
-              src="/ubtrippin_logo.png"
+              src="/ubtrippin_logo_simple.png"
               alt="UBTRIPPIN"
               width={160}
-              height={85}
+              height={56}
               className="h-10 w-auto blend-multiply"
               priority
             />

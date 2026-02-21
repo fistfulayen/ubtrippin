@@ -51,10 +51,29 @@ def generate_icon(size, output_name):
     resized.save(output_path, 'PNG', optimize=True)
     print(f"Generated: {output_path} ({size}x{size})")
 
+def generate_simple_logo():
+    """Crop the logo to just the character + speech bubble, no tagline text."""
+    logo = Image.open(LOGO_PATH).convert('RGBA')
+    w, h = logo.size
+
+    # Keep the top ~65% (character + speech bubble), trim tagline at bottom
+    crop_bottom = int(h * 0.65)
+    cropped = logo.crop((0, 0, w, crop_bottom))
+
+    # Fill transparent areas with cream so blend-multiply works on any background
+    output = Image.new('RGBA', cropped.size, (0, 0, 0, 0))
+    output.paste(cropped, (0, 0), cropped)
+
+    output_path = os.path.join(PROJECT_ROOT, 'public', 'ubtrippin_logo_simple.png')
+    output.save(output_path, 'PNG', optimize=True)
+    print(f"Generated: {output_path} ({output.size[0]}x{output.size[1]})")
+
+
 os.makedirs(ICONS_DIR, exist_ok=True)
 
 generate_icon(192, 'icon-192x192.png')
 generate_icon(512, 'icon-512x512.png')
 generate_icon(180, 'apple-touch-icon.png')
+generate_simple_logo()
 
-print("Done! All PWA icons generated.")
+print("Done! All icons generated.")

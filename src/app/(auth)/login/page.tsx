@@ -27,10 +27,10 @@ function LoginContent() {
           {/* Logo/Brand */}
           <div className="text-center space-y-2">
             <Image
-              src="/ubtrippin_logo.png"
+              src="/ubtrippin_logo_simple.png"
               alt="UBTRIPPIN"
               width={400}
-              height={213}
+              height={139}
               className="mx-auto w-full max-w-xs blend-multiply"
               priority
             />
