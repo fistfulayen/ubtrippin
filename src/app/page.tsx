@@ -157,6 +157,13 @@ export default async function HomePage() {
       {/* Footer */}
       <footer className="border-t-2 border-[#d4c9b0] py-12 mt-20">
         <div className="max-w-7xl mx-auto px-6 text-center text-sm tracking-wide uppercase text-[#544836]">
+          <div className="flex items-center justify-center gap-6 mb-4">
+            <a href="/privacy" className="hover:text-[#2a2419] transition-colors">Privacy Policy</a>
+            <span className="text-[#d4c9b0]">·</span>
+            <a href="/terms" className="hover:text-[#2a2419] transition-colors">Terms of Service</a>
+            <span className="text-[#d4c9b0]">·</span>
+            <a href="https://github.com/fistfulayen/ubtrippin" className="hover:text-[#2a2419] transition-colors">GitHub</a>
+          </div>
           <p>&copy; {new Date().getFullYear()} UBTRIPPIN. All rights reserved.</p>
         </div>
       </footer>
