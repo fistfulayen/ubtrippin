@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -36,9 +37,14 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link href="/trips" className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight text-gray-900">
-              UBTRIPPIN
-            </span>
+            <Image
+              src="/ubtrippin_logo.png"
+              alt="UBTRIPPIN"
+              width={160}
+              height={85}
+              className="h-10 w-auto blend-multiply"
+              priority
+            />
           </Link>
 
           {/* Desktop nav */}

@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import Image from 'next/image'
 
 function LoginContent() {
   const searchParams = useSearchParams()
@@ -25,9 +26,14 @@ function LoginContent() {
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
           {/* Logo/Brand */}
           <div className="text-center space-y-2">
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-              UBTRIPPIN
-            </h1>
+            <Image
+              src="/ubtrippin_logo.png"
+              alt="UBTRIPPIN"
+              width={400}
+              height={213}
+              className="mx-auto w-full max-w-xs blend-multiply"
+              priority
+            />
             <p className="text-gray-600">
               Turn your booking emails into beautiful itineraries
             </p>
