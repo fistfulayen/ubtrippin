@@ -1,0 +1,261 @@
+#!/usr/bin/env bash
+#
+# ubt — UB Trippin CLI
+# Talk directly to Supabase REST API
+#
+set -euo pipefail
+
+# Load config
+CONFIG_FILE="${UBT_CONFIG:-$HOME/.ubt/config}"
+if [ -f "$CONFIG_FILE" ]; then
+  source "$CONFIG_FILE"
+fi
+
+# Can also be set via env vars
+SUPABASE_URL="${UBT_SUPABASE_URL:-${SUPABASE_URL:-}}"
+SUPABASE_KEY="${UBT_SUPABASE_KEY:-${SUPABASE_KEY:-}}"
+
+if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+  # Try loading from .env.local in the repo
+  REPO_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+  if [ -f "$REPO_DIR/.env.local" ]; then
+    SUPABASE_URL=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
+    SUPABASE_KEY=$(grep '^SUPABASE_SECRET_KEY=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
+  fi
+fi
+
+if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+  echo "Error: Supabase credentials not configured." >&2
+  echo "Set UBT_SUPABASE_URL and UBT_SUPABASE_KEY, or create ~/.ubt/config" >&2
+  exit 1
+fi
+
+API="${SUPABASE_URL}/rest/v1"
+
+# Helpers
+_curl() {
+  curl -s "$@" \
+    -H "apikey: ${SUPABASE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_KEY}" \
+    -H "Content-Type: application/json"
+}
+
+_json() {
+  if command -v python3 &>/dev/null; then
+    python3 -m json.tool 2>/dev/null || cat
+  else
+    cat
+  fi
+}
+
+_format_trips() {
+  python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if not data:
+    print('No trips found.')
+    sys.exit(0)
+for t in data:
+    dates = ''
+    if t.get('start_date'):
+        dates = t['start_date']
+        if t.get('end_date') and t['end_date'] != t['start_date']:
+            dates += ' → ' + t['end_date']
+    loc = t.get('primary_location') or ''
+    print(f\"  {t['id'][:8]}  {t.get('title','(unnamed)'):<30} {dates:<25} {loc}\")
+"
+}
+
+_format_items() {
+  python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if not data:
+    print('No items found.')
+    sys.exit(0)
+for item in data:
+    det = item.get('details_json') or {}
+    kind = item.get('kind','?').upper()
+    provider = item.get('provider','')
+    summary = item.get('summary','')
+    dep_time = det.get('departure_local_time','')
+    arr_time = det.get('arrival_local_time','')
+    start_loc = item.get('start_location','')
+    end_loc = item.get('end_location','')
+    date = item.get('start_date','')
+    
+    time_str = ''
+    if dep_time:
+        time_str = dep_time
+        if arr_time:
+            time_str += ' → ' + arr_time
+    
+    loc_str = start_loc
+    if end_loc and end_loc != start_loc:
+        loc_str += ' → ' + end_loc
+    
+    print(f\"  {item['id'][:8]}  {kind:<10} {provider:<20} {date}  {time_str:<15} {loc_str}\")
+    if summary:
+        print(f\"           {summary}\")
+"
+}
+
+# Commands
+cmd_trips_list() {
+  local user_id="${1:-}"
+  local query="select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=20"
+  if [ -n "$user_id" ]; then
+    query="${query}&user_id=eq.${user_id}"
+  fi
+  
+  local result=$(_curl "${API}/trips?${query}")
+  
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+  else
+    echo "Trips:"
+    echo "$result" | _format_trips
+  fi
+}
+
+cmd_trips_show() {
+  local trip_id="$1"
+  
+  # Get trip
+  local trip=$(_curl "${API}/trips?id=eq.${trip_id}&select=*")
+  
+  # Also try partial match
+  if [ "$(echo "$trip" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)))' 2>/dev/null)" = "0" ]; then
+    trip=$(_curl "${API}/trips?id=like.${trip_id}*&select=*")
+  fi
+  
+  # Get items
+  local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id}&select=*&order=start_date,start_ts")
+  
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    python3 -c "
+import json, sys
+trip = json.loads('''${trip}''')
+items = json.loads('''${items}''')
+print(json.dumps({'trip': trip[0] if trip else None, 'items': items}, indent=2))
+"
+  else
+    echo "$trip" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if not data:
+    print('Trip not found.')
+    sys.exit(1)
+t = data[0]
+print(f\"Trip: {t.get('title','(unnamed)')}\")
+print(f\"  ID: {t['id']}\")
+dates = t.get('start_date','')
+if t.get('end_date'): dates += ' → ' + t['end_date']
+print(f\"  Dates: {dates}\")
+if t.get('primary_location'): print(f\"  Location: {t['primary_location']}\")
+if t.get('travelers'): print(f\"  Travelers: {', '.join(t['travelers'])}\")
+print()
+"
+    echo "Items:"
+    echo "$items" | _format_items
+  fi
+}
+
+cmd_items_list() {
+  local trip_id="$1"
+  local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id}&select=*&order=start_date,start_ts")
+  
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$items" | _json
+  else
+    echo "$items" | _format_items
+  fi
+}
+
+cmd_tables() {
+  # List all tables via RPC or information_schema
+  _curl "${API}/rpc/get_tables" -X POST -d '{}' 2>/dev/null | _json || \
+  echo "Use 'supabase db' commands for schema inspection."
+}
+
+cmd_sql() {
+  local query="$1"
+  _curl "${SUPABASE_URL}/rest/v1/rpc/exec_sql" -X POST -d "{\"query\": \"$query\"}" | _json
+}
+
+cmd_health() {
+  curl -s "${SUPABASE_URL}/rest/v1/" \
+    -H "apikey: ${SUPABASE_KEY}" \
+    -o /dev/null -w "Supabase: HTTP %{http_code} (%{time_total}s)\n"
+  
+  curl -s "https://www.ubtrippin.xyz/api/health" \
+    -o /dev/null -w "App: HTTP %{http_code} (%{time_total}s)\n"
+}
+
+cmd_users() {
+  _curl "${API}/profiles?select=id,email,full_name,created_at&order=created_at" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if isinstance(data, dict) and 'message' in data:
+    print(f'Error: {data[\"message\"]}')
+    sys.exit(1)
+for u in data:
+    email = u.get('email','?')
+    name = u.get('full_name','')
+    created = (u.get('created_at') or '?')[:10]
+    print(f\"  {u['id'][:8]}  {email:<35} {name:<20} joined: {created}\")
+" 2>/dev/null || echo "Could not list users"
+}
+
+cmd_rls_check() {
+  echo "Checking RLS policies via Supabase CLI..."
+  cd /home/iancr/ubtrippin
+  supabase inspect db policies --linked 2>/dev/null || echo "Use 'supabase inspect db policies --linked' manually"
+}
+
+# Usage
+usage() {
+  cat <<EOF
+ubt — UB Trippin CLI
+
+Usage: ubt <command> [args]
+
+Commands:
+  trips list [user_id]     List all trips (optionally filter by user)
+  trips show <trip_id>     Show trip details + items
+  items list <trip_id>     List items in a trip
+  users                    List all users
+  health                   Check service health
+  rls-check                Verify RLS policies
+
+Options:
+  FORMAT=json ubt ...      Output raw JSON instead of formatted text
+
+Examples:
+  ubt trips list
+  ubt trips show 58bd2048-607c-4afc-a915-2edb6a9f6c54
+  FORMAT=json ubt items list <trip_id>
+EOF
+}
+
+# Main router
+case "${1:-}" in
+  trips)
+    case "${2:-}" in
+      list) cmd_trips_list "${3:-}" ;;
+      show) cmd_trips_show "${3:?Usage: ubt trips show <trip_id>}" ;;
+      *) usage ;;
+    esac
+    ;;
+  items)
+    case "${2:-}" in
+      list) cmd_items_list "${3:?Usage: ubt items list <trip_id>}" ;;
+      *) usage ;;
+    esac
+    ;;
+  users) cmd_users ;;
+  health) cmd_health ;;
+  rls-check) cmd_rls_check ;;
+  -h|--help|help|"") usage ;;
+  *) echo "Unknown command: $1"; usage; exit 1 ;;
+esac
