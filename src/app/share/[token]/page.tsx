@@ -141,7 +141,7 @@ export default async function SharePage({ params }: SharePageProps) {
         <header className="border-b border-amber-200 bg-white/80 backdrop-blur-sm">
           <div className="mx-auto max-w-4xl px-4 py-4">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/logo.png" alt="UB Trippin" width={32} height={32} className="rounded-lg" />
+              <Image src="/ubtrippin_logo.png" alt="UB Trippin" width={32} height={32} className="rounded-lg" />
               <span className="text-lg font-bold text-amber-700">UB Trippin</span>
             </Link>
           </div>
@@ -187,7 +187,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <header className="sticky top-0 z-20 border-b border-amber-200 bg-white/90 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="UB Trippin" width={28} height={28} className="rounded-lg" />
+            <Image src="/ubtrippin_logo.png" alt="UB Trippin" width={28} height={28} className="rounded-lg" />
             <span className="text-base font-bold text-amber-700">UB Trippin</span>
           </Link>
           <Link
@@ -331,7 +331,7 @@ export default async function SharePage({ params }: SharePageProps) {
       <footer className="border-t border-amber-200 bg-white">
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 text-center">
           <Image
-            src="/logo.png"
+            src="/ubtrippin_logo.png"
             alt="UB Trippin"
             width={40}
             height={40}
