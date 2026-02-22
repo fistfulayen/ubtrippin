@@ -116,6 +116,10 @@ export function TripHeader({ trip }: TripHeaderProps) {
     setTimeout(() => setCopied(false), 2000)
   }, [shareUrl])
 
+  const handleDownloadCalendar = useCallback(() => {
+    window.location.href = `/api/trips/${trip.id}/calendar`
+  }, [trip.id])
+
   return (
     <div className="relative overflow-hidden rounded-2xl">
       {/* Background image or gradient */}
@@ -137,6 +141,19 @@ export function TripHeader({ trip }: TripHeaderProps) {
 
       {/* Buttons: share, cover, edit */}
       <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+        {/* Calendar download button */}
+        <button
+          onClick={handleDownloadCalendar}
+          className={`rounded-full p-2 transition-opacity opacity-60 hover:opacity-100 ${
+            trip.cover_image_url
+              ? 'bg-black/40 text-white hover:bg-black/60'
+              : 'bg-white/60 text-gray-700 hover:bg-white/80'
+          }`}
+          title="Add to Calendar"
+        >
+          <Calendar className="h-4 w-4" />
+        </button>
+
         {/* Share button */}
         <button
           onClick={handleOpenShareDialog}
