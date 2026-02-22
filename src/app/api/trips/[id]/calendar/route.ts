@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { generateTripICal } from '@/lib/calendar/ical'
+import { isValidUUID } from '@/lib/validation'
 
 function sanitizeFileName(title: string): string {
   const base = title
@@ -17,6 +18,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params
+
+  // SECURITY: Validate route param is a well-formed UUID
+  if (!isValidUUID(tripId)) {
+    return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
+  }
+
   const supabase = await createClient()
 
   const {

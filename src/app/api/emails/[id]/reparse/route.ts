@@ -3,12 +3,18 @@ import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/server'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
 import { assignToTrip, updateTripDates, collectTravelerNames } from '@/lib/trips/assignment'
+import { isValidUUID } from '@/lib/validation'
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  // SECURITY: Validate id is a well-formed UUID
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: 'Invalid email ID' }, { status: 400 })
+  }
 
   // Verify user is authenticated
   const supabase = await createClient()
@@ -65,10 +71,11 @@ export async function POST(
       })
     }
 
-    // Get existing trips
+    // SECURITY: Explicitly filter by user_id for defense-in-depth (RLS also enforces this)
     const { data: existingTrips } = await supabase
       .from('trips')
       .select('id, title, start_date, end_date, primary_location')
+      .eq('user_id', user.id)
 
     // Create items
     let itemsCreated = 0

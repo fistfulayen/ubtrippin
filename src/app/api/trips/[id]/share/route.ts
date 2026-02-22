@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { nanoid } from 'nanoid'
+import { isValidUUID } from '@/lib/validation'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 
@@ -9,6 +10,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params
+
+  // SECURITY: Validate route param is a well-formed UUID
+  if (!isValidUUID(tripId)) {
+    return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -42,6 +48,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params
+
+  // SECURITY: Validate route param is a well-formed UUID
+  if (!isValidUUID(tripId)) {
+    return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -81,6 +92,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: tripId } = await params
+
+  // SECURITY: Validate route param is a well-formed UUID
+  if (!isValidUUID(tripId)) {
+    return NextResponse.json({ error: 'Invalid trip ID' }, { status: 400 })
+  }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

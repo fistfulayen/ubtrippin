@@ -452,10 +452,11 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', sourceEmail.id)
 
+      // SECURITY: Do not echo raw error details back to webhook sender — internals stay server-side
+      console.error('Processing error detail (not returned to caller):', error instanceof Error ? error.message : error)
       return NextResponse.json({
         message: 'Processing failed',
         email_id: sourceEmail.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
       })
     }
   } catch (error) {

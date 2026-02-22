@@ -126,10 +126,24 @@ export default async function SharePage({ params }: SharePageProps) {
   const { token } = await params
   const supabase = createSecretClient()
 
-  // Look up trip by share_token where sharing is enabled
+  // SECURITY: Validate token format before querying — nanoid(21) produces URL-safe chars only
+  if (!/^[A-Za-z0-9_-]{10,64}$/.test(token)) {
+    return (
+      <div className="min-h-screen bg-amber-50 flex items-center justify-center p-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900">Trip not found</h1>
+          <p className="mt-2 text-gray-500">This trip either doesn&apos;t exist or sharing has been disabled.</p>
+        </div>
+      </div>
+    )
+  }
+
+  // SECURITY: Select only fields needed for display — exclude sensitive fields (confirmation_code, etc.)
+  // Note: service-role client is required here since visitors are unauthenticated.
+  // RLS is intentionally bypassed; share_enabled check acts as the gate.
   const { data: trip } = await supabase
     .from('trips')
-    .select('*')
+    .select('id, title, start_date, end_date, primary_location, travelers, notes, cover_image_url, share_enabled')
     .eq('share_token', token)
     .eq('share_enabled', true)
     .single()
@@ -168,10 +182,11 @@ export default async function SharePage({ params }: SharePageProps) {
     )
   }
 
-  // Fetch trip items
+  // SECURITY: Fetch only fields needed for display — explicitly exclude confirmation_code,
+  // details_json, source_email_id, confidence, needs_review to prevent data leakage
   const { data: items } = await supabase
     .from('trip_items')
-    .select('*')
+    .select('id, kind, provider, traveler_names, start_date, end_date, start_ts, end_ts, start_location, end_location, summary, status')
     .eq('trip_id', trip.id)
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
@@ -307,7 +322,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <div className="divide-y divide-amber-100">
                   {items.map((item) => (
                     <div key={item.id} className="px-5">
-                      <TripItemRow item={item} />
+                      <TripItemRow item={item as any} />
                     </div>
                   ))}
                 </div>

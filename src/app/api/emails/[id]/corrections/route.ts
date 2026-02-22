@@ -3,6 +3,7 @@ import { createClient, createSecretClient } from '@/lib/supabase/server'
 import { createEmailSnippet } from '@/lib/ai/example-selection'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 import type { Json } from '@/types/database'
+import { isValidUUID } from '@/lib/validation'
 
 interface CorrectionRequest {
   corrected_items: ExtractedItem[]
@@ -14,6 +15,11 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  // SECURITY: Validate that id is a well-formed UUID before using it in queries
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: 'Invalid email ID' }, { status: 400 })
+  }
 
   // Verify user is authenticated
   const supabase = await createClient()
@@ -48,6 +54,15 @@ export async function POST(
 
   if (!Array.isArray(corrected_items)) {
     return NextResponse.json({ error: 'corrected_items must be an array' }, { status: 400 })
+  }
+
+  // SECURITY: Cap the number of items that can be submitted to prevent large payload abuse
+  const MAX_ITEMS = 50
+  if (corrected_items.length > MAX_ITEMS) {
+    return NextResponse.json(
+      { error: `Too many items (max ${MAX_ITEMS})` },
+      { status: 400 }
+    )
   }
 
   const secretClient = createSecretClient()
