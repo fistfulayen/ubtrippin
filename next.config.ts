@@ -43,6 +43,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'pics.avs.io' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'cqijgtijuselspyzpphf.supabase.co' },
     ],
   },
   // SECURITY: Apply security headers to all routes
