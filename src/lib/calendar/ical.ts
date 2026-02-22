@@ -65,56 +65,41 @@ function normalizeTime(value: string | null | undefined): string | null {
 }
 
 /**
- * Convert a local time + date + IANA timezone to a UTC iCal datetime string (with Z suffix).
- * E.g., "08:20" on "2026-02-25" in "Europe/Copenhagen" → "20260225T072000Z"
+ * Convert a UTC ISO timestamp to local date+time in a given IANA timezone.
  */
-function localToUtc(dateStr: string, localTime: string, tzid: string): string | null {
+function utcToLocal(isoUtc: string, tzid: string): { date: string; time: string } | null {
   try {
-    const [h, m] = localTime.split(':').map(Number)
-    // Create a date string that JS will parse in the given timezone
-    // Use Intl to find the UTC offset for this timezone on this date
-    const testDate = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`)
-    
-    // Get the offset by comparing local representation to UTC
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const d = new Date(isoUtc)
+    if (isNaN(d.getTime())) return null
+    const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: tzid,
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false,
-    })
-    
-    // Binary search for the UTC time that produces the desired local time
-    // Start with a rough estimate based on common offsets
-    const localMs = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00Z`).getTime()
-    
-    // Try offsets from -12 to +14 hours
-    for (let offsetHours = -12; offsetHours <= 14; offsetHours++) {
-      const candidateMs = localMs - offsetHours * 3600000
-      const candidate = new Date(candidateMs)
-      const parts = formatter.formatToParts(candidate)
-      const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
-      const candidateH = parseInt(get('hour'))
-      const candidateM = parseInt(get('minute'))
-      if (candidateH === h && candidateM === m) {
-        return toUtcDateTime(candidate)
-      }
+    }).formatToParts(d)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+    return {
+      date: `${get('year')}${get('month')}${get('day')}`,
+      time: `${get('hour')}${get('minute')}${get('second')}`,
     }
-    return null
   } catch {
     return null
   }
 }
 
 /**
- * Build a DTSTART or DTEND iCal property line — ALWAYS in UTC (Z suffix).
+ * Build a DTSTART or DTEND iCal property line.
  *
- * Strategy: emit everything as UTC. Every calendar app handles UTC correctly.
- * No VTIMEZONE blocks needed.
+ * Strategy: use DTSTART;TZID=<iana_tz>:<local_datetime> with NO custom VTIMEZONE blocks.
+ * Google Calendar, Apple Calendar, and Outlook all have built-in IANA timezone databases
+ * and handle bare TZID references correctly. Custom VTIMEZONE blocks were causing
+ * misinterpretation on Google Calendar Android.
  *
  * Priority:
- * 1. If we have a UTC timestamp (start_ts/end_ts), use it directly
- * 2. If we have local time + airport code, convert local→UTC
- * 3. Fall back to null (caller handles date-only fallback)
+ * 1. If we have explicit local time + known airport → TZID with local time
+ * 2. If we have UTC timestamp + known airport → convert to local, emit with TZID
+ * 3. If we have UTC timestamp, no airport → floating time (no Z, no TZID)
+ * 4. Fall back to null
  */
 function buildDateTimeProp(
   propName: 'DTSTART' | 'DTEND',
@@ -123,27 +108,33 @@ function buildDateTimeProp(
   utcIso: string | null,
   airportCode: string | null | undefined,
 ): string | null {
-  // Case 1: We have explicit local time + airport → convert to UTC
-  // This is the most trustworthy source (extracted from the ticket)
+  const tzid = airportCode ? getAirportTimezone(airportCode) : null
+
+  // Case 1: Explicit local time from ticket extraction + known timezone
   const normalized = normalizeTime(localTime)
-  if (dateStr && normalized && airportCode) {
-    const tzid = getAirportTimezone(airportCode)
-    if (tzid) {
-      const hhmm = `${normalized.slice(0,2)}:${normalized.slice(2,4)}`
-      const utc = localToUtc(dateStr, hhmm, tzid)
-      if (utc) return `${propName}:${utc}`
+  if (dateStr && normalized && tzid) {
+    return `${propName};TZID=${tzid}:${dateStr.replace(/-/g, '')}T${normalized}`
+  }
+
+  // Case 2: UTC timestamp + known airport → convert UTC to airport local time
+  if (utcIso && tzid) {
+    const local = utcToLocal(utcIso, tzid)
+    if (local) {
+      return `${propName};TZID=${tzid}:${local.date}T${local.time}`
     }
   }
 
-  // Case 2: We have a UTC timestamp — use it directly
+  // Case 3: UTC timestamp, unknown airport → floating time
+  // (strip timezone info, display as-is — imperfect but rare)
   if (utcIso) {
     const d = new Date(utcIso)
     if (!isNaN(d.getTime())) {
-      return `${propName}:${toUtcDateTime(d)}`
+      // Use UTC digits as floating — better than nothing
+      return `${propName}:${toUtcDateTime(d).replace('Z', '')}`
     }
   }
 
-  // Case 3: We have local time but no airport — treat as floating (not ideal but rare)
+  // Case 4: Local time but no airport — floating
   if (dateStr && normalized) {
     return `${propName}:${dateStr.replace(/-/g, '')}T${normalized}`
   }
