@@ -13,13 +13,19 @@ export default async function TripsPage() {
     .order('start_date', { ascending: true })
 
   // Separate upcoming and past trips
+  // A trip is "past" only when its end_date (or start_date if no end) is before today
   const today = new Date().toISOString().split('T')[0]
   const upcomingTrips = trips?.filter(
-    (trip) => !trip.start_date || trip.start_date >= today
+    (trip) => !trip.start_date || (trip.end_date || trip.start_date) >= today
   ) || []
   const pastTrips = trips?.filter(
-    (trip) => trip.start_date && trip.start_date < today
-  ) || []
+    (trip) => trip.start_date && (trip.end_date || trip.start_date) < today
+  )?.sort((a, b) => {
+    // Reverse chronological — most recent past trips first
+    const dateA = a.end_date || a.start_date || ''
+    const dateB = b.end_date || b.start_date || ''
+    return dateB.localeCompare(dateA)
+  }) || []
 
   const hasTrips = (trips?.length ?? 0) > 0
 
