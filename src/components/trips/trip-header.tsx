@@ -7,7 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { formatDateRange } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { MapPin, Calendar, Users, Pencil, Check, X } from 'lucide-react'
+import { MapPin, Calendar, Users, Pencil, Check, X, Camera } from 'lucide-react'
+import { CoverImagePicker } from './cover-image-picker'
 import type { Trip } from '@/types/database'
 
 interface TripHeaderProps {
@@ -19,6 +20,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(trip.title)
   const [loading, setLoading] = useState(false)
+  const [showImagePicker, setShowImagePicker] = useState(false)
 
   const handleSave = async () => {
     if (!title.trim()) return
@@ -56,6 +58,19 @@ export function TripHeader({ trip }: TripHeaderProps) {
       ) : (
         <div className="absolute inset-0 bg-gradient-to-r from-amber-100 to-orange-100" />
       )}
+
+      {/* Change cover image button */}
+      <button
+        onClick={() => setShowImagePicker(true)}
+        className={`absolute top-3 right-3 z-10 rounded-full p-2 transition-opacity opacity-60 hover:opacity-100 ${
+          trip.cover_image_url
+            ? 'bg-black/40 text-white hover:bg-black/60'
+            : 'bg-white/60 text-gray-700 hover:bg-white/80'
+        }`}
+        title="Change cover image"
+      >
+        <Camera className="h-4 w-4" />
+      </button>
 
       {/* Content */}
       <div className="relative p-6 sm:p-8">
@@ -148,6 +163,15 @@ export function TripHeader({ trip }: TripHeaderProps) {
           </p>
         )}
       </div>
+
+      {/* Cover image picker modal */}
+      {showImagePicker && (
+        <CoverImagePicker
+          tripId={trip.id}
+          currentImageUrl={trip.cover_image_url}
+          onClose={() => setShowImagePicker(false)}
+        />
+      )}
     </div>
   )
 }
