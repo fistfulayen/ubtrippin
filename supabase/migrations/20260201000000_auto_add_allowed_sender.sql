@@ -11,7 +11,7 @@ begin
     new.id,
     new.email,
     new.raw_user_meta_data ->> 'full_name',
-    new.raw_user_meta_data ->> 'avatar_url'
+    coalesce(new.raw_user_meta_data ->> 'avatar_url', new.raw_user_meta_data ->> 'picture')
   );
 
   -- Auto-add their email as allowed sender

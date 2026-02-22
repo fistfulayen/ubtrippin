@@ -42,6 +42,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'pics.avs.io' },
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
     ],
   },
   // SECURITY: Apply security headers to all routes
