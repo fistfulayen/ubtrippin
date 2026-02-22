@@ -12,6 +12,7 @@ import {
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
 import { locationToCityAsync } from '@/lib/images/airport-cities'
+import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
 import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
@@ -243,11 +244,14 @@ export async function POST(request: NextRequest) {
             const rawLocation = primaryLocation || item.end_location || item.start_location
             const cityLocation = rawLocation ? await locationToCityAsync(rawLocation) : null
 
+            // Generate smart trip name using AI
+            const smartTitle = await generateTripName(extractionResult.items, assignment.tripTitle)
+
             const { data: newTrip, error: tripError } = await supabase
               .from('trips')
               .insert({
                 user_id: userId,
-                title: assignment.tripTitle || 'Untitled Trip',
+                title: smartTitle,
                 start_date: item.start_date,
                 end_date: item.end_date,
                 primary_location: cityLocation,
@@ -367,14 +371,33 @@ export async function POST(request: NextRequest) {
           new Set([...(existingTripData?.travelers || []), ...newTravelers])
         )
 
+        // Build update object
+        const tripUpdate: Record<string, unknown> = {
+          start_date: newDates.start_date,
+          end_date: newDates.end_date,
+          primary_location: newLocation,
+          travelers: mergedTravelers,
+        }
+
+        // Re-generate trip name if it's still a default title
+        if (trip.title && isDefaultTitle(trip.title)) {
+          // Fetch all items for this trip to generate a comprehensive name
+          const { data: allTripItems } = await supabase
+            .from('trip_items')
+            .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
+            .eq('trip_id', tripId)
+
+          if (allTripItems && allTripItems.length > 0) {
+            const newTitle = await generateTripName(allTripItems, trip.title)
+            if (newTitle && !isDefaultTitle(newTitle)) {
+              tripUpdate.title = newTitle
+            }
+          }
+        }
+
         await supabase
           .from('trips')
-          .update({
-            start_date: newDates.start_date,
-            end_date: newDates.end_date,
-            primary_location: newLocation,
-            travelers: mergedTravelers,
-          })
+          .update(tripUpdate)
           .eq('id', tripId)
       }
 
