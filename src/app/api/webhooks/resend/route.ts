@@ -16,6 +16,7 @@ import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
 import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
+import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
@@ -155,6 +156,25 @@ export async function POST(request: NextRequest) {
       ? profilesData[0] as { email: string; full_name: string | null } | undefined
       : profilesData as { email: string; full_name: string | null } | null
 
+    // ── Soft usage gate: check monthly extraction limit ───────────────────────
+    const extractionCheck = await checkExtractionLimit(userId)
+    if (!extractionCheck.allowed) {
+      console.log(`Extraction limit reached for user ${userId}: ${extractionCheck.used}/${extractionCheck.limit}`)
+      await supabase
+        .from('source_emails')
+        .update({
+          parse_status: 'failed',
+          parse_error: `Monthly extraction limit reached (${extractionCheck.used}/${extractionCheck.limit}). Upgrade to Pro for unlimited extractions.`,
+        })
+        .eq('id', sourceEmail.id)
+
+      return NextResponse.json({
+        message: 'Extraction limit reached',
+        email_id: sourceEmail.id,
+      })
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     try {
       // Extract text from PDF attachments using Resend attachments API
       let attachmentText = ''
@@ -183,6 +203,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      // Count this extraction against the user's monthly limit
+      await incrementExtractionCount(userId)
 
       // Extract sender domain for example matching
       const senderDomain = fromEmail.split('@')[1]?.toLowerCase()

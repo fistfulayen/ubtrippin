@@ -1,75 +1,28 @@
-'use client'
-
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { fetchAndSetCoverImage } from './actions'
+import { createClient } from '@/lib/supabase/server'
+import { checkTripLimit } from '@/lib/usage/limits'
+import NewTripForm from './new-trip-form'
 
-export default function NewTripPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export default async function NewTripPage() {
+  // Get current user server-side
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
+  // Check trip limit for authenticated users
+  let limitHit = false
+  let limitUsed = 0
+  let limitMax = 3
 
-    const formData = new FormData(e.currentTarget)
-    const title = formData.get('title') as string
-    const primary_location = formData.get('location') as string
-    const start_date = formData.get('start_date') as string
-    const end_date = formData.get('end_date') as string
-    const notes = formData.get('notes') as string
-    const travelers = (formData.get('travelers') as string)
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean)
-
-    const supabase = createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      setError('You must be logged in')
-      setLoading(false)
-      return
+  if (user) {
+    const tripLimit = await checkTripLimit(user.id)
+    if (!tripLimit.allowed) {
+      limitHit = true
+      limitUsed = tripLimit.used
+      limitMax = tripLimit.limit ?? 3
     }
-
-    const { data, error: insertError } = await supabase
-      .from('trips')
-      .insert({
-        user_id: user.id,
-        title,
-        primary_location: primary_location || null,
-        start_date: start_date || null,
-        end_date: end_date || null,
-        notes: notes || null,
-        travelers: travelers.length > 0 ? travelers : [],
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      setError(insertError.message)
-      setLoading(false)
-      return
-    }
-
-    // Fetch cover image in the background (don't block navigation)
-    if (primary_location) {
-      fetchAndSetCoverImage(data.id, primary_location)
-    }
-
-    router.push(`/trips/${data.id}`)
   }
 
   return (
@@ -84,96 +37,35 @@ export default function NewTripPage() {
         </Link>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Create New Trip</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
-              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                {error}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label htmlFor="title" className="text-sm font-medium text-gray-700">
-                Trip Name *
-              </label>
-              <Input
-                id="title"
-                name="title"
-                required
-                placeholder="e.g., Summer Europe Trip 2024"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="location" className="text-sm font-medium text-gray-700">
-                Primary Location
-              </label>
-              <Input
-                id="location"
-                name="location"
-                placeholder="e.g., Paris, France"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <label htmlFor="start_date" className="text-sm font-medium text-gray-700">
-                  Start Date
-                </label>
-                <Input id="start_date" name="start_date" type="date" />
-              </div>
-
-              <div className="space-y-2">
-                <label htmlFor="end_date" className="text-sm font-medium text-gray-700">
-                  End Date
-                </label>
-                <Input id="end_date" name="end_date" type="date" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="travelers" className="text-sm font-medium text-gray-700">
-                Travelers
-              </label>
-              <Input
-                id="travelers"
-                name="travelers"
-                placeholder="Names separated by commas"
-              />
-              <p className="text-xs text-gray-500">
-                Add names of people traveling, separated by commas
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="notes" className="text-sm font-medium text-gray-700">
-                Notes
-              </label>
-              <Textarea
-                id="notes"
-                name="notes"
-                rows={3}
-                placeholder="Any additional notes for this trip..."
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creating...' : 'Create Trip'}
-              </Button>
-              <Link href="/trips">
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      {limitHit ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+          <h2 className="text-lg font-semibold text-amber-900">Trip limit reached</h2>
+          <p className="text-sm text-amber-800">
+            You&apos;ve used {limitUsed} of {limitMax} trips on the free plan. Upgrade to{' '}
+            <strong>Pro</strong> for unlimited trips.
+          </p>
+          <p className="text-xs text-amber-700">
+            Alternatively, delete an existing trip to free up a slot.
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Link
+              href="/trips"
+              className="inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+            >
+              Back to trips
+            </Link>
+            {/* Upgrade link placeholder — wire up Stripe when billing is ready */}
+            <Link
+              href="/settings"
+              className="inline-flex items-center rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50"
+            >
+              Upgrade to Pro
+            </Link>
+          </div>
+        </div>
+      ) : (
+        <NewTripForm />
+      )}
     </div>
   )
 }
