@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Plane, Inbox, Settings, LogOut, Menu, X } from 'lucide-react'
 import { useState } from 'react'
+import { UserAvatar } from '@/components/user-avatar'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
 
@@ -24,6 +25,7 @@ const navItems = [
 export function DashboardNav({ user, profile }: DashboardNavProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // avatar handled by UserAvatar component
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -74,24 +76,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           {/* User menu (desktop) */}
           <div className="hidden md:flex md:items-center md:gap-4">
             <div className="flex items-center gap-3">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name || 'User'}
-                  className="h-8 w-8 rounded-full"
-                  onError={(e) => {
-                    // Hide broken avatar and show fallback initial
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-              ) : null}
-              <div className={cn(
-                'flex h-8 w-8 items-center justify-center rounded-full bg-amber-200 text-amber-800 text-sm font-medium',
-                profile?.avatar_url && 'hidden'
-              )}>
-                {(profile?.full_name || user.email || '?')[0].toUpperCase()}
-              </div>
+              <UserAvatar src={profile?.avatar_url} name={profile?.full_name} email={user.email} size="sm" />
               <span className="text-sm text-gray-700">
                 {profile?.full_name || user.email}
               </span>
@@ -147,23 +132,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           </div>
           <div className="border-t border-gray-200 px-4 py-3">
             <div className="flex items-center gap-3 mb-3">
-              {profile?.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.full_name || 'User'}
-                  className="h-10 w-10 rounded-full"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-              ) : null}
-              <div className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-full bg-amber-200 text-amber-800 font-medium',
-                profile?.avatar_url && 'hidden'
-              )}>
-                {(profile?.full_name || user.email || '?')[0].toUpperCase()}
-              </div>
+              <UserAvatar src={profile?.avatar_url} name={profile?.full_name} email={user.email} size="md" />
               <div>
                 <p className="font-medium text-gray-900">
                   {profile?.full_name || 'User'}

@@ -16,6 +16,8 @@ import {
   Ticket,
   CalendarDays,
 } from 'lucide-react'
+import { getAirlineLogoUrl } from '@/lib/images/airline-logo'
+import { AirlineLogoIcon } from './airline-logo-icon'
 import type { TripItem, TripItemKind } from '@/types/database'
 
 interface SharePageProps {
@@ -71,15 +73,24 @@ function TripItemRow({ item }: { item: TripItem }) {
     item.start_location && item.end_location
       ? `${item.start_location} → ${item.end_location}`
       : item.start_location || item.end_location || null
+  const airlineLogoUrl = item.kind === 'flight' && item.provider
+    ? getAirlineLogoUrl(item.provider)
+    : null
 
   return (
     <div className="flex items-start gap-3 py-4 border-b border-amber-100 last:border-0">
-      {/* Kind icon badge */}
-      <div
-        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${kindColors[item.kind]}`}
-      >
-        <KindIcon kind={item.kind} className="h-4 w-4" />
-      </div>
+      {/* Icon — airline logo for flights, generic icon for others */}
+      {airlineLogoUrl ? (
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-200 overflow-hidden">
+          <AirlineLogoIcon url={airlineLogoUrl} alt={item.provider || 'Airline'} />
+        </div>
+      ) : (
+        <div
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${kindColors[item.kind]}`}
+        >
+          <KindIcon kind={item.kind} className="h-4 w-4" />
+        </div>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -155,8 +166,8 @@ export default async function SharePage({ params }: SharePageProps) {
         <header className="border-b border-amber-200 bg-white/80 backdrop-blur-sm">
           <div className="mx-auto max-w-4xl px-4 py-4">
             <Link href="/" className="flex items-center gap-2">
-              <Image src="/ubtrippin_logo.png" alt="UB Trippin" width={32} height={32} className="rounded-lg" />
-              <span className="text-lg font-bold text-amber-700">UB Trippin</span>
+              <Image src="/ubtrippin_logo.png" alt="UBTRIPPIN" width={32} height={32} className="rounded-lg" />
+              <span className="text-lg font-bold text-amber-700">UBTRIPPIN</span>
             </Link>
           </div>
         </header>
@@ -174,7 +185,7 @@ export default async function SharePage({ params }: SharePageProps) {
               href="/"
               className="mt-6 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors"
             >
-              Plan your own trip with UB Trippin
+              Plan your own trip with UBTRIPPIN
             </Link>
           </div>
         </main>
@@ -182,14 +193,27 @@ export default async function SharePage({ params }: SharePageProps) {
     )
   }
 
-  // SECURITY: Fetch only fields needed for display — explicitly exclude confirmation_code,
-  // details_json, source_email_id, confidence, needs_review to prevent data leakage
-  const { data: items } = await supabase
+  // SECURITY: Fetch fields needed for display — explicitly exclude confirmation_code and
+  // source_email_id. details_json is included but sanitised below before rendering.
+  const { data: rawItems } = await supabase
     .from('trip_items')
-    .select('id, kind, provider, traveler_names, start_date, end_date, start_ts, end_ts, start_location, end_location, summary, status')
+    .select('id, trip_id, kind, provider, summary, start_date, end_date, start_ts, end_ts, start_location, end_location, traveler_names, needs_review, status, details_json')
     .eq('trip_id', trip.id)
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
+
+  // Strip sensitive fields from details_json before passing to the component
+  const items = rawItems?.map((item) => {
+    const { details_json, ...rest } = item
+    let safeDetails: Record<string, unknown> | null = null
+    if (details_json && typeof details_json === 'object') {
+      const { confirmation_code, booking_reference, ...remaining } = details_json as Record<string, unknown>
+      void confirmation_code
+      void booking_reference
+      safeDetails = remaining
+    }
+    return { ...rest, details_json: safeDetails }
+  }) ?? null
 
   const travelers = (trip.travelers ?? []).map(obfuscateName)
 
@@ -202,8 +226,8 @@ export default async function SharePage({ params }: SharePageProps) {
       <header className="sticky top-0 z-20 border-b border-amber-200 bg-white/90 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/ubtrippin_logo.png" alt="UB Trippin" width={28} height={28} className="rounded-lg" />
-            <span className="text-base font-bold text-amber-700">UB Trippin</span>
+            <Image src="/ubtrippin_logo.png" alt="UBTRIPPIN" width={28} height={28} className="rounded-lg" />
+            <span className="text-base font-bold text-amber-700">UBTRIPPIN</span>
           </Link>
           <Link
             href="/sign-up"
@@ -347,13 +371,13 @@ export default async function SharePage({ params }: SharePageProps) {
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 text-center">
           <Image
             src="/ubtrippin_logo.png"
-            alt="UB Trippin"
+            alt="UBTRIPPIN"
             width={40}
             height={40}
             className="mx-auto rounded-xl mb-3"
           />
           <h2 className="text-lg font-semibold text-gray-900">
-            Organize your trips with UB Trippin
+            Organize your trips with UBTRIPPIN
           </h2>
           <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
             Automatically extract travel bookings from your inbox and keep your
@@ -366,7 +390,7 @@ export default async function SharePage({ params }: SharePageProps) {
             Get started — it&apos;s free
           </Link>
           <p className="mt-4 text-xs text-gray-400">
-            &copy; {new Date().getFullYear()} UB Trippin
+            &copy; {new Date().getFullYear()} UBTRIPPIN
           </p>
         </div>
       </footer>

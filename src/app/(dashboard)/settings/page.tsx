@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AllowedSendersList } from '@/components/settings/allowed-senders-list'
 import { AddSenderForm } from '@/components/settings/add-sender-form'
 import { Mail, User, Info } from 'lucide-react'
+import { UserAvatar } from '@/components/user-avatar'
 import type { Profile, AllowedSender } from '@/types/database'
 
 export default async function SettingsPage() {
@@ -47,17 +48,7 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            {profile?.avatar_url ? (
-              <img
-                src={profile.avatar_url}
-                alt={profile.full_name || 'User'}
-                className="h-16 w-16 rounded-full"
-              />
-            ) : (
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-200 text-amber-800 text-xl font-medium">
-                {(profile?.full_name || user?.email || '?')[0].toUpperCase()}
-              </div>
-            )}
+            <UserAvatar src={profile?.avatar_url} name={profile?.full_name} email={user?.email} size="lg" />
             <div>
               <p className="font-medium text-gray-900">
                 {profile?.full_name || 'User'}

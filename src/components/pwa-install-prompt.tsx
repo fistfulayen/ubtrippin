@@ -30,6 +30,12 @@ export function PWAInstallPrompt() {
       if (Date.now() - dismissedAt < 7 * 24 * 60 * 60 * 1000) return
     }
 
+    // Only show on mobile devices (screen width < 768px or mobile UA)
+    const isMobile =
+      window.innerWidth < 768 ||
+      /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent)
+    if (!isMobile) return
+
     const handler = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
