@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +36,7 @@ import {
   Hash,
 } from 'lucide-react'
 import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
+import { getAirlineLogoUrl } from '@/lib/images/airline-logo'
 import {
   FlightDetailsView,
   HotelDetailsView,
@@ -78,8 +80,12 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
   const [deleting, setDeleting] = useState(false)
   const [moveTarget, setMoveTarget] = useState<string>('')
 
+  const [logoError, setLogoError] = useState(false)
   const Icon = kindIcons[item.kind] || Calendar
   const details = item.details_json as FlightDetails | HotelDetails | null
+  const airlineLogoUrl = item.kind === 'flight' && item.provider
+    ? getAirlineLogoUrl(item.provider)
+    : null
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -143,7 +149,17 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
               </div>
 
               {/* Provider/Summary */}
-              <h4 className="mt-1 font-semibold text-gray-900">
+              <h4 className="mt-1 flex items-center gap-2 font-semibold text-gray-900">
+                {airlineLogoUrl && !logoError && (
+                  <Image
+                    src={airlineLogoUrl}
+                    alt={item.provider || 'Airline'}
+                    width={24}
+                    height={24}
+                    className="rounded"
+                    onError={() => setLogoError(true)}
+                  />
+                )}
                 {item.provider || item.summary || 'Untitled'}
               </h4>
 
