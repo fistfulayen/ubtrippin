@@ -4,17 +4,54 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
 import { MapPin, Calendar, AlertCircle } from 'lucide-react'
-import type { Trip } from '@/types/database'
+import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
+import { getAirlineLogoUrl, extractAirlineCode } from '@/lib/images/airline-logo'
+
+interface TripItem {
+  id: string
+  kind: string
+  needs_review: boolean
+  provider: string | null
+  details_json: Json
+}
 
 interface TripCardProps {
-  trip: Trip
+  trip: Trip & { trip_items?: TripItem[] }
   itemCount: number
   needsReview?: boolean
   isPast?: boolean
 }
 
+function getAirlineLogos(items?: TripItem[]): string[] {
+  if (!items) return []
+  const seen = new Set<string>()
+  const logos: string[] = []
+
+  for (const item of items) {
+    if (item.kind !== 'flight') continue
+
+    // Try provider field first, then flight_number from details_json
+    const airline = item.provider
+    const details = item.details_json as Record<string, unknown> | null
+    const flightNumber = details?.flight_number as string | undefined
+
+    const logoUrl = airline ? getAirlineLogoUrl(airline) : null
+    const logoFromFlight = !logoUrl && flightNumber ? getAirlineLogoUrl(flightNumber) : null
+    const url = logoUrl || logoFromFlight
+
+    if (url && !seen.has(url)) {
+      seen.add(url)
+      logos.push(url)
+    }
+  }
+
+  return logos.slice(0, 3) // Max 3 airline logos
+}
+
 export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps) {
+  const airlineLogos = getAirlineLogos(trip.trip_items)
+
   return (
     <Link href={`/trips/${trip.id}`}>
       <Card
@@ -33,6 +70,27 @@ export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps
               className="object-cover"
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
+          )}
+          {/* Airline logos */}
+          {airlineLogos.length > 0 && (
+            <div className="absolute bottom-2 right-2 flex -space-x-2">
+              {airlineLogos.map((url, i) => (
+                <div
+                  key={url}
+                  className="h-7 w-7 rounded-full border-2 border-white bg-white shadow-sm overflow-hidden"
+                  style={{ zIndex: airlineLogos.length - i }}
+                >
+                  <Image
+                    src={url}
+                    alt="Airline"
+                    width={28}
+                    height={28}
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
         <CardContent className="p-4">

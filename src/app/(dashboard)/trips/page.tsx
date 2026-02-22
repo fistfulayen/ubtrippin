@@ -9,7 +9,7 @@ export default async function TripsPage() {
 
   const { data: trips } = await supabase
     .from('trips')
-    .select('*, trip_items(id, kind, needs_review)')
+    .select('*, trip_items(id, kind, needs_review, provider, details_json)')
     .order('start_date', { ascending: true })
 
   // Three trip states: current (started, not ended), upcoming (not started), past (ended)
