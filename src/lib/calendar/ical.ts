@@ -1,5 +1,5 @@
 import type { Trip, TripItem, Json, FlightDetails, HotelDetails, TrainDetails } from '@/types/database'
-import { getAirportTimezone, getVTimezoneBlock } from './airport-timezones'
+import { getAirportTimezone } from './airport-timezones'
 
 const PROD_ID = '-//UB Trippin//Travel Calendar//EN'
 const CALENDAR_NAME = 'UB Trippin Trips'
@@ -65,79 +65,87 @@ function normalizeTime(value: string | null | undefined): string | null {
 }
 
 /**
- * Convert a UTC ISO timestamp to a local time string in the given IANA timezone.
- * Returns "HH:MM" or null if conversion fails.
+ * Convert a local time + date + IANA timezone to a UTC iCal datetime string (with Z suffix).
+ * E.g., "08:20" on "2026-02-25" in "Europe/Copenhagen" → "20260225T072000Z"
  */
-function utcToLocalTime(isoUtc: string, tzid: string): { date: string; time: string } | null {
+function localToUtc(dateStr: string, localTime: string, tzid: string): string | null {
   try {
-    const d = new Date(isoUtc)
-    if (isNaN(d.getTime())) return null
-    // Use Intl to get the local date/time in the target timezone
-    const parts = new Intl.DateTimeFormat('en-CA', {
+    const [h, m] = localTime.split(':').map(Number)
+    // Create a date string that JS will parse in the given timezone
+    // Use Intl to find the UTC offset for this timezone on this date
+    const testDate = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`)
+    
+    // Get the offset by comparing local representation to UTC
+    const formatter = new Intl.DateTimeFormat('en-US', {
       timeZone: tzid,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
       hour12: false,
-    }).formatToParts(d)
-    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
-    return {
-      date: `${get('year')}${get('month')}${get('day')}`,
-      time: `${get('hour')}${get('minute')}${get('second')}`,
+    })
+    
+    // Binary search for the UTC time that produces the desired local time
+    // Start with a rough estimate based on common offsets
+    const localMs = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00Z`).getTime()
+    
+    // Try offsets from -12 to +14 hours
+    for (let offsetHours = -12; offsetHours <= 14; offsetHours++) {
+      const candidateMs = localMs - offsetHours * 3600000
+      const candidate = new Date(candidateMs)
+      const parts = formatter.formatToParts(candidate)
+      const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+      const candidateH = parseInt(get('hour'))
+      const candidateM = parseInt(get('minute'))
+      if (candidateH === h && candidateM === m) {
+        return toUtcDateTime(candidate)
+      }
     }
+    return null
   } catch {
     return null
   }
 }
 
 /**
- * Build a DTSTART or DTEND iCal property line.
+ * Build a DTSTART or DTEND iCal property line — ALWAYS in UTC (Z suffix).
+ *
+ * Strategy: emit everything as UTC. Every calendar app handles UTC correctly.
+ * No VTIMEZONE blocks needed.
  *
  * Priority:
- * 1. If we have an explicit local time (from extraction), use it + airport TZID
- * 2. If we have a UTC timestamp + airport code, convert UTC → local time in that timezone
- * 3. If we have a UTC timestamp but no airport, use floating time (stripped UTC — imperfect but best we can do)
- * 4. Fall back to date-only
+ * 1. If we have a UTC timestamp (start_ts/end_ts), use it directly
+ * 2. If we have local time + airport code, convert local→UTC
+ * 3. Fall back to null (caller handles date-only fallback)
  */
 function buildDateTimeProp(
   propName: 'DTSTART' | 'DTEND',
   dateStr: string | null,
   localTime: string | null,
-  fallbackIso: string | null,
+  utcIso: string | null,
   airportCode: string | null | undefined,
-  collectedTzids: Set<string>
 ): string | null {
-  const tzid = airportCode ? getAirportTimezone(airportCode) : null
-
-  // Case 1: We have explicit local time from extraction
+  // Case 1: We have explicit local time + airport → convert to UTC
+  // This is the most trustworthy source (extracted from the ticket)
   const normalized = normalizeTime(localTime)
-  if (dateStr && normalized) {
-    const dateVal = dateStr.replace(/-/g, '')
+  if (dateStr && normalized && airportCode) {
+    const tzid = getAirportTimezone(airportCode)
     if (tzid) {
-      collectedTzids.add(tzid)
-      return `${propName};TZID=${tzid}:${dateVal}T${normalized}`
-    }
-    return `${propName}:${dateVal}T${normalized}`
-  }
-
-  // Case 2: We have a UTC timestamp — convert to airport's local time
-  if (fallbackIso && tzid) {
-    const local = utcToLocalTime(fallbackIso, tzid)
-    if (local) {
-      collectedTzids.add(tzid)
-      return `${propName};TZID=${tzid}:${local.date}T${local.time}`
+      const hhmm = `${normalized.slice(0,2)}:${normalized.slice(2,4)}`
+      const utc = localToUtc(dateStr, hhmm, tzid)
+      if (utc) return `${propName}:${utc}`
     }
   }
 
-  // Case 3: UTC timestamp, no airport — use floating (strip Z, use UTC digits)
-  if (fallbackIso) {
-    const match = fallbackIso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
-    if (match) {
-      return `${propName}:${match[1]}${match[2]}${match[3]}T${match[4]}${match[5]}00`
+  // Case 2: We have a UTC timestamp — use it directly
+  if (utcIso) {
+    const d = new Date(utcIso)
+    if (!isNaN(d.getTime())) {
+      return `${propName}:${toUtcDateTime(d)}`
     }
+  }
+
+  // Case 3: We have local time but no airport — treat as floating (not ideal but rare)
+  if (dateStr && normalized) {
+    return `${propName}:${dateStr.replace(/-/g, '')}T${normalized}`
   }
 
   return null
@@ -295,7 +303,6 @@ function buildFlightLocation(item: TripItem, details: Record<string, unknown>): 
 
 function buildEventLines(
   item: TripItem,
-  collectedTzids: Set<string>,
   trip?: Trip | null
 ): string[] {
   const details = parseDetailObject(item.details_json)
@@ -346,7 +353,6 @@ function buildEventLines(
       depLocalTime,
       item.start_ts,
       depAirport,
-      collectedTzids
     )
     const dtend = buildDateTimeProp(
       'DTEND',
@@ -354,7 +360,6 @@ function buildEventLines(
       arrLocalTime,
       item.end_ts,
       arrAirport,
-      collectedTzids
     )
 
     lines.push(`SUMMARY:${escapeIcsText(buildFlightSummary(item, details))}`)
@@ -466,14 +471,7 @@ function buildTripSpanEvent(trip: Trip): string[] {
   ].filter(Boolean) as string[]
 }
 
-function buildCalendar(events: string[], tzids: Set<string>): string {
-  // Collect VTIMEZONE blocks for all timezone IDs used
-  const vtimezoneLines: string[] = []
-  for (const tzid of tzids) {
-    const block = getVTimezoneBlock(tzid)
-    if (block) vtimezoneLines.push(...block)
-  }
-
+function buildCalendar(events: string[]): string {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
@@ -481,7 +479,6 @@ function buildCalendar(events: string[], tzids: Set<string>): string {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcsText(CALENDAR_NAME)}`,
-    ...vtimezoneLines,
     ...events,
     'END:VCALENDAR',
   ]
@@ -496,14 +493,13 @@ export function generateTripICal(trip: Trip, items: TripItem[]): string {
     return aKey.localeCompare(bKey)
   })
 
-  const collectedTzids = new Set<string>()
   const events: string[] = []
   events.push(...buildTripSpanEvent(trip))
   for (const item of sorted) {
-    events.push(...buildEventLines(item, collectedTzids, trip))
+    events.push(...buildEventLines(item, trip))
   }
 
-  return buildCalendar(events, collectedTzids)
+  return buildCalendar(events)
 }
 
 export function generateFeedICal(trips: Trip[], items: ItemWithTrip[]): string {
@@ -517,7 +513,6 @@ export function generateFeedICal(trips: Trip[], items: ItemWithTrip[]): string {
     groupedItems.set(item.trip_id, bucket)
   }
 
-  const collectedTzids = new Set<string>()
   const events: string[] = []
 
   const sortedTrips = [...trips].sort((a, b) => {
@@ -536,9 +531,9 @@ export function generateFeedICal(trips: Trip[], items: ItemWithTrip[]): string {
     })
 
     for (const item of sortedItems) {
-      events.push(...buildEventLines(item, collectedTzids, tripMap.get(item.trip_id || '') ?? null))
+      events.push(...buildEventLines(item, tripMap.get(item.trip_id || '') ?? null))
     }
   }
 
-  return buildCalendar(events, collectedTzids)
+  return buildCalendar(events)
 }
