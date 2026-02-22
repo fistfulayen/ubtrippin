@@ -76,6 +76,8 @@ export interface Database {
           travelers: string[]
           notes: string | null
           cover_image_url: string | null
+          share_token: string | null
+          share_enabled: boolean
           created_at: string
           updated_at: string
         }
@@ -89,6 +91,8 @@ export interface Database {
           travelers?: string[]
           notes?: string | null
           cover_image_url?: string | null
+          share_token?: string | null
+          share_enabled?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -102,6 +106,8 @@ export interface Database {
           travelers?: string[]
           notes?: string | null
           cover_image_url?: string | null
+          share_token?: string | null
+          share_enabled?: boolean
           created_at?: string
           updated_at?: string
         }
