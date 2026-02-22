@@ -64,13 +64,86 @@ function normalizeTime(value: string | null | undefined): string | null {
   return `${hours}${minutes}00`
 }
 
-function isoToFloatingDateTime(value: string | null): string | null {
-  if (!value) return null
-  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
-  if (!match) return null
-  return `${match[1]}${match[2]}${match[3]}T${match[4]}${match[5]}00`
+/**
+ * Convert a UTC ISO timestamp to a local time string in the given IANA timezone.
+ * Returns "HH:MM" or null if conversion fails.
+ */
+function utcToLocalTime(isoUtc: string, tzid: string): { date: string; time: string } | null {
+  try {
+    const d = new Date(isoUtc)
+    if (isNaN(d.getTime())) return null
+    // Use Intl to get the local date/time in the target timezone
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: tzid,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(d)
+    const get = (type: string) => parts.find(p => p.type === type)?.value ?? '00'
+    return {
+      date: `${get('year')}${get('month')}${get('day')}`,
+      time: `${get('hour')}${get('minute')}${get('second')}`,
+    }
+  } catch {
+    return null
+  }
 }
 
+/**
+ * Build a DTSTART or DTEND iCal property line.
+ *
+ * Priority:
+ * 1. If we have an explicit local time (from extraction), use it + airport TZID
+ * 2. If we have a UTC timestamp + airport code, convert UTC → local time in that timezone
+ * 3. If we have a UTC timestamp but no airport, use floating time (stripped UTC — imperfect but best we can do)
+ * 4. Fall back to date-only
+ */
+function buildDateTimeProp(
+  propName: 'DTSTART' | 'DTEND',
+  dateStr: string | null,
+  localTime: string | null,
+  fallbackIso: string | null,
+  airportCode: string | null | undefined,
+  collectedTzids: Set<string>
+): string | null {
+  const tzid = airportCode ? getAirportTimezone(airportCode) : null
+
+  // Case 1: We have explicit local time from extraction
+  const normalized = normalizeTime(localTime)
+  if (dateStr && normalized) {
+    const dateVal = dateStr.replace(/-/g, '')
+    if (tzid) {
+      collectedTzids.add(tzid)
+      return `${propName};TZID=${tzid}:${dateVal}T${normalized}`
+    }
+    return `${propName}:${dateVal}T${normalized}`
+  }
+
+  // Case 2: We have a UTC timestamp — convert to airport's local time
+  if (fallbackIso && tzid) {
+    const local = utcToLocalTime(fallbackIso, tzid)
+    if (local) {
+      collectedTzids.add(tzid)
+      return `${propName};TZID=${tzid}:${local.date}T${local.time}`
+    }
+  }
+
+  // Case 3: UTC timestamp, no airport — use floating (strip Z, use UTC digits)
+  if (fallbackIso) {
+    const match = fallbackIso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+    if (match) {
+      return `${propName}:${match[1]}${match[2]}${match[3]}T${match[4]}${match[5]}00`
+    }
+  }
+
+  return null
+}
+
+/** Simple local datetime for non-flight items (no timezone conversion, floating time) */
 function localDateTime(
   date: string | null,
   localTime: string | null,
@@ -80,27 +153,11 @@ function localDateTime(
   if (date && normalized) {
     return `${date.replace(/-/g, '')}T${normalized}`
   }
-  return isoToFloatingDateTime(fallbackIso)
-}
-
-/** Build a DTSTART or DTEND property line, using TZID when we know the airport timezone. */
-function buildDateTimeProp(
-  propName: 'DTSTART' | 'DTEND',
-  dateStr: string | null,
-  localTime: string | null,
-  fallbackIso: string | null,
-  airportCode: string | null | undefined,
-  collectedTzids: Set<string>
-): string | null {
-  const datetime = localDateTime(dateStr, localTime, fallbackIso)
-  if (!datetime) return null
-
-  const tzid = airportCode ? getAirportTimezone(airportCode) : null
-  if (tzid) {
-    collectedTzids.add(tzid)
-    return `${propName};TZID=${tzid}:${datetime}`
+  if (fallbackIso) {
+    const match = fallbackIso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
+    if (match) return `${match[1]}${match[2]}${match[3]}T${match[4]}${match[5]}00`
   }
-  return `${propName}:${datetime}`
+  return null
 }
 
 // ─── DESCRIPTION builders ────────────────────────────────────────────────────
