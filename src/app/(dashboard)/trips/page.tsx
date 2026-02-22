@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
+import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { Button } from '@/components/ui/button'
 import { Plus, Mail, MapPin } from 'lucide-react'
 import Link from 'next/link'
@@ -33,6 +34,9 @@ export default async function TripsPage() {
 
   return (
     <div className="space-y-8">
+      {/* PWA install prompt */}
+      <PWAInstallPrompt />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
