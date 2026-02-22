@@ -179,6 +179,21 @@ export function TripHeader({ trip }: TripHeaderProps) {
         >
           <Camera className="h-4 w-4" />
         </button>
+
+        {/* Edit title button */}
+        {!editing && (
+          <button
+            onClick={() => setEditing(true)}
+            className={`rounded-full p-2 transition-opacity opacity-60 hover:opacity-100 ${
+              trip.cover_image_url
+                ? 'bg-black/40 text-white hover:bg-black/60'
+                : 'bg-white/60 text-gray-700 hover:bg-white/80'
+            }`}
+            title="Edit title"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -209,18 +224,6 @@ export function TripHeader({ trip }: TripHeaderProps) {
               >
                 {trip.title}
               </h1>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditing(true)}
-                className={
-                  trip.cover_image_url
-                    ? 'text-white/80 hover:text-white hover:bg-white/20'
-                    : 'text-gray-600 hover:text-gray-900'
-                }
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
             </>
           )}
         </div>
