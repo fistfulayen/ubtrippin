@@ -207,44 +207,6 @@ for u in data:
 " 2>/dev/null || echo "Could not list users"
 }
 
-cmd_set_tier() {
-  local email="${1:?Usage: ubt set-tier <email> <free|pro>}"
-  local tier="${2:?Usage: ubt set-tier <email> <free|pro>}"
-  if [[ "$tier" != "free" && "$tier" != "pro" ]]; then
-    echo "Error: tier must be 'free' or 'pro'" >&2
-    exit 1
-  fi
-  # Look up user by email
-  local user_id
-  user_id=$(_curl "${API}/profiles?select=id,email,full_name&email=eq.${email}" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-if not data:
-    print('NOT_FOUND', end='')
-    sys.exit(0)
-print(data[0]['id'], end='')
-")
-  if [ "$user_id" = "NOT_FOUND" ] || [ -z "$user_id" ]; then
-    echo "Error: no user found with email '$email'" >&2
-    exit 1
-  fi
-  # Update tier
-  local result
-  result=$(_curl "${API}/profiles?id=eq.${user_id}" \
-    -X PATCH \
-    -d "{\"subscription_tier\": \"${tier}\"}" \
-    -H "Prefer: return=representation" | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-if isinstance(data, list) and data:
-    u = data[0]
-    print(f\"{u.get('full_name','?')} ({u.get('email','?')}) → {u.get('subscription_tier','?')}\")
-else:
-    print('Update failed')
-")
-  echo "$result"
-}
-
 cmd_rls_check() {
   echo "Checking RLS policies via Supabase CLI..."
   cd /home/iancr/ubtrippin
@@ -263,7 +225,6 @@ Commands:
   trips show <trip_id>     Show trip details + items
   items list <trip_id>     List items in a trip
   users                    List all users
-  set-tier <email> <tier>  Set user to free or pro (e.g. ubt set-tier friend@gmail.com pro)
   health                   Check service health
   rls-check                Verify RLS policies
 
@@ -293,7 +254,6 @@ case "${1:-}" in
     esac
     ;;
   users) cmd_users ;;
-  set-tier) cmd_set_tier "${2:-}" "${3:-}" ;;
   health) cmd_health ;;
   rls-check) cmd_rls_check ;;
   -h|--help|help|"") usage ;;
