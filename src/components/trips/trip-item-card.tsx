@@ -117,21 +117,34 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
         <CardContent className="p-4">
           {/* Header row */}
           <div className="flex items-start gap-3">
-            {/* Icon */}
-            <div
-              className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                item.kind === 'flight' && 'bg-blue-100 text-blue-600',
-                item.kind === 'hotel' && 'bg-purple-100 text-purple-600',
-                item.kind === 'train' && 'bg-green-100 text-green-600',
-                item.kind === 'car' && 'bg-orange-100 text-orange-600',
-                item.kind === 'restaurant' && 'bg-red-100 text-red-600',
-                item.kind === 'activity' && 'bg-pink-100 text-pink-600',
-                item.kind === 'other' && 'bg-gray-100 text-gray-600'
-              )}
-            >
-              <Icon className="h-5 w-5" />
-            </div>
+            {/* Icon — airline logo for flights, generic icon for others */}
+            {airlineLogoUrl && !logoError ? (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-200 overflow-hidden">
+                <Image
+                  src={airlineLogoUrl}
+                  alt={item.provider || 'Airline'}
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                  onError={() => setLogoError(true)}
+                />
+              </div>
+            ) : (
+              <div
+                className={cn(
+                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                  item.kind === 'flight' && 'bg-blue-100 text-blue-600',
+                  item.kind === 'hotel' && 'bg-purple-100 text-purple-600',
+                  item.kind === 'train' && 'bg-green-100 text-green-600',
+                  item.kind === 'car' && 'bg-orange-100 text-orange-600',
+                  item.kind === 'restaurant' && 'bg-red-100 text-red-600',
+                  item.kind === 'activity' && 'bg-pink-100 text-pink-600',
+                  item.kind === 'other' && 'bg-gray-100 text-gray-600'
+                )}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+            )}
 
             {/* Content */}
             <div className="min-w-0 flex-1">
@@ -149,17 +162,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
               </div>
 
               {/* Provider/Summary */}
-              <h4 className="mt-1 flex items-center gap-2 font-semibold text-gray-900">
-                {airlineLogoUrl && !logoError && (
-                  <Image
-                    src={airlineLogoUrl}
-                    alt={item.provider || 'Airline'}
-                    width={24}
-                    height={24}
-                    className="rounded"
-                    onError={() => setLogoError(true)}
-                  />
-                )}
+              <h4 className="mt-1 font-semibold text-gray-900">
                 {item.provider || item.summary || 'Untitled'}
               </h4>
 
