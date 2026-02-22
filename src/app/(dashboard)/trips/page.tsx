@@ -12,11 +12,13 @@ export default async function TripsPage() {
     .select('*, trip_items(id, kind, needs_review)')
     .order('start_date', { ascending: true })
 
-  // Separate upcoming and past trips
-  // A trip is "past" only when its end_date (or start_date if no end) is before today
+  // Three trip states: current (started, not ended), upcoming (not started), past (ended)
   const today = new Date().toISOString().split('T')[0]
+  const currentTrips = trips?.filter(
+    (trip) => trip.start_date && trip.start_date <= today && (trip.end_date || trip.start_date) >= today
+  ) || []
   const upcomingTrips = trips?.filter(
-    (trip) => !trip.start_date || (trip.end_date || trip.start_date) >= today
+    (trip) => !trip.start_date || trip.start_date > today
   ) || []
   const pastTrips = trips?.filter(
     (trip) => trip.start_date && (trip.end_date || trip.start_date) < today
@@ -75,6 +77,27 @@ export default async function TripsPage() {
         </div>
       ) : (
         <div className="space-y-8">
+          {/* Current trips */}
+          {currentTrips.length > 0 && (
+            <section>
+              <h2 className="mb-4 text-lg font-semibold text-gray-900">
+                Current Trip{currentTrips.length > 1 ? 's' : ''}
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {currentTrips.map((trip) => (
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    itemCount={trip.trip_items?.length ?? 0}
+                    needsReview={
+                      trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false
+                    }
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* Upcoming trips */}
           {upcomingTrips.length > 0 && (
             <section>
