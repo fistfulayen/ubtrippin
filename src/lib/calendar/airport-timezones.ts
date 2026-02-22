@@ -378,7 +378,6 @@ const VTIMEZONE_BLOCKS: Record<string, string[]> = {
     'Europe/Oslo',
     'Europe/Luxembourg',
     'Europe/Zurich',
-    'Europe/Tallinn',
   ].reduce<Record<string, string[]>>((acc, tzid) => {
     acc[tzid] = [
       `BEGIN:VTIMEZONE`,
@@ -402,9 +401,10 @@ const VTIMEZONE_BLOCKS: Record<string, string[]> = {
     return acc
   }, {})),
 
-  // EET/EEST zones (+2/+3): Helsinki, Athens, Riga, Vilnius
+  // EET/EEST zones (+2/+3): Helsinki, Tallinn, Athens, Riga, Vilnius
   ...([
     'Europe/Helsinki',
+    'Europe/Tallinn',
     'Europe/Athens',
     'Europe/Riga',
     'Europe/Vilnius',
