@@ -230,7 +230,7 @@ export default async function SharePage({ params }: SharePageProps) {
             <span className="text-base font-bold text-amber-700">UBTRIPPIN</span>
           </Link>
           <Link
-            href="/sign-up"
+            href="/"
             className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
           >
             Plan your trip free
@@ -384,7 +384,7 @@ export default async function SharePage({ params }: SharePageProps) {
             entire itinerary in one beautiful place.
           </p>
           <Link
-            href="/sign-up"
+            href="/"
             className="mt-5 inline-flex items-center rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors shadow-sm"
           >
             Get started — it&apos;s free
