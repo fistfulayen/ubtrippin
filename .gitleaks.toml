@@ -1,0 +1,8 @@
+# Gitleaks config — suppress false positives in documentation examples
+
+[[allowlist]]
+description = "Example API keys in docs and README"
+paths = [
+  '''README\.md''',
+  '''docs/.*\.md''',
+]
