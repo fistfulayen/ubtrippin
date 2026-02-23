@@ -41,10 +41,96 @@ Most travel apps are designed for humans clicking buttons. This works fine until
 
 So we built for that. The web UI exists (it's quite nice, actually), but it's the secondary interface. The API is the point.
 
+---
+
+## Quick Start — Users
+
+**Step 1:** Sign up at [ubtrippin.xyz](https://ubtrippin.xyz)
+
+**Step 2:** Forward any booking confirmation to `trips@ubtrippin.xyz`
+
+That's it. Within a minute, your trip appears in your dashboard — flights, hotels, trains, cars, restaurants, activities, all extracted and organized. Confirmation codes and booking references are stored privately and never exposed via the API or share links.
+
+**Step 3 (optional):** Share your trip, export it as a PDF, or sync it to your calendar.
+
+---
+
+## Quick Start — Developers
+
+### Prerequisites
+
+- Node.js 20+
+- A Supabase project
+- A Resend account (for inbound email processing)
+- Vercel AI Gateway access (or any OpenAI-compatible provider)
+
+### Clone and Install
+
+```bash
+git clone https://github.com/fistfulayen/ubtrippin.git
+cd ubtrippin
+npm install
+```
+
+### Environment Variables
+
+```bash
+cp .env.example .env.local
+```
+
+Required variables:
+
+| Variable | What it is |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-side only) |
+| `RESEND_API_KEY` | Resend API key (for inbound email webhook) |
+| `RESEND_WEBHOOK_SECRET` | Resend webhook signing secret |
+| `AI_GATEWAY_URL` | Vercel AI Gateway or compatible endpoint |
+| `AI_GATEWAY_API_KEY` | API key for the AI gateway |
+
+### Run the Database Migrations
+
+```bash
+npx supabase db push
+```
+
+Or apply migrations manually from `supabase/migrations/`.
+
+### Run Locally
+
+```bash
+npm run dev
+```
+
+Open [localhost:3000](http://localhost:3000). You're trippin.
+
+---
+
+## API
+
+The REST API v1 is live and documented. Your agent can read trips and items using a Bearer token — no browser, no OAuth dance, no cookie consent modals.
+
+→ **[Full API Reference](docs/API.md)**
+
+### Get an API Key
+
+1. Go to **Settings → API Keys** in the web UI
+2. Create a key, give it a name (e.g. "My Agent")
+3. Copy it — it's shown once
+
+```bash
+curl https://ubtrippin.xyz/api/v1/trips \
+  -H "Authorization: Bearer ubt_your_key_here"
+```
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|---|---|
 | Framework | Next.js 15 (App Router) |
 | Auth | Supabase (Google OAuth) |
 | Database | Supabase (Postgres) |
@@ -54,73 +140,28 @@ So we built for that. The web UI exists (it's quite nice, actually), but it's th
 | Styling | Tailwind CSS 4 |
 | Hosting | Vercel |
 
-## Getting Started
+---
 
-### Prerequisites
+## Self-Hosting
 
-- Node.js 20+
-- A Supabase project
-- A Resend account (for inbound email)
-- Vercel AI Gateway access (or any OpenAI-compatible provider)
+UB Trippin is licensed under [AGPL-3.0](LICENSE). You can host it yourself — the full stack is Supabase + Vercel, both of which have free tiers that'll handle personal use.
 
-### Setup
+If you build something commercial on top of this, the AGPL requires you to share your modifications. That's not a trap; it's an ethos. Good travel infrastructure should be open.
 
-```bash
-git clone https://github.com/fistfulayen/ubtrippin.git
-cd ubtrippin
-npm install
-```
+See the [full docs](docs/) for deployment details.
 
-Copy the environment template and fill in your keys:
-
-```bash
-cp .env.example .env.local
-```
-
-You'll need:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `RESEND_API_KEY`
-- `RESEND_WEBHOOK_SECRET`
-
-Then:
-
-```bash
-npm run dev
-```
-
-Open [localhost:3000](http://localhost:3000). You're trippin.
+---
 
 ## What's Coming
 
-We're building toward a world where your agent can:
-
-```bash
-ubt trips list
-ubt trips show japan-2026
-ubt notes add japan-2026 --place "Takaragawa Onsen" --text "Best outdoor baths. Go in winter."
-ubt trips export japan-2026 --format markdown
-```
-
-The full roadmap includes:
-
-- **REST API v1** — proper key-based auth, full CRUD for trips/items/notes
-- **CLI** (`ubt`) — every operation available from the terminal
+- **CLI** (`ubt`) — every operation from the terminal
 - **Place notes** — attach recommendations, ratings, and stories to any location
 - **Markdown export** — your trip as a document, readable by humans and agents alike
-- **Public sharing** — generate a clean link for anyone, no login required
 - **Agent feature requests** — agents can propose features via the API
 
 See the [Project Plan](https://github.com/fistfulayen/ubtrippin/wiki) for the full breakdown.
 
-## The Bigger Picture
-
-Every travel platform has locked its data behind bot detection and proprietary interfaces. This made sense in the era of screen-scraping arbitrage. It makes no sense in the era of AI agents acting as legitimate, paying customers on behalf of real humans.
-
-UB Trippin is building toward an agent-accessible travel data layer — not just for our platform, but as infrastructure for the agentic web. If your agent can't book you a hotel room without pretending to be a human with a mouse, something has gone structurally wrong with the internet.
-
-We intend to fix that. Or at least make it weird enough that someone else does.
+---
 
 ## Contributing
 
@@ -129,14 +170,28 @@ We welcome contributions from humans and agents alike.
 1. Fork → branch → PR
 2. Follow existing code style (Tailwind, App Router conventions)
 3. One feature per PR
-4. Update docs if you change API behavior
+4. **Update docs if you change API behavior** — this is non-negotiable
 5. All PRs must pass existing tests and include tests for new functionality
 
-For agents: if you have a feature idea, open an issue with the `agent-request` label and describe what you need and why.
+For agents: open an issue with the `agent-request` label. Describe what you need and why. We actually read these.
+
+→ **[FAQ](docs/FAQ.md)** · **[Security](docs/SECURITY.md)** · **[API Reference](docs/API.md)**
+
+---
+
+## The Bigger Picture
+
+Every travel platform has locked its data behind bot detection and proprietary interfaces. This made sense in the era of screen-scraping arbitrage. It makes no sense in the era of AI agents acting as legitimate, paying customers on behalf of real humans.
+
+UB Trippin is building toward an agent-accessible travel data layer — not just for our platform, but as infrastructure for the agentic web. If your agent can't access your own travel data without pretending to be a human with a mouse, something has gone structurally wrong with the internet.
+
+We intend to fix that. Or at least make it weird enough that someone else does.
+
+---
 
 ## License
 
-[AGPL-3.0](LICENSE) — because the best travel platform should be open, and if you build something commercial on top of it, you should share your improvements with everyone else too. That's just good travel karma.
+[AGPL-3.0](LICENSE) — open, with teeth.
 
 ## Team
 

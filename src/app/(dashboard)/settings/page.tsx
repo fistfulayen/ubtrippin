@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AllowedSendersList } from '@/components/settings/allowed-senders-list'
 import { AddSenderForm } from '@/components/settings/add-sender-form'
-import { Mail, User, Info } from 'lucide-react'
+import { ApiKeysSection } from '@/components/settings/api-keys-section'
+import { Mail, User, Info, Key } from 'lucide-react'
 import { UserAvatar } from '@/components/user-avatar'
 import type { Profile, AllowedSender } from '@/types/database'
 
@@ -90,6 +91,22 @@ export default async function SettingsPage() {
 
           {/* List */}
           <AllowedSendersList senders={allowedSenders || []} />
+        </CardContent>
+      </Card>
+
+      {/* API Keys */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Key className="h-5 w-5" />
+            API Keys
+          </CardTitle>
+          <CardDescription>
+            Generate API keys for programmatic access to your UB Trippin data (agents, integrations, CI/CD pipelines).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ApiKeysSection />
         </CardContent>
       </Card>
 
