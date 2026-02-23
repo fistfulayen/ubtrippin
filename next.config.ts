@@ -6,7 +6,7 @@ const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://images.unsplash.com https://pics.avs.io https://*.supabase.co;
+  img-src 'self' blob: data: https://images.unsplash.com https://pics.avs.io https://*.supabase.co https://lh3.googleusercontent.com;
   font-src 'self';
   connect-src 'self' https://*.supabase.co https://api.unsplash.com;
   frame-ancestors 'none';
