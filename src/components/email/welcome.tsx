@@ -123,7 +123,7 @@ const container = {
 }
 
 const h1 = {
-  color: '#1e1b4b',
+  color: '#1e293b',
   fontSize: '28px',
   fontWeight: '700',
   lineHeight: '1.3',
@@ -131,7 +131,7 @@ const h1 = {
 }
 
 const h2 = {
-  color: '#1e1b4b',
+  color: '#1e293b',
   fontSize: '20px',
   fontWeight: '600',
   lineHeight: '1.3',
@@ -160,7 +160,7 @@ const codeBox = {
 }
 
 const codeText = {
-  color: '#92400e',
+  color: '#4338ca',
   fontSize: '16px',
   fontFamily: 'monospace',
   fontWeight: '600',
@@ -168,7 +168,7 @@ const codeText = {
 }
 
 const link = {
-  color: '#b45309',
+  color: '#4f46e5',
   textDecoration: 'underline',
 }
 
@@ -182,7 +182,7 @@ const buttonContainer = {
 }
 
 const button = {
-  backgroundColor: '#b45309',
+  backgroundColor: '#4f46e5',
   borderRadius: '8px',
   color: '#ffffff',
   display: 'inline-block',

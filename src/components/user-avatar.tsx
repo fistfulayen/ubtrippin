@@ -33,7 +33,7 @@ export function UserAvatar({ src, name, email, size = 'sm' }: UserAvatarProps) {
   }
 
   return (
-    <div className={`flex ${s.outer} items-center justify-center rounded-full bg-[#c7c2b8] text-[#1e1b4b] font-medium`}>
+    <div className={`flex ${s.outer} items-center justify-center rounded-full bg-[#cbd5e1] text-[#1e293b] font-medium`}>
       {initial}
     </div>
   )

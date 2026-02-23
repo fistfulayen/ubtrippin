@@ -38,26 +38,26 @@ export default async function NewTripPage() {
       </div>
 
       {limitHit ? (
-        <div className="rounded-xl border border-[#c7c2b8] bg-[#f5f3ef] p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-[#1e1b4b]">Trip limit reached</h2>
-          <p className="text-sm text-[#1e1b4b]">
+        <div className="rounded-xl border border-[#cbd5e1] bg-[#ffffff] p-6 space-y-3">
+          <h2 className="text-lg font-semibold text-[#1e293b]">Trip limit reached</h2>
+          <p className="text-sm text-[#1e293b]">
             You&apos;ve used {limitUsed} of {limitMax} trips on the free plan. Upgrade to{' '}
             <strong>Pro</strong> for unlimited trips.
           </p>
-          <p className="text-xs text-[#92400e]">
+          <p className="text-xs text-[#4338ca]">
             Alternatively, delete an existing trip to free up a slot.
           </p>
           <div className="flex gap-3 pt-2">
             <Link
               href="/trips"
-              className="inline-flex items-center rounded-md bg-[#1e1b4b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
+              className="inline-flex items-center rounded-md bg-[#1e293b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
             >
               Back to trips
             </Link>
             {/* Upgrade link placeholder — wire up Stripe when billing is ready */}
             <Link
               href="/settings"
-              className="inline-flex items-center rounded-md border border-[#c7c2b8] bg-white px-4 py-2 text-sm font-medium text-[#1e1b4b] hover:bg-[#f5f3ef]"
+              className="inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-medium text-[#1e293b] hover:bg-[#ffffff]"
             >
               Upgrade to Pro
             </Link>

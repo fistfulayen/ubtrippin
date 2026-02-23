@@ -23,7 +23,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
         </p>
         <Link
           href={`/trips/${tripId}/add-item`}
-          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1e1b4b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1e293b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
         >
           <Plus className="h-4 w-4" />
           Add first item
@@ -53,7 +53,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
           <div key={date} className="relative">
             {/* Date header */}
             <div className="sticky top-20 z-10 mb-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eceae4] text-[#92400e] font-semibold">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f1f5f9] text-[#4338ca] font-semibold">
                 {dateIndex + 1}
               </div>
               <div>
@@ -65,7 +65,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
             </div>
 
             {/* Items for this day */}
-            <div className="ml-5 border-l-2 border-[#c7c2b8] pl-8 space-y-4">
+            <div className="ml-5 border-l-2 border-[#cbd5e1] pl-8 space-y-4">
               {sortedDayItems.map((item) => (
                 <TripItemCard key={item.id} item={item} allTrips={allTrips} />
               ))}

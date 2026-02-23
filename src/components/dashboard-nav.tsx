@@ -34,7 +34,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
   }
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[#c7c2b8]/50 bg-white/80 backdrop-blur-sm">
+    <nav className="sticky top-0 z-40 border-b border-[#cbd5e1]/50 bg-white/80 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -62,7 +62,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
                   className={cn(
                     'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                     isActive
-                      ? 'bg-[#eceae4] text-[#1e1b4b]'
+                      ? 'bg-[#f1f5f9] text-[#1e293b]'
                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   )}
                 >
@@ -120,7 +120,7 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
                   className={cn(
                     'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
                     isActive
-                      ? 'bg-[#eceae4] text-[#1e1b4b]'
+                      ? 'bg-[#f1f5f9] text-[#1e293b]'
                       : 'text-gray-600 hover:bg-gray-100'
                   )}
                 >

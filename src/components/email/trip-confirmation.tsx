@@ -227,7 +227,7 @@ const tripCard = {
 }
 
 const dateText = {
-  color: '#92400e',
+  color: '#4338ca',
   fontSize: '14px',
   margin: '0',
 }
@@ -263,7 +263,7 @@ const itemDetail = {
 }
 
 const itemConfirmation = {
-  color: '#92400e',
+  color: '#4338ca',
   fontSize: '14px',
   fontWeight: '500',
   margin: '4px 0 0',

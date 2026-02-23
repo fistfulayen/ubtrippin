@@ -156,13 +156,13 @@ export default async function TripsPage() {
       )}
 
       {/* Info box */}
-      <div className="rounded-xl bg-[#f5f3ef] border border-[#c7c2b8] p-4">
-        <h3 className="font-medium text-[#1e1b4b]">Quick tip</h3>
-        <p className="mt-1 text-sm text-[#1e1b4b]">
+      <div className="rounded-xl bg-[#ffffff] border border-[#cbd5e1] p-4">
+        <h3 className="font-medium text-[#1e293b]">Quick tip</h3>
+        <p className="mt-1 text-sm text-[#1e293b]">
           Forward booking emails from your registered email address to{' '}
           <strong>trips@ubtrippin.xyz</strong> to automatically create and organize trips.
           Make sure to add your sending email address in{' '}
-          <Link href="/settings" className="underline hover:text-[#1e1b4b]">
+          <Link href="/settings" className="underline hover:text-[#1e293b]">
             Settings
           </Link>
           .

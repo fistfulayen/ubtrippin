@@ -9,13 +9,16 @@
   --color-indigo-500: oklch(0.585 0.233 277.12);
   --color-indigo-600: oklch(0.511 0.262 276.97);
   --color-indigo-700: oklch(0.457 0.240 277.02);
-  --color-copper-50: oklch(0.970 0.020 75.0);
+  --color-slate-50: oklch(0.984 0.003 247.86);
+  --color-slate-100: oklch(0.968 0.007 247.86);
+  --color-slate-200: oklch(0.929 0.013 255.51);
+  --color-slate-800: oklch(0.279 0.029 260.03);
 }
 
 :root {
-  --background: #f5f3ef;
-  --foreground: #1e1b4b;
-  --accent: #b45309;
+  --background: #ffffff;
+  --foreground: #1e293b;
+  --accent: #4f46e5;
 }
 
 body {
@@ -47,15 +50,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #eceae4;
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #b45309;
+  background: #94a3b8;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #92400e;
+  background: #64748b;
 }
 
 /* Subtle entrance animations */

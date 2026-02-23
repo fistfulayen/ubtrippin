@@ -24,7 +24,7 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
         particleCount: 120,
         spread: 80,
         origin: { x: 0.5, y: 0.5 },
-        colors: ['#b45309', '#d97706', '#fbbf24', '#1e1b4b', '#4f46e5', '#f5f3ef'],
+        colors: ['#4f46e5', '#d97706', '#fbbf24', '#1e293b', '#4f46e5', '#ffffff'],
         startVelocity: 40,
         gravity: 0.9,
       })
@@ -36,7 +36,7 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
           angle: 60,
           spread: 55,
           origin: { x: 0, y: 0.6 },
-          colors: ['#b45309', '#d97706', '#fbbf24'],
+          colors: ['#4f46e5', '#d97706', '#fbbf24'],
         })
       }, 250)
 
@@ -47,7 +47,7 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
           angle: 120,
           spread: 55,
           origin: { x: 1, y: 0.6 },
-          colors: ['#1e1b4b', '#4f46e5', '#818cf8'],
+          colors: ['#1e293b', '#4f46e5', '#818cf8'],
         })
       }, 400)
     })
@@ -63,10 +63,10 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
   if (!visible) return null
 
   return (
-    <div className="relative rounded-2xl border border-[#b45309]/30 bg-gradient-to-br from-[#fff7ed] via-[#fffbf5] to-[#f5f3ef] p-6 shadow-sm overflow-hidden">
+    <div className="relative rounded-2xl border border-[#4f46e5]/30 bg-gradient-to-br from-[#fff7ed] via-[#fffbf5] to-[#ffffff] p-6 shadow-sm overflow-hidden">
       {/* Decorative background accent */}
-      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#b45309]/5" />
-      <div className="pointer-events-none absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-[#1e1b4b]/5" />
+      <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-[#4f46e5]/5" />
+      <div className="pointer-events-none absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-[#1e293b]/5" />
 
       {/* Dismiss button */}
       <button
@@ -83,9 +83,9 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
         <div className="flex items-center gap-3">
           <span className="text-3xl" role="img" aria-label="party popper">🎉</span>
           <div>
-            <h2 className="text-xl font-bold text-[#1e1b4b]">Your first trip!</h2>
+            <h2 className="text-xl font-bold text-[#1e293b]">Your first trip!</h2>
             <p className="text-sm text-gray-600 mt-0.5">
-              <span className="font-medium text-[#b45309]">{tripTitle}</span> has been added to UBTRIPPIN.
+              <span className="font-medium text-[#4f46e5]">{tripTitle}</span> has been added to UBTRIPPIN.
             </p>
           </div>
         </div>
@@ -95,36 +95,36 @@ export function FirstTripBanner({ tripId, tripTitle }: FirstTripBannerProps) {
       <div className="grid gap-3 sm:grid-cols-3">
         <a
           href={`/trips/${tripId}`}
-          className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#c7c2b8]/50 p-3 hover:bg-white hover:border-[#b45309]/30 transition-colors group"
+          className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#cbd5e1]/50 p-3 hover:bg-white hover:border-[#4f46e5]/30 transition-colors group"
         >
-          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#b45309]/10 group-hover:bg-[#b45309]/20 transition-colors">
-            <Share2 className="h-4 w-4 text-[#b45309]" />
+          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#4f46e5]/10 group-hover:bg-[#4f46e5]/20 transition-colors">
+            <Share2 className="h-4 w-4 text-[#4f46e5]" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#1e1b4b]">Share it</p>
+            <p className="text-sm font-semibold text-[#1e293b]">Share it</p>
             <p className="text-xs text-gray-500 mt-0.5">Generate a shareable link for friends &amp; family</p>
           </div>
         </a>
 
         <a
           href={`/trips/${tripId}`}
-          className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#c7c2b8]/50 p-3 hover:bg-white hover:border-[#b45309]/30 transition-colors group"
+          className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#cbd5e1]/50 p-3 hover:bg-white hover:border-[#4f46e5]/30 transition-colors group"
         >
-          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#1e1b4b]/10 group-hover:bg-[#1e1b4b]/20 transition-colors">
-            <Calendar className="h-4 w-4 text-[#1e1b4b]" />
+          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-[#1e293b]/10 group-hover:bg-[#1e293b]/20 transition-colors">
+            <Calendar className="h-4 w-4 text-[#1e293b]" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#1e1b4b]">Export to calendar</p>
+            <p className="text-sm font-semibold text-[#1e293b]">Export to calendar</p>
             <p className="text-xs text-gray-500 mt-0.5">Add the whole itinerary to Apple/Google Calendar</p>
           </div>
         </a>
 
-        <div className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#c7c2b8]/50 p-3">
-          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
-            <Mail className="h-4 w-4 text-amber-600" />
+        <div className="flex items-start gap-3 rounded-xl bg-white/70 border border-[#cbd5e1]/50 p-3">
+          <div className="flex-shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+            <Mail className="h-4 w-4 text-indigo-600" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-[#1e1b4b]">Keep forwarding</p>
+            <p className="text-sm font-semibold text-[#1e293b]">Keep forwarding</p>
             <p className="text-xs text-gray-500 mt-0.5">Forward more booking confirmations to build your itinerary</p>
           </div>
         </div>

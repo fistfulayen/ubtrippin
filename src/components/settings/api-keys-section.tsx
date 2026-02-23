@@ -125,15 +125,15 @@ export function ApiKeysSection() {
 
       {/* One-time key reveal */}
       {newPlaintext && (
-        <div className="rounded-lg border border-[#c7c2b8] bg-[#f5f3ef] p-4 space-y-3">
-          <div className="flex items-start gap-2 text-[#1e1b4b]">
-            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-[#b45309]" />
+        <div className="rounded-lg border border-[#cbd5e1] bg-[#ffffff] p-4 space-y-3">
+          <div className="flex items-start gap-2 text-[#1e293b]">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-[#4f46e5]" />
             <p className="text-sm font-medium">
               Save this key — you won&apos;t see it again. Copy it now and store it somewhere safe.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <code className="flex-1 rounded bg-white border border-[#c7c2b8] px-3 py-2 text-sm font-mono text-gray-800 select-all overflow-x-auto">
+            <code className="flex-1 rounded bg-white border border-[#cbd5e1] px-3 py-2 text-sm font-mono text-gray-800 select-all overflow-x-auto">
               {newPlaintext}
             </code>
             <Button
@@ -141,7 +141,7 @@ export function ApiKeysSection() {
               variant="ghost"
               size="sm"
               onClick={handleCopy}
-              className="shrink-0 text-[#92400e] hover:text-[#1e1b4b] hover:bg-[#eceae4]"
+              className="shrink-0 text-[#4338ca] hover:text-[#1e293b] hover:bg-[#f1f5f9]"
             >
               {copied ? (
                 <Check className="h-4 w-4" />
@@ -154,7 +154,7 @@ export function ApiKeysSection() {
           <button
             type="button"
             onClick={dismissNewKey}
-            className="text-xs text-[#b45309] hover:text-[#1e1b4b] underline underline-offset-2"
+            className="text-xs text-[#4f46e5] hover:text-[#1e293b] underline underline-offset-2"
           >
             I&apos;ve saved it — dismiss
           </button>

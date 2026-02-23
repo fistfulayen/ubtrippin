@@ -80,13 +80,13 @@ export function PWAInstallPrompt() {
 
   return (
     <div className="relative mx-auto max-w-4xl px-4 mb-4">
-      <div className="flex items-center gap-3 rounded-lg border border-[#c7c2b8] bg-[#f5f3ef] px-4 py-3">
-        <Download className="h-5 w-5 shrink-0 text-[#b45309]" />
+      <div className="flex items-center gap-3 rounded-lg border border-[#cbd5e1] bg-[#ffffff] px-4 py-3">
+        <Download className="h-5 w-5 shrink-0 text-[#4f46e5]" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[#1e1b4b]">
+          <p className="text-sm font-medium text-[#1e293b]">
             Install UB Trippin
           </p>
-          <p className="text-xs text-[#92400e]">
+          <p className="text-xs text-[#4338ca]">
             {isIOS
               ? 'Tap the share button, then "Add to Home Screen"'
               : 'Add to your home screen for quick access to your trips'
@@ -97,14 +97,14 @@ export function PWAInstallPrompt() {
           <Button
             size="sm"
             onClick={handleInstall}
-            className="shrink-0 bg-[#1e1b4b] hover:bg-[#312e81] text-white"
+            className="shrink-0 bg-[#1e293b] hover:bg-[#312e81] text-white"
           >
             Install
           </Button>
         )}
         <button
           onClick={handleDismiss}
-          className="shrink-0 rounded p-1 text-[#b45309] hover:text-[#b45309]"
+          className="shrink-0 rounded p-1 text-[#4f46e5] hover:text-[#4f46e5]"
         >
           <X className="h-4 w-4" />
         </button>

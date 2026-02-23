@@ -136,7 +136,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
                   item.kind === 'flight' && 'bg-blue-100 text-blue-600',
                   item.kind === 'hotel' && 'bg-purple-100 text-purple-600',
                   item.kind === 'train' && 'bg-green-100 text-green-600',
-                  item.kind === 'car' && 'bg-[#eceae4] text-[#b45309]',
+                  item.kind === 'car' && 'bg-[#f1f5f9] text-[#4f46e5]',
                   item.kind === 'restaurant' && 'bg-red-100 text-red-600',
                   item.kind === 'activity' && 'bg-pink-100 text-pink-600',
                   item.kind === 'other' && 'bg-gray-100 text-gray-600'
@@ -248,7 +248,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
             <>
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="mt-3 flex items-center gap-1 text-sm text-[#b45309] hover:text-[#92400e]"
+                className="mt-3 flex items-center gap-1 text-sm text-[#4f46e5] hover:text-[#4338ca]"
               >
                 {expanded ? (
                   <>

@@ -56,12 +56,12 @@ export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps
     <Link href={`/trips/${trip.id}`}>
       <Card
         className={cn(
-          'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-[#c7c2b8]',
+          'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-[#cbd5e1]',
           isPast && 'opacity-75'
         )}
       >
         {/* Cover image */}
-        <div className="relative h-36 w-full bg-gradient-to-br from-[#eceae4] to-[#f5f3ef]">
+        <div className="relative h-36 w-full bg-gradient-to-br from-[#f1f5f9] to-[#ffffff]">
           {trip.cover_image_url && (
             <Image
               src={trip.cover_image_url}
@@ -96,7 +96,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps
         <CardContent className="p-4">
           {/* Header with title and review badge */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-gray-900 group-hover:text-[#92400e] transition-colors line-clamp-1">
+            <h3 className="font-semibold text-gray-900 group-hover:text-[#4338ca] transition-colors line-clamp-1">
               {trip.title}
             </h3>
             {needsReview && (

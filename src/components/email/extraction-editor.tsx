@@ -110,7 +110,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
               <CardTitle className="text-base flex items-center gap-2">
                 <span className="font-medium">Item {index + 1}</span>
                 {item.confidence < 0.65 && (
-                  <span className="text-xs text-[#b45309] bg-[#f5f3ef] px-2 py-0.5 rounded">
+                  <span className="text-xs text-[#4f46e5] bg-[#ffffff] px-2 py-0.5 rounded">
                     Needs Review
                   </span>
                 )}
@@ -351,9 +351,9 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             type="checkbox"
             checked={createExample}
             onChange={(e) => setCreateExample(e.target.checked)}
-            className="rounded border-gray-300 text-[#b45309] focus:ring-[#b45309]"
+            className="rounded border-gray-300 text-[#4f46e5] focus:ring-[#4f46e5]"
           />
-          <Sparkles className="h-4 w-4 text-[#b45309]" />
+          <Sparkles className="h-4 w-4 text-[#4f46e5]" />
           Save as learning example
         </label>
         <Button onClick={() => onSave(createExample)} disabled={isSaving}>

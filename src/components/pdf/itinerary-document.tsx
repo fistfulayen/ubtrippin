@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 12,
     fontWeight: 'bold',
-    color: '#92400e',
+    color: '#4338ca',
   },
   dayDate: {
     fontSize: 10,
@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
   itemConfirmation: {
     fontSize: 9,
     fontWeight: 'bold',
-    color: '#92400e',
+    color: '#4338ca',
     marginTop: 4,
   },
   itemLocation: {

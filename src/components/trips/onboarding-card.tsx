@@ -18,7 +18,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="ml-2 rounded p-1 hover:bg-[#eceae4] transition-colors"
+      className="ml-2 rounded p-1 hover:bg-[#f1f5f9] transition-colors"
       aria-label="Copy to clipboard"
     >
       {copied ? (
@@ -32,22 +32,22 @@ function CopyButton({ text }: { text: string }) {
 
 export function OnboardingCard() {
   return (
-    <div className="rounded-2xl border border-[#c7c2b8] bg-[#f5f3ef] p-8">
-      <h2 className="text-2xl font-bold text-[#1e1b4b] mb-6">
+    <div className="rounded-2xl border border-[#cbd5e1] bg-[#ffffff] p-8">
+      <h2 className="text-2xl font-bold text-[#1e293b] mb-6">
         Welcome to UBTRIPPIN 🧳
       </h2>
 
       <div className="grid gap-8 md:grid-cols-2">
         {/* Left column */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-[#1e1b4b]">
+          <h3 className="text-lg font-semibold text-[#1e293b]">
             Add your bookings
           </h3>
           <p className="text-sm text-gray-600">
             Forward any booking confirmation to:
           </p>
-          <div className="flex items-center rounded-lg bg-white border border-[#c7c2b8] px-4 py-2 shadow-sm">
-            <code className="font-mono text-sm font-semibold text-[#b45309]">
+          <div className="flex items-center rounded-lg bg-white border border-[#cbd5e1] px-4 py-2 shadow-sm">
+            <code className="font-mono text-sm font-semibold text-[#4f46e5]">
               trips@ubtrippin.xyz
             </code>
             <CopyButton text="trips@ubtrippin.xyz" />
@@ -68,7 +68,7 @@ export function OnboardingCard() {
           </p>
           <p className="text-xs text-gray-500">
             💡 Make sure to add your email in{' '}
-            <Link href="/settings" className="underline hover:text-[#1e1b4b]">
+            <Link href="/settings" className="underline hover:text-[#1e293b]">
               Settings
             </Link>{' '}
             first.
@@ -77,15 +77,15 @@ export function OnboardingCard() {
 
         {/* Right column */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-[#1e1b4b]">
+          <h3 className="text-lg font-semibold text-[#1e293b]">
             Connect your AI agent
           </h3>
           <p className="text-sm text-gray-600">
             If you use an AI assistant (OpenClaw, Claude, etc.):
           </p>
 
-          <div className="flex items-center rounded-lg bg-white border border-[#c7c2b8] px-4 py-2 shadow-sm">
-            <code className="font-mono text-sm font-semibold text-[#b45309]">
+          <div className="flex items-center rounded-lg bg-white border border-[#cbd5e1] px-4 py-2 shadow-sm">
+            <code className="font-mono text-sm font-semibold text-[#4f46e5]">
               npx clawhub install ubtrippin
             </code>
             <CopyButton text="npx clawhub install ubtrippin" />
@@ -93,7 +93,7 @@ export function OnboardingCard() {
 
           <p className="text-sm text-gray-600">
             Then give your agent your API key from{' '}
-            <Link href="/settings" className="underline hover:text-[#1e1b4b]">
+            <Link href="/settings" className="underline hover:text-[#1e293b]">
               Settings
             </Link>
             .

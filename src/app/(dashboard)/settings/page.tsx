@@ -74,9 +74,9 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Info box */}
-          <div className="rounded-lg bg-[#f5f3ef] border border-[#c7c2b8] p-4 flex gap-3">
-            <Info className="h-5 w-5 text-[#b45309] shrink-0 mt-0.5" />
-            <div className="text-sm text-[#1e1b4b]">
+          <div className="rounded-lg bg-[#ffffff] border border-[#cbd5e1] p-4 flex gap-3">
+            <Info className="h-5 w-5 text-[#4f46e5] shrink-0 mt-0.5" />
+            <div className="text-sm text-[#1e293b]">
               <p className="font-medium mb-1">How it works:</p>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Add your email address(es) below</li>
