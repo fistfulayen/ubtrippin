@@ -73,7 +73,7 @@ export default async function InboxPage() {
 
             return (
               <Link key={email.id} href={`/inbox/${email.id}`}>
-                <Card className="group cursor-pointer transition-all hover:shadow-md hover:border-amber-200">
+                <Card className="group cursor-pointer transition-all hover:shadow-md hover:border-[#c7c2b8]">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       {/* Status indicator */}
@@ -94,7 +94,7 @@ export default async function InboxPage() {
                       {/* Content */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 truncate group-hover:text-amber-700">
+                          <span className="font-medium text-gray-900 truncate group-hover:text-[#92400e]">
                             {email.subject || '(no subject)'}
                           </span>
                           <Badge variant={status.variant} className="shrink-0">

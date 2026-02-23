@@ -12,14 +12,14 @@ export function CarDetailsView({ details }: CarDetailsViewProps) {
   const sameLocation = pickup_location && dropoff_location && pickup_location === dropoff_location
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-orange-50 to-gray-100 p-4">
+    <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-[#f5f3ef] to-gray-100 p-4">
       {/* Header row */}
       <div className="flex items-center justify-between">
         {rental_company && (
           <span className="text-lg font-bold text-gray-900">{rental_company}</span>
         )}
         {vehicle_type && (
-          <span className="flex items-center gap-1 rounded bg-orange-100 px-2 py-0.5 text-sm font-medium text-orange-700">
+          <span className="flex items-center gap-1 rounded bg-[#eceae4] px-2 py-0.5 text-sm font-medium text-[#b45309]">
             <Car className="h-3.5 w-3.5" />
             {vehicle_type}
           </span>

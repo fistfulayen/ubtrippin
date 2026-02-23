@@ -136,7 +136,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
           <div className="absolute inset-0 bg-black/30" />
         </>
       ) : (
-        <div className="absolute inset-0 bg-gradient-to-r from-amber-100 to-orange-100" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#eceae4] to-[#f5f3ef]" />
       )}
 
       {/* Buttons: share, cover, edit */}
@@ -237,7 +237,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
           {(trip.start_date || trip.end_date) && (
             <div className="flex items-center gap-1.5">
               <Calendar
-                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-amber-600'}`}
+                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-[#b45309]'}`}
               />
               <span>{formatDateRange(trip.start_date, trip.end_date)}</span>
             </div>
@@ -246,7 +246,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
           {trip.primary_location && (
             <div className="flex items-center gap-1.5">
               <MapPin
-                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-amber-600'}`}
+                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-[#b45309]'}`}
               />
               <span>{trip.primary_location}</span>
             </div>
@@ -255,7 +255,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
           {trip.travelers && trip.travelers.length > 0 && (
             <div className="flex items-center gap-1.5">
               <Users
-                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-amber-600'}`}
+                className={`h-4 w-4 ${trip.cover_image_url ? 'text-white' : 'text-[#b45309]'}`}
               />
               <span>{trip.travelers.join(', ')}</span>
             </div>
@@ -290,7 +290,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Share2 className="h-5 w-5 text-amber-600" />
+              <Share2 className="h-5 w-5 text-[#b45309]" />
               Share trip
             </DialogTitle>
             <DialogDescription>
@@ -316,8 +316,8 @@ export function TripHeader({ trip }: TripHeaderProps) {
                 aria-checked={shareEnabled}
                 onClick={handleToggleShare}
                 disabled={shareLoading}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-                  shareEnabled ? 'bg-amber-600' : 'bg-gray-200'
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b45309] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+                  shareEnabled ? 'bg-[#1e1b4b]' : 'bg-gray-200'
                 }`}
               >
                 <span

@@ -223,7 +223,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
               <button
                 className={`flex-1 px-4 py-3 text-sm font-medium ${
                   tab === 'search'
-                    ? 'border-b-2 border-amber-500 text-amber-700'
+                    ? 'border-b-2 border-[#b45309] text-[#92400e]'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
                 onClick={() => setTab('search')}
@@ -234,7 +234,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
               <button
                 className={`flex-1 px-4 py-3 text-sm font-medium ${
                   tab === 'upload'
-                    ? 'border-b-2 border-amber-500 text-amber-700'
+                    ? 'border-b-2 border-[#b45309] text-[#92400e]'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
                 onClick={() => setTab('upload')}
@@ -265,7 +265,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                       {searchResults.map((result, i) => (
                         <button
                           key={i}
-                          className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-amber-500 transition-all"
+                          className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#b45309] transition-all"
                           onClick={() => handleSelectUnsplash(result.urls.regular)}
                           disabled={uploading}
                         >
@@ -294,7 +294,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
               ) : (
                 <div className="space-y-4">
                   <div
-                    className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 hover:border-amber-400 cursor-pointer transition-colors"
+                    className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 p-8 hover:border-[#b45309] cursor-pointer transition-colors"
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <Camera className="h-8 w-8 text-gray-400" />
@@ -317,7 +317,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
         {/* Loading overlay */}
         {uploading && !previewSrc && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#b45309]" />
           </div>
         )}
       </div>

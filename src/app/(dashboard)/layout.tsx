@@ -24,7 +24,7 @@ export default async function DashboardLayout({
     .single()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50/50 to-orange-50/30">
+    <div className="min-h-screen bg-gradient-to-b from-[#f5f3ef]/50 to-[#eceae4]/30">
       <DashboardNav user={user} profile={profile} />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}

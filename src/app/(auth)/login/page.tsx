@@ -21,7 +21,7 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#f5f3ef] to-[#eceae4] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
           {/* Logo/Brand */}
@@ -40,9 +40,9 @@ function LoginContent() {
           </div>
 
           {/* How it works */}
-          <div className="bg-amber-50 rounded-xl p-4 space-y-3">
-            <h2 className="font-medium text-amber-900">How it works</h2>
-            <ol className="text-sm text-amber-800 space-y-2">
+          <div className="bg-[#f5f3ef] rounded-xl p-4 space-y-3">
+            <h2 className="font-medium text-[#1e1b4b]">How it works</h2>
+            <ol className="text-sm text-[#1e1b4b] space-y-2">
               <li className="flex gap-2">
                 <span className="font-semibold">1.</span>
                 <span>Sign in with Google</span>
@@ -104,7 +104,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-[#f5f3ef] to-[#eceae4] flex items-center justify-center">
         <div className="text-gray-500">Loading...</div>
       </div>
     }>

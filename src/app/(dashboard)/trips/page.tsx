@@ -55,9 +55,9 @@ export default async function TripsPage() {
 
       {!hasTrips ? (
         /* Empty state */
-        <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50/50 p-12 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-            <MapPin className="h-8 w-8 text-amber-600" />
+        <div className="rounded-2xl border-2 border-dashed border-[#c7c2b8] bg-[#f5f3ef]/50 p-12 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#eceae4]">
+            <MapPin className="h-8 w-8 text-[#b45309]" />
           </div>
           <h3 className="mt-6 text-lg font-semibold text-gray-900">
             No trips yet
@@ -66,8 +66,8 @@ export default async function TripsPage() {
             Forward your first booking confirmation email to get started, or create a trip manually.
           </p>
           <div className="mt-6 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 font-mono text-sm shadow-sm border border-amber-200">
-              <Mail className="h-4 w-4 text-amber-600" />
+            <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 font-mono text-sm shadow-sm border border-[#c7c2b8]">
+              <Mail className="h-4 w-4 text-[#b45309]" />
               trips@ubtrippin.xyz
             </div>
             <span className="text-sm text-gray-500">or</span>
@@ -146,13 +146,13 @@ export default async function TripsPage() {
       )}
 
       {/* Info box */}
-      <div className="rounded-xl bg-amber-50 border border-amber-200 p-4">
-        <h3 className="font-medium text-amber-900">Quick tip</h3>
-        <p className="mt-1 text-sm text-amber-800">
+      <div className="rounded-xl bg-[#f5f3ef] border border-[#c7c2b8] p-4">
+        <h3 className="font-medium text-[#1e1b4b]">Quick tip</h3>
+        <p className="mt-1 text-sm text-[#1e1b4b]">
           Forward booking emails from your registered email address to{' '}
           <strong>trips@ubtrippin.xyz</strong> to automatically create and organize trips.
           Make sure to add your sending email address in{' '}
-          <Link href="/settings" className="underline hover:text-amber-900">
+          <Link href="/settings" className="underline hover:text-[#1e1b4b]">
             Settings
           </Link>
           .

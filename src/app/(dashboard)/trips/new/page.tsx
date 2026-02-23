@@ -38,26 +38,26 @@ export default async function NewTripPage() {
       </div>
 
       {limitHit ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-amber-900">Trip limit reached</h2>
-          <p className="text-sm text-amber-800">
+        <div className="rounded-xl border border-[#c7c2b8] bg-[#f5f3ef] p-6 space-y-3">
+          <h2 className="text-lg font-semibold text-[#1e1b4b]">Trip limit reached</h2>
+          <p className="text-sm text-[#1e1b4b]">
             You&apos;ve used {limitUsed} of {limitMax} trips on the free plan. Upgrade to{' '}
             <strong>Pro</strong> for unlimited trips.
           </p>
-          <p className="text-xs text-amber-700">
+          <p className="text-xs text-[#92400e]">
             Alternatively, delete an existing trip to free up a slot.
           </p>
           <div className="flex gap-3 pt-2">
             <Link
               href="/trips"
-              className="inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700"
+              className="inline-flex items-center rounded-md bg-[#1e1b4b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
             >
               Back to trips
             </Link>
             {/* Upgrade link placeholder — wire up Stripe when billing is ready */}
             <Link
               href="/settings"
-              className="inline-flex items-center rounded-md border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50"
+              className="inline-flex items-center rounded-md border border-[#c7c2b8] bg-white px-4 py-2 text-sm font-medium text-[#1e1b4b] hover:bg-[#f5f3ef]"
             >
               Upgrade to Pro
             </Link>

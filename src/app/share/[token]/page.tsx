@@ -59,9 +59,9 @@ function KindIcon({ kind, className }: { kind: TripItemKind; className?: string 
 
 const kindColors: Record<TripItemKind, string> = {
   flight: 'bg-sky-100 text-sky-800',
-  hotel: 'bg-amber-100 text-amber-800',
+  hotel: 'bg-[#eceae4] text-[#1e1b4b]',
   train: 'bg-emerald-100 text-emerald-800',
-  car: 'bg-orange-100 text-orange-800',
+  car: 'bg-[#eceae4] text-[#b45309]',
   restaurant: 'bg-rose-100 text-rose-800',
   activity: 'bg-purple-100 text-purple-800',
   other: 'bg-gray-100 text-gray-800',
@@ -78,7 +78,7 @@ function TripItemRow({ item }: { item: TripItem }) {
     : null
 
   return (
-    <div className="flex items-start gap-3 py-4 border-b border-amber-100 last:border-0">
+    <div className="flex items-start gap-3 py-4 border-b border-[#eceae4] last:border-0">
       {/* Icon — airline logo for flights, generic icon for others */}
       {airlineLogoUrl ? (
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-200 overflow-hidden">
@@ -111,19 +111,19 @@ function TripItemRow({ item }: { item: TripItem }) {
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
           {(item.start_date || item.end_date) && (
             <span className="flex items-center gap-1">
-              <Calendar className="h-3 w-3 text-amber-500" />
+              <Calendar className="h-3 w-3 text-[#b45309]" />
               {formatDateRange(item.start_date, item.end_date)}
             </span>
           )}
           {location && (
             <span className="flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-amber-500" />
+              <MapPin className="h-3 w-3 text-[#b45309]" />
               {location}
             </span>
           )}
           {names.length > 0 && (
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3 text-amber-500" />
+              <Users className="h-3 w-3 text-[#b45309]" />
               {names.join(', ')}
             </span>
           )}
@@ -140,7 +140,7 @@ export default async function SharePage({ params }: SharePageProps) {
   // SECURITY: Validate token format before querying — nanoid(21) produces URL-safe chars only
   if (!/^[A-Za-z0-9_-]{10,64}$/.test(token)) {
     return (
-      <div className="min-h-screen bg-amber-50 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-[#f5f3ef] flex items-center justify-center p-8">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900">Trip not found</h1>
           <p className="mt-2 text-gray-500">This trip either doesn&apos;t exist or sharing has been disabled.</p>
@@ -161,21 +161,21 @@ export default async function SharePage({ params }: SharePageProps) {
 
   if (!trip) {
     return (
-      <div className="min-h-screen bg-amber-50 flex flex-col">
+      <div className="min-h-screen bg-[#f5f3ef] flex flex-col">
         {/* Header */}
-        <header className="border-b border-amber-200 bg-white/80 backdrop-blur-sm">
+        <header className="border-b border-[#c7c2b8] bg-white/80 backdrop-blur-sm">
           <div className="mx-auto max-w-4xl px-4 py-4">
             <Link href="/" className="flex items-center gap-2">
               <Image src="/ubtrippin_logo.png" alt="UBTRIPPIN" width={32} height={32} className="rounded-lg" />
-              <span className="text-lg font-bold text-amber-700">UBTRIPPIN</span>
+              <span className="text-lg font-bold text-[#92400e]">UBTRIPPIN</span>
             </Link>
           </div>
         </header>
 
         <main className="flex flex-1 items-center justify-center p-8">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
-              <MapPin className="h-8 w-8 text-amber-500" />
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#eceae4]">
+              <MapPin className="h-8 w-8 text-[#b45309]" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Trip not found</h1>
             <p className="mt-2 text-gray-500">
@@ -183,7 +183,7 @@ export default async function SharePage({ params }: SharePageProps) {
             </p>
             <Link
               href="/"
-              className="mt-6 inline-flex items-center rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors"
+              className="mt-6 inline-flex items-center rounded-lg bg-[#1e1b4b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81] transition-colors"
             >
               Plan your own trip with UBTRIPPIN
             </Link>
@@ -221,17 +221,17 @@ export default async function SharePage({ params }: SharePageProps) {
   const itemCount = items?.length ?? 0
 
   return (
-    <div className="min-h-screen bg-amber-50 flex flex-col">
+    <div className="min-h-screen bg-[#f5f3ef] flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-amber-200 bg-white/90 backdrop-blur-sm">
+      <header className="sticky top-0 z-20 border-b border-[#c7c2b8] bg-white/90 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <Image src="/ubtrippin_logo.png" alt="UBTRIPPIN" width={28} height={28} className="rounded-lg" />
-            <span className="text-base font-bold text-amber-700">UBTRIPPIN</span>
+            <span className="text-base font-bold text-[#92400e]">UBTRIPPIN</span>
           </Link>
           <Link
             href="/"
-            className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
+            className="rounded-lg bg-[#1e1b4b] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#312e81] transition-colors"
           >
             Plan your trip free
           </Link>
@@ -283,7 +283,7 @@ export default async function SharePage({ params }: SharePageProps) {
               </div>
             </>
           ) : (
-            <div className="bg-gradient-to-r from-amber-100 to-orange-100 py-10 px-6 sm:px-8">
+            <div className="bg-gradient-to-r from-[#eceae4] to-[#f5f3ef] py-10 px-6 sm:px-8">
               <div className="mx-auto max-w-4xl">
                 <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight">
                   {trip.title}
@@ -291,19 +291,19 @@ export default async function SharePage({ params }: SharePageProps) {
                 <div className="mt-3 flex flex-wrap gap-4 text-sm text-gray-700">
                   {(trip.start_date || trip.end_date) && (
                     <span className="flex items-center gap-1.5">
-                      <Calendar className="h-4 w-4 text-amber-600" />
+                      <Calendar className="h-4 w-4 text-[#b45309]" />
                       {formatDateRange(trip.start_date, trip.end_date)}
                     </span>
                   )}
                   {trip.primary_location && (
                     <span className="flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4 text-amber-600" />
+                      <MapPin className="h-4 w-4 text-[#b45309]" />
                       {trip.primary_location}
                     </span>
                   )}
                   {travelers.length > 0 && (
                     <span className="flex items-center gap-1.5">
-                      <Users className="h-4 w-4 text-amber-600" />
+                      <Users className="h-4 w-4 text-[#b45309]" />
                       {travelers.join(', ')}
                     </span>
                   )}
@@ -332,7 +332,7 @@ export default async function SharePage({ params }: SharePageProps) {
 
           {/* Notes */}
           {trip.notes && (
-            <Card className="mb-6 border-amber-200 bg-amber-50">
+            <Card className="mb-6 border-[#c7c2b8] bg-[#f5f3ef]">
               <CardContent className="p-4">
                 <p className="text-sm text-gray-700 leading-relaxed">{trip.notes}</p>
               </CardContent>
@@ -341,9 +341,9 @@ export default async function SharePage({ params }: SharePageProps) {
 
           {/* Trip Items */}
           {items && items.length > 0 ? (
-            <Card className="border-amber-200">
+            <Card className="border-[#c7c2b8]">
               <CardContent className="p-0">
-                <div className="divide-y divide-amber-100">
+                <div className="divide-y divide-[#eceae4]">
                   {items.map((item) => (
                     <div key={item.id} className="px-5">
                       <TripItemRow item={item as any} />
@@ -367,7 +367,7 @@ export default async function SharePage({ params }: SharePageProps) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-amber-200 bg-white">
+      <footer className="border-t border-[#c7c2b8] bg-white">
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 text-center">
           <Image
             src="/ubtrippin_logo.png"
@@ -385,7 +385,7 @@ export default async function SharePage({ params }: SharePageProps) {
           </p>
           <Link
             href="/"
-            className="mt-5 inline-flex items-center rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition-colors shadow-sm"
+            className="mt-5 inline-flex items-center rounded-lg bg-[#1e1b4b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#312e81] transition-colors shadow-sm"
           >
             Get started — it&apos;s free
           </Link>
