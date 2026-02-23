@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
+import { FirstTripBanner } from '@/components/trips/first-trip-banner'
 import { sendWelcomeEmail } from './actions'
 import { Button } from '@/components/ui/button'
 import { Plus, Mail, MapPin } from 'lucide-react'
@@ -14,11 +15,11 @@ export default async function TripsPage() {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Fetch profile for welcome email check
+  // Fetch profile for welcome email + onboarding state
   const { data: profile } = user
     ? await supabase
         .from('profiles')
-        .select('welcome_email_sent, full_name, email')
+        .select('welcome_email_sent, onboarding_completed, full_name, email')
         .eq('id', user.id)
         .single()
     : { data: null }
@@ -56,6 +57,10 @@ export default async function TripsPage() {
 
   const hasTrips = (trips?.length ?? 0) > 0
 
+  // Show first-trip celebration banner once, until dismissed
+  const showFirstTripBanner = hasTrips && profile && !profile.onboarding_completed
+  const firstTrip = trips?.[0]
+
   return (
     <div className="space-y-8">
       {/* PWA install prompt */}
@@ -76,6 +81,11 @@ export default async function TripsPage() {
           </Button>
         </Link>
       </div>
+
+      {/* First trip celebration banner */}
+      {showFirstTripBanner && firstTrip && (
+        <FirstTripBanner tripId={firstTrip.id} tripTitle={firstTrip.title} />
+      )}
 
       {!hasTrips ? (
         <OnboardingCard />

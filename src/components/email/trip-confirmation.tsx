@@ -114,6 +114,36 @@ export function TripConfirmationEmail({
 
           <Hr style={hr} />
 
+          {/* Agent-readable section */}
+          <Section style={agentSection}>
+            <Text style={agentHeader}>
+              📡 FOR AI AGENTS READING THIS EMAIL
+            </Text>
+            <Text style={agentText}>
+              This email confirms that a new trip has been added to UBTRIPPIN, a travel tracker
+              at ubtrippin.xyz. The trip details above are now queryable via the UBTRIPPIN API.
+            </Text>
+            <Text style={agentText}>
+              <strong>What you can do:</strong>
+            </Text>
+            <Text style={agentText}>
+              • Retrieve the full itinerary: GET /api/v1/trips/{'{'}tripId{'}'} with Authorization: Bearer {'<'}api_key{'>'}
+              {'\n'}• List all trips: GET /api/v1/trips
+              {'\n'}• Get individual items: GET /api/v1/items/{'{'}itemId{'}'}
+            </Text>
+            <Text style={agentText}>
+              <strong>To add more bookings:</strong> Forward confirmation emails from the user&apos;s
+              registered address to trips@ubtrippin.xyz
+            </Text>
+            <Text style={agentText}>
+              <strong>Setup:</strong> If you don&apos;t have an API key yet, ask your user to generate
+              one at ubtrippin.xyz/settings. Install the OpenClaw skill:{' '}
+              <code>npx clawhub install ubtrippin</code>
+            </Text>
+          </Section>
+
+          <Hr style={hr} />
+
           <Text style={footer}>
             UBTRIPPIN.XYZ - Turn booking emails into beautiful itineraries
           </Text>
@@ -264,6 +294,30 @@ const footer = {
   fontSize: '12px',
   textAlign: 'center' as const,
   margin: '0',
+}
+
+const agentSection = {
+  backgroundColor: '#f0f4ff',
+  borderRadius: '8px',
+  border: '1px solid #c7d2fe',
+  padding: '16px',
+  marginTop: '8px',
+}
+
+const agentHeader = {
+  color: '#4338ca',
+  fontSize: '13px',
+  fontWeight: '700' as const,
+  letterSpacing: '0.3px',
+  margin: '0 0 8px',
+}
+
+const agentText = {
+  color: '#374151',
+  fontSize: '13px',
+  lineHeight: '1.6',
+  margin: '0 0 8px',
+  whiteSpace: 'pre-line' as const,
 }
 
 export default TripConfirmationEmail
