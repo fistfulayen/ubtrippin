@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AllowedSendersList } from '@/components/settings/allowed-senders-list'
 import { AddSenderForm } from '@/components/settings/add-sender-form'
 import { ApiKeysSection } from '@/components/settings/api-keys-section'
-import { Mail, User, Info, Key } from 'lucide-react'
+import { CalendarFeedSection } from '@/components/settings/calendar-feed-section'
+import { Mail, User, Info, Key, Rss } from 'lucide-react'
 import { UserAvatar } from '@/components/user-avatar'
 import type { Profile, AllowedSender } from '@/types/database'
 
@@ -107,6 +108,22 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <ApiKeysSection />
+        </CardContent>
+      </Card>
+
+      {/* Calendar Feed */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Rss className="h-5 w-5" />
+            Calendar Feed
+          </CardTitle>
+          <CardDescription>
+            Subscribe to a live calendar feed of all your trips in Google Calendar, Apple Calendar, or any .ics-compatible app.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CalendarFeedSection />
         </CardContent>
       </Card>
 

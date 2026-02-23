@@ -1,0 +1,40 @@
+{
+  "name": "ubtrippin-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for UBTRIPPIN — read your travel itineraries from any MCP-compatible AI client",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "ubtrippin-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "prepublishOnly": "pnpm build"
+  },
+  "files": ["dist", "README.md"],
+  "keywords": [
+    "mcp",
+    "travel",
+    "trips",
+    "ubtrippin",
+    "itinerary"
+  ],
+  "license": "MIT",
+  "homepage": "https://ubtrippin.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fistfulayen/ubtrippin.git",
+    "directory": "mcp"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
