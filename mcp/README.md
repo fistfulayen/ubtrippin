@@ -51,10 +51,13 @@ Use the same pattern — `command: npx`, `args: ["ubtrippin-mcp"]`, set `UBT_API
 ## Tools
 
 ### `list_trips`
-List all your trips ordered by start date (soonest upcoming first).
+List all trips ordered by start date (soonest upcoming first).
+
+### `get_upcoming`
+Return only future trips, sorted by date ascending. Ideal for "what do I have coming up?"
 
 ```
-No parameters required.
+limit?: number   (default: 10, max: 50)
 ```
 
 ### `get_trip`
@@ -69,6 +72,23 @@ Get a single trip item by ID.
 
 ```
 item_id: string (UUID)
+```
+
+### `search_trips`
+Search trips by destination, date range, or traveler name.
+
+```
+query?:    string         text search across title, location, notes
+after?:    YYYY-MM-DD    trips starting on or after this date
+before?:   YYYY-MM-DD    trips starting on or before this date
+traveler?: string         filter by traveler name (partial match)
+```
+
+### `get_calendar`
+Generate an iCal (.ics) file for a trip. Returns raw iCal text — save as `.ics` and import anywhere.
+
+```
+trip_id: string (UUID)
 ```
 
 ## Resources
