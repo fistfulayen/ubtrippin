@@ -1,12 +1,36 @@
 import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
+import { OnboardingCard } from '@/components/trips/onboarding-card'
+import { sendWelcomeEmail } from './actions'
 import { Button } from '@/components/ui/button'
 import { Plus, Mail, MapPin } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function TripsPage() {
   const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  // Fetch profile for welcome email check
+  const { data: profile } = user
+    ? await supabase
+        .from('profiles')
+        .select('welcome_email_sent, full_name, email')
+        .eq('id', user.id)
+        .single()
+    : { data: null }
+
+  // Send welcome email if not yet sent
+  if (user && profile && !profile.welcome_email_sent) {
+    await sendWelcomeEmail(
+      user.id,
+      profile.full_name || 'Traveler',
+      profile.email || user.email || ''
+    ).catch(() => {}) // swallow errors to not break page
+  }
 
   const { data: trips } = await supabase
     .from('trips')
@@ -54,31 +78,7 @@ export default async function TripsPage() {
       </div>
 
       {!hasTrips ? (
-        /* Empty state */
-        <div className="rounded-2xl border-2 border-dashed border-[#c7c2b8] bg-[#f5f3ef]/50 p-12 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#eceae4]">
-            <MapPin className="h-8 w-8 text-[#b45309]" />
-          </div>
-          <h3 className="mt-6 text-lg font-semibold text-gray-900">
-            No trips yet
-          </h3>
-          <p className="mx-auto mt-2 max-w-sm text-gray-600">
-            Forward your first booking confirmation email to get started, or create a trip manually.
-          </p>
-          <div className="mt-6 flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 font-mono text-sm shadow-sm border border-[#c7c2b8]">
-              <Mail className="h-4 w-4 text-[#b45309]" />
-              trips@ubtrippin.xyz
-            </div>
-            <span className="text-sm text-gray-500">or</span>
-            <Link href="/trips/new">
-              <Button variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Create trip manually
-              </Button>
-            </Link>
-          </div>
-        </div>
+        <OnboardingCard />
       ) : (
         <div className="space-y-8">
           {/* Current trips */}
