@@ -36,7 +36,7 @@ import {
   Hash,
 } from 'lucide-react'
 import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
-import { getAirlineLogoUrl } from '@/lib/images/airline-logo'
+import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import {
   FlightDetailsView,
   HotelDetailsView,
@@ -83,8 +83,8 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
   const [logoError, setLogoError] = useState(false)
   const Icon = kindIcons[item.kind] || Calendar
   const details = item.details_json as FlightDetails | HotelDetails | null
-  const airlineLogoUrl = item.kind === 'flight' && item.provider
-    ? getAirlineLogoUrl(item.provider)
+  const providerLogoUrl = item.provider
+    ? getProviderLogoUrl(item.provider, item.kind)
     : null
 
   const handleDelete = async () => {
@@ -123,10 +123,10 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
           {/* Header row */}
           <div className="flex items-start gap-3">
             {/* Icon — airline logo for flights, generic icon for others */}
-            {airlineLogoUrl && !logoError ? (
+            {providerLogoUrl && !logoError ? (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white border border-gray-200 overflow-hidden">
                 <Image
-                  src={airlineLogoUrl}
+                  src={providerLogoUrl}
                   alt={item.provider || 'Airline'}
                   width={32}
                   height={32}

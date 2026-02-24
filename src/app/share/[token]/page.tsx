@@ -16,7 +16,7 @@ import {
   Ticket,
   CalendarDays,
 } from 'lucide-react'
-import { getAirlineLogoUrl } from '@/lib/images/airline-logo'
+import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { AirlineLogoIcon } from './airline-logo-icon'
 import type { TripItem, TripItemKind } from '@/types/database'
 
@@ -74,7 +74,7 @@ function TripItemRow({ item }: { item: TripItem }) {
       ? `${item.start_location} → ${item.end_location}`
       : item.start_location || item.end_location || null
   const airlineLogoUrl = item.kind === 'flight' && item.provider
-    ? getAirlineLogoUrl(item.provider)
+    ? getProviderLogoUrl(item.provider, item.kind)
     : null
 
   return (

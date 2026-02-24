@@ -6,7 +6,7 @@ const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://images.unsplash.com https://pics.avs.io https://*.supabase.co https://lh3.googleusercontent.com;
+  img-src 'self' blob: data: https://images.unsplash.com https://pics.avs.io https://*.supabase.co https://lh3.googleusercontent.com https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com;
   font-src 'self';
   connect-src 'self' https://*.supabase.co https://api.unsplash.com;
   frame-ancestors 'none';
@@ -44,6 +44,11 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'pics.avs.io' },
       { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
       { protocol: 'https', hostname: 'cqijgtijuselspyzpphf.supabase.co' },
+      { protocol: 'https', hostname: 'www.google.com' },
+      { protocol: 'https', hostname: 't0.gstatic.com' },
+      { protocol: 'https', hostname: 't1.gstatic.com' },
+      { protocol: 'https', hostname: 't2.gstatic.com' },
+      { protocol: 'https', hostname: 't3.gstatic.com' },
     ],
   },
   // SECURITY: Apply security headers to all routes

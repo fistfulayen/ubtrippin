@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { Plane, MapPin, Clock, Armchair } from 'lucide-react'
 import type { FlightDetails } from '@/types/database'
-import { getAirlineLogoUrl } from '@/lib/images/airline-logo'
+import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 
 interface FlightDetailsViewProps {
   details: FlightDetails
@@ -33,7 +33,7 @@ export function FlightDetailsView({ details }: FlightDetailsViewProps) {
     : null
 
   const seatInfo = [cabin_class, seat].filter(Boolean).join(' · ')
-  const logoUrl = airline ? getAirlineLogoUrl(airline) : null
+  const logoUrl = airline ? getProviderLogoUrl(airline, 'flight') : null
 
   // Debug logging
   if (typeof window !== 'undefined') {

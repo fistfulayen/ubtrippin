@@ -6,7 +6,8 @@ import { formatDateRange } from '@/lib/utils'
 import { MapPin, Calendar, AlertCircle } from 'lucide-react'
 import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
-import { getAirlineLogoUrl, extractAirlineCode } from '@/lib/images/airline-logo'
+import { getProviderLogoUrl } from '@/lib/images/provider-logo'
+import { extractAirlineCode } from '@/lib/images/airline-logo'
 
 interface TripItem {
   id: string
@@ -36,8 +37,8 @@ function getAirlineLogos(items?: TripItem[]): string[] {
     const details = item.details_json as Record<string, unknown> | null
     const flightNumber = details?.flight_number as string | undefined
 
-    const logoUrl = airline ? getAirlineLogoUrl(airline) : null
-    const logoFromFlight = !logoUrl && flightNumber ? getAirlineLogoUrl(flightNumber) : null
+    const logoUrl = airline ? getProviderLogoUrl(airline, 'flight') : null
+    const logoFromFlight = !logoUrl && flightNumber ? getProviderLogoUrl(flightNumber, 'flight') : null
     const url = logoUrl || logoFromFlight
 
     if (url && !seen.has(url)) {
