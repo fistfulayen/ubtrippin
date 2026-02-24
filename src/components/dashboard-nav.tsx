@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { Plane, Inbox, Settings, LogOut, Menu, X } from 'lucide-react'
+import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
 import type { User } from '@supabase/supabase-js'
@@ -18,6 +18,7 @@ interface DashboardNavProps {
 
 const navItems = [
   { href: '/trips', label: 'Trips', icon: Plane },
+  { href: '/guides', label: 'Guides', icon: BookOpen },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]

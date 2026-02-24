@@ -58,6 +58,40 @@ interface TripWithItems extends Trip {
   items: TripItem[]
 }
 
+interface CityGuide {
+  id: string
+  city: string
+  country: string | null
+  country_code: string | null
+  is_public: boolean
+  share_token: string | null
+  entry_count: number
+  created_at: string
+  updated_at: string
+}
+
+interface GuideEntry {
+  id: string
+  guide_id: string
+  name: string
+  category: string
+  status: 'visited' | 'to_try'
+  description: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  website_url: string | null
+  rating: number | null
+  recommended_by: string | null
+  tags: string[]
+  source: string
+  created_at: string
+}
+
+interface CityGuideWithEntries extends CityGuide {
+  entries: GuideEntry[]
+}
+
 // ---------------------------------------------------------------------------
 // API client helpers
 // ---------------------------------------------------------------------------
@@ -183,15 +217,16 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.1.0' },
+  { name: 'ubtrippin', version: '1.2.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
-This server provides read-only access to your UBTRIPPIN travel data.
+This server provides access to your UBTRIPPIN travel data and city guides.
 Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 
-Tools: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
-Resources: ubtrippin://trips, ubtrippin://trips/{id}
+Trips: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
+City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
+Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
     `.trim(),
   }
 )
@@ -388,6 +423,218 @@ server.registerTool(
 )
 
 // ---------------------------------------------------------------------------
+// City Guide Tools (Phase 3)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'list_guides',
+  {
+    title: 'List City Guides',
+    description:
+      'List all city guides for the authenticated user. Use city parameter to find a specific city guide.',
+    inputSchema: {
+      city: z
+        .string()
+        .optional()
+        .describe('Filter by city name (partial match, case-insensitive)'),
+    },
+  },
+  async ({ city }) => {
+    const qs = city ? `?city=${encodeURIComponent(city)}` : ''
+    const result = await apiFetch<{ data: CityGuide[]; meta: { count: number } }>(
+      `/api/v1/guides${qs}`
+    )
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'get_guide',
+  {
+    title: 'Get City Guide',
+    description:
+      'Get a city guide with all its entries (places). Returns visited and to-try entries grouped by category.',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('The UUID of the guide to retrieve'),
+    },
+  },
+  async ({ guide_id }) => {
+    const result = await apiFetch<{ data: CityGuideWithEntries; meta: { entry_count: number } }>(
+      `/api/v1/guides/${guide_id}`
+    )
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'get_guide_markdown',
+  {
+    title: 'Get City Guide as Markdown',
+    description:
+      'Get a city guide formatted as clean Markdown — useful for reading, summarizing, or including in documents. Entries grouped by category.',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('The UUID of the guide'),
+    },
+  },
+  async ({ guide_id }) => {
+    const text = await fetch(`${BASE_URL}/api/v1/guides/${guide_id}?format=md`, {
+      headers: authHeaders(),
+    }).then((r) => r.text())
+
+    return {
+      content: [{ type: 'text', text }],
+    }
+  }
+)
+
+server.registerTool(
+  'add_guide_entry',
+  {
+    title: 'Add Place to City Guide',
+    description: `Add a place to a city guide. If the guide doesn't exist yet, use find_or_create_guide first.
+
+Examples:
+- "Add Télescope to my Paris guide under Coffee."
+- "Add Bagnaia to my to-try list for Rome under Restaurants."
+- "Note that Giacomo Arengario in Milan was recommended by Sarah."`,
+    inputSchema: {
+      guide_id: z.string().uuid().describe('The UUID of the city guide'),
+      name: z.string().describe('Name of the place'),
+      category: z
+        .string()
+        .optional()
+        .default('Hidden Gems')
+        .describe(
+          'Category: Coffee, Restaurants, Hotels, Bars & Wine, Museums & Galleries, Shopping, Parks & Nature, Activities, Music & Nightlife, Running & Sports, Markets, Architecture, Hidden Gems'
+        ),
+      status: z
+        .enum(['visited', 'to_try'])
+        .optional()
+        .default('visited')
+        .describe('"visited" (you have been) or "to_try" (want to go)'),
+      description: z
+        .string()
+        .optional()
+        .describe('Your personal take — write a paragraph, not a star rating'),
+      address: z.string().optional().describe('Street address'),
+      website_url: z.string().optional().describe("Place's website URL"),
+      rating: z
+        .number()
+        .int()
+        .min(1)
+        .max(5)
+        .optional()
+        .describe('Personal rating 1-5 (optional)'),
+      recommended_by: z.string().optional().describe('Who recommended this place'),
+      latitude: z.number().optional().describe('Latitude coordinate'),
+      longitude: z.number().optional().describe('Longitude coordinate'),
+      tags: z.array(z.string()).optional().describe('Freeform tags'),
+    },
+  },
+  async (input) => {
+    const body = { ...input, source: 'agent' }
+    const result = await fetch(`${BASE_URL}/api/v1/guides/${input.guide_id}/entries`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    }).then((r) => r.json())
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'find_or_create_guide',
+  {
+    title: 'Find or Create City Guide',
+    description:
+      'Find an existing guide for a city, or create one if it doesn\'t exist. Use this before add_guide_entry when you\'re not sure if a guide exists.',
+    inputSchema: {
+      city: z.string().describe('City name (e.g. "Paris", "Milan", "Tokyo")'),
+      country: z.string().optional().describe('Country name'),
+      country_code: z.string().optional().describe('ISO 3166-1 alpha-2 country code (e.g. "FR")'),
+    },
+  },
+  async ({ city, country, country_code }) => {
+    const result = await fetch(`${BASE_URL}/api/v1/guides`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ city, country, country_code, find_or_create: true }),
+    }).then((r) => r.json())
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'update_guide_entry',
+  {
+    title: 'Update Guide Entry',
+    description: 'Update an existing entry in a city guide (e.g. mark as visited, add description, update rating).',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('The UUID of the city guide'),
+      entry_id: z.string().uuid().describe('The UUID of the entry to update'),
+      name: z.string().optional(),
+      category: z.string().optional(),
+      status: z.enum(['visited', 'to_try']).optional(),
+      description: z.string().optional(),
+      address: z.string().optional(),
+      website_url: z.string().optional(),
+      rating: z.number().int().min(1).max(5).optional(),
+      recommended_by: z.string().optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional(),
+      tags: z.array(z.string()).optional(),
+    },
+  },
+  async ({ guide_id, entry_id, ...updates }) => {
+    const result = await fetch(`${BASE_URL}/api/v1/guides/${guide_id}/entries/${entry_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    }).then((r) => r.json())
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'get_nearby_places',
+  {
+    title: 'Get Nearby Places from Guides',
+    description:
+      'Find places from your city guides near a given location. Returns entries sorted by distance. Use for "what do I have recommended near me?" queries.',
+    inputSchema: {
+      lat: z.number().describe('Latitude'),
+      lng: z.number().describe('Longitude'),
+      radius_km: z
+        .number()
+        .optional()
+        .default(5)
+        .describe('Search radius in kilometers (default: 5)'),
+    },
+  },
+  async ({ lat, lng, radius_km = 5 }) => {
+    const result = await apiFetch<{ data: unknown[]; meta: { count: number } }>(
+      `/api/v1/guides/nearby?lat=${lat}&lng=${lng}&radius=${radius_km}`
+    )
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+// ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------
 
@@ -426,6 +673,54 @@ server.registerResource(
     if (!id) throw new Error('Trip ID is required')
     const result = await apiFetch<{ data: TripWithItems; meta: { item_count: number } }>(
       `/api/v1/trips/${id}`
+    )
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: 'application/json',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    }
+  }
+)
+
+server.registerResource(
+  'guides',
+  'ubtrippin://guides',
+  {
+    title: 'All City Guides',
+    description: 'All city guides for the authenticated UBTRIPPIN user.',
+    mimeType: 'application/json',
+  },
+  async (_uri) => {
+    const result = await apiFetch<{ data: CityGuide[]; meta: { count: number } }>('/api/v1/guides')
+    return {
+      contents: [
+        {
+          uri: 'ubtrippin://guides',
+          mimeType: 'application/json',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    }
+  }
+)
+
+server.registerResource(
+  'guide-detail',
+  new ResourceTemplate('ubtrippin://guides/{id}', { list: undefined }),
+  {
+    title: 'City Guide Detail',
+    description: 'Full detail for a single city guide including all entries.',
+    mimeType: 'application/json',
+  },
+  async (uri, variables) => {
+    const id = variables['id'] as string
+    if (!id) throw new Error('Guide ID is required')
+    const result = await apiFetch<{ data: CityGuideWithEntries; meta: { entry_count: number } }>(
+      `/api/v1/guides/${id}`
     )
     return {
       contents: [

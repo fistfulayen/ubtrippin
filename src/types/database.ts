@@ -380,6 +380,27 @@ export interface Database {
   }
 }
 
+export type GuideEntryStatus = 'visited' | 'to_try'
+export type GuideEntrySource = 'manual' | 'agent' | 'import' | 'share-to'
+
+export const GUIDE_CATEGORIES = [
+  'Coffee',
+  'Restaurants',
+  'Hotels',
+  'Bars & Wine',
+  'Museums & Galleries',
+  'Shopping',
+  'Parks & Nature',
+  'Activities',
+  'Music & Nightlife',
+  'Running & Sports',
+  'Markets',
+  'Architecture',
+  'Hidden Gems',
+] as const
+
+export type GuideCategory = typeof GUIDE_CATEGORIES[number] | string
+
 // Convenience types for common use
 export type Profile = Database['public']['Tables']['profiles']['Row']
 export type AllowedSender = Database['public']['Tables']['allowed_senders']['Row']
@@ -441,4 +462,46 @@ export interface TrainDetails {
   carriage?: string
   seat?: string
   booking_reference?: string
+}
+
+// City Guides
+export interface CityGuide {
+  id: string
+  user_id: string
+  city: string
+  country: string | null
+  country_code: string | null
+  is_public: boolean
+  share_token: string | null
+  cover_image_url: string | null
+  entry_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface GuideEntry {
+  id: string
+  guide_id: string
+  user_id: string
+  name: string
+  category: string
+  status: GuideEntryStatus
+  description: string | null
+  address: string | null
+  latitude: number | null
+  longitude: number | null
+  google_place_id: string | null
+  website_url: string | null
+  rating: number | null
+  recommended_by: string | null
+  recommended_by_user_id: string | null
+  tags: string[]
+  source: GuideEntrySource
+  source_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CityGuideWithEntries extends CityGuide {
+  entries: GuideEntry[]
 }
