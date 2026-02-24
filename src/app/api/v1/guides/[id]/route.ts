@@ -194,7 +194,7 @@ function guideToMarkdown(guide: CityGuide, entries: GuideEntry[]): string {
         ...guide.country_code
           .toUpperCase()
           .split('')
-          .map((c: string) => 0x1f1e0 + c.charCodeAt(0) - 65)
+          .map((c: string) => 0x1f1e6 + c.charCodeAt(0) - 65)
       )
     : ''
 
