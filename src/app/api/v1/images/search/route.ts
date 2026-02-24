@@ -56,9 +56,9 @@ export async function GET(request: NextRequest) {
   }
 
   // 4. Check API key is configured
-  const accessKey = process.env.NEXT_PUBLIC_UNSPLASH_ACCESS_KEY
+  const accessKey = process.env.UNSPLASH_ACCESS_KEY
   if (!accessKey) {
-    console.error('[v1/images/search] NEXT_PUBLIC_UNSPLASH_ACCESS_KEY is not set')
+    console.error('[v1/images/search] UNSPLASH_ACCESS_KEY is not set')
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Image search is not configured.' } },
       { status: 500 }

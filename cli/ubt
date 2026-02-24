@@ -31,12 +31,32 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
 fi
 
 API="${SUPABASE_URL}/rest/v1"
+APP_URL="${UBT_APP_URL:-https://www.ubtrippin.xyz}"
+
+# UBT_API_KEY enables v1 REST API calls (required for merge, move, etc.)
+# Set in config or via env: export UBT_API_KEY=ubt_...
+UBT_API_KEY="${UBT_API_KEY:-}"
+if [ -z "$UBT_API_KEY" ] && [ -f "$CONFIG_FILE" ]; then
+  UBT_API_KEY=$(grep '^UBT_API_KEY=' "$CONFIG_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"')
+fi
 
 # Helpers
 _curl() {
   curl -s "$@" \
     -H "apikey: ${SUPABASE_KEY}" \
     -H "Authorization: Bearer ${SUPABASE_KEY}" \
+    -H "Content-Type: application/json"
+}
+
+# v1 API calls — requires UBT_API_KEY
+_api() {
+  if [ -z "$UBT_API_KEY" ]; then
+    echo "Error: UBT_API_KEY is required for this command." >&2
+    echo "Get yours at ubtrippin.xyz/settings and set UBT_API_KEY in ~/.ubt/config" >&2
+    exit 1
+  fi
+  curl -s "$@" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json"
 }
 
@@ -207,6 +227,122 @@ for u in data:
 " 2>/dev/null || echo "Could not list users"
 }
 
+cmd_trips_merge() {
+  local target_id="${1:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
+  local source_id="${2:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
+  echo "Merging source trip ${source_id:0:8} → target ${target_id:0:8}..."
+  _api -X POST "${APP_URL}/api/v1/trips/${target_id}/merge" \
+    -d "{\"source_trip_id\": \"${source_id}\"}" | _json
+}
+
+cmd_items_move() {
+  local item_id="${1:?Usage: ubt items move <item_id> <target_trip_id>}"
+  local trip_id="${2:?Usage: ubt items move <item_id> <target_trip_id>}"
+  echo "Moving item ${item_id:0:8} → trip ${trip_id:0:8}..."
+  _api -X PATCH "${APP_URL}/api/v1/items/${item_id}" \
+    -d "{\"trip_id\": \"${trip_id}\"}" | _json
+}
+
+cmd_calendar_get() {
+  _api "${APP_URL}/api/v1/calendar/token" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+d = data.get('data', {})
+if not d:
+    print(json.dumps(data, indent=2))
+    sys.exit(0)
+print('Calendar feed URL:')
+print(f\"  {d.get('feed_url', 'N/A')}\")
+print()
+print('Add this URL to any calendar app (Google Calendar, Apple, Fantastical).')
+print('Token: ' + d.get('token', 'N/A')[:8] + '...')
+"
+}
+
+cmd_calendar_regen() {
+  echo "Regenerating calendar token (this will invalidate the old URL)..."
+  _api -X POST "${APP_URL}/api/v1/calendar/token" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+d = data.get('data', {})
+print('New calendar feed URL:')
+print(f\"  {d.get('feed_url', 'N/A')}\")
+"
+}
+
+cmd_senders_list() {
+  _api "${APP_URL}/api/v1/settings/senders" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+senders = data.get('data', [])
+if not senders:
+    print('No senders configured.')
+    sys.exit(0)
+print(f'Allowed senders ({len(senders)}):')
+for s in senders:
+    label = s.get('label') or ''
+    label_str = f' [{label}]' if label else ''
+    verified = ' ✓' if s.get('verified') else ''
+    print(f\"  {s['id'][:8]}  {s['email']:<35}{label_str}{verified}\")
+"
+}
+
+cmd_senders_add() {
+  local email="${1:?Usage: ubt senders add <email> [label]}"
+  local label="${2:-}"
+  local body
+  if [ -n "$label" ]; then
+    body="{\"email\": \"${email}\", \"label\": \"${label}\"}"
+  else
+    body="{\"email\": \"${email}\"}"
+  fi
+  _api -X POST "${APP_URL}/api/v1/settings/senders" -d "$body" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f'Error: {data[\"error\"][\"message\"]}')
+    sys.exit(1)
+d = data.get('data', {})
+print(f'Added: {d.get(\"email\")} (id: {d.get(\"id\", \"\")[:8]}...)')
+"
+}
+
+cmd_senders_remove() {
+  local sender_id="${1:?Usage: ubt senders remove <sender_id>}"
+  echo "Removing sender ${sender_id:0:8}..."
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${APP_URL}/api/v1/settings/senders/${sender_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+  if [ "$status" = "204" ]; then
+    echo "Removed."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_image_search() {
+  local query="${1:?Usage: ubt image search <query>}"
+  _api "${APP_URL}/api/v1/images/search?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('$query'))")" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+images = data.get('data', [])
+if not images:
+    print('No images found.')
+    sys.exit(0)
+print(f'Found {len(images)} images:')
+for i, img in enumerate(images):
+    credit = img.get('credit', {})
+    by = credit.get('photographer', 'Unknown')
+    print(f'  [{i+1}] {img.get(\"url\",\"\")[:60]}...')
+    print(f'       thumb: {img.get(\"thumb\",\"\")[:60]}...')
+    print(f'       by {by} on Unsplash')
+    print()
+"
+}
+
 cmd_rls_check() {
   echo "Checking RLS policies via Supabase CLI..."
   cd /home/iancr/ubtrippin
@@ -221,12 +357,22 @@ ubt — UB Trippin CLI
 Usage: ubt <command> [args]
 
 Commands:
-  trips list [user_id]     List all trips (optionally filter by user)
-  trips show <trip_id>     Show trip details + items
-  items list <trip_id>     List items in a trip
-  users                    List all users
-  health                   Check service health
-  rls-check                Verify RLS policies
+  trips list [user_id]           List all trips (optionally filter by user)
+  trips show <trip_id>           Show trip details + items
+  trips merge <target> <source>  Merge source trip into target (deletes source) *
+  items list <trip_id>           List items in a trip
+  items move <item_id> <trip_id> Move item to another trip *
+  calendar get                   Get your iCal feed URL *
+  calendar regen                 Regenerate calendar token (invalidates old URL) *
+  image search <query>           Search Unsplash for cover images *
+  senders list                   List allowed email senders *
+  senders add <email> [label]    Add an allowed sender *
+  senders remove <id>            Remove an allowed sender *
+  users                          List all users (admin)
+  health                         Check service health
+  rls-check                      Verify RLS policies
+
+Commands marked * require UBT_API_KEY in ~/.ubt/config or env.
 
 Options:
   FORMAT=json ubt ...      Output raw JSON instead of formatted text
@@ -234,6 +380,11 @@ Options:
 Examples:
   ubt trips list
   ubt trips show 58bd2048-607c-4afc-a915-2edb6a9f6c54
+  ubt trips merge <target_id> <source_id>
+  ubt items move <item_id> <target_trip_id>
+  ubt calendar get
+  ubt senders list
+  ubt image search "paris eiffel tower"
   FORMAT=json ubt items list <trip_id>
 EOF
 }
@@ -242,19 +393,42 @@ EOF
 case "${1:-}" in
   trips)
     case "${2:-}" in
-      list) cmd_trips_list "${3:-}" ;;
-      show) cmd_trips_show "${3:?Usage: ubt trips show <trip_id>}" ;;
-      *) usage ;;
+      list)  cmd_trips_list "${3:-}" ;;
+      show)  cmd_trips_show "${3:?Usage: ubt trips show <trip_id>}" ;;
+      merge) cmd_trips_merge "${3:-}" "${4:-}" ;;
+      *)     usage ;;
     esac
     ;;
   items)
     case "${2:-}" in
       list) cmd_items_list "${3:?Usage: ubt items list <trip_id>}" ;;
-      *) usage ;;
+      move) cmd_items_move "${3:-}" "${4:-}" ;;
+      *)    usage ;;
     esac
     ;;
-  users) cmd_users ;;
-  health) cmd_health ;;
+  calendar)
+    case "${2:-}" in
+      get)   cmd_calendar_get ;;
+      regen) cmd_calendar_regen ;;
+      *)     usage ;;
+    esac
+    ;;
+  senders)
+    case "${2:-}" in
+      list)   cmd_senders_list ;;
+      add)    cmd_senders_add "${3:-}" "${4:-}" ;;
+      remove) cmd_senders_remove "${3:?Usage: ubt senders remove <sender_id>}" ;;
+      *)      usage ;;
+    esac
+    ;;
+  image)
+    case "${2:-}" in
+      search) cmd_image_search "${3:?Usage: ubt image search <query>}" ;;
+      *)      usage ;;
+    esac
+    ;;
+  users)    cmd_users ;;
+  health)   cmd_health ;;
   rls-check) cmd_rls_check ;;
   -h|--help|help|"") usage ;;
   *) echo "Unknown command: $1"; usage; exit 1 ;;

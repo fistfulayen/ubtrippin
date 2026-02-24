@@ -217,7 +217,7 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.3.0' },
+  { name: 'ubtrippin', version: '1.4.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
@@ -225,9 +225,11 @@ This server provides access to your UBTRIPPIN travel data and city guides.
 Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 
 Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
-Write (trips): create_trip, update_trip, delete_trip
-Write (items): add_item, add_items, update_item, delete_item
+Write (trips): create_trip, update_trip, delete_trip, merge_trips
+Write (items): add_item, add_items, update_item, delete_item, move_item
 City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
+Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender
+Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
     `.trim(),
   }
@@ -552,7 +554,7 @@ Example (flight):
       end_ts: z.string().optional().describe('End datetime ISO 8601 UTC'),
       start_location: z.string().optional().describe('Departure / check-in location'),
       end_location: z.string().optional().describe('Arrival / check-out location'),
-      details_json: z.record(z.unknown()).optional().describe('Type-specific structured data (max 10KB)'),
+      details_json: z.record(z.string(), z.unknown()).optional().describe('Type-specific structured data (max 10KB)'),
       status: z.string().optional().describe('confirmed, pending, cancelled, etc.'),
     },
   },
@@ -590,7 +592,7 @@ Body: { trip_id, items: [ <item>, ... ] }`,
         end_ts: z.string().optional(),
         start_location: z.string().optional(),
         end_location: z.string().optional(),
-        details_json: z.record(z.unknown()).optional(),
+        details_json: z.record(z.string(), z.unknown()).optional(),
         status: z.string().optional(),
       })).min(1).max(50).describe('Array of items to add (1–50)'),
     },
@@ -627,7 +629,7 @@ Example: update_item({ item_id: "...", status: "cancelled" })`,
       end_ts: z.string().nullable().optional(),
       start_location: z.string().nullable().optional(),
       end_location: z.string().nullable().optional(),
-      details_json: z.record(z.unknown()).nullable().optional(),
+      details_json: z.record(z.string(), z.unknown()).nullable().optional(),
       status: z.string().nullable().optional(),
       needs_review: z.boolean().nullable().optional(),
     },
@@ -878,6 +880,174 @@ server.registerTool(
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Parity Tools — PRD 011 (move_item, merge_trips, cover images, calendar, senders)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'move_item',
+  {
+    title: 'Move Item to Another Trip',
+    description: `Move a trip item from its current trip to a different trip. Both trips must belong to you.
+
+Example: move_item({ item_id: "...", target_trip_id: "..." })`,
+    inputSchema: {
+      item_id: z.string().uuid().describe('UUID of the item to move'),
+      target_trip_id: z.string().uuid().describe('UUID of the destination trip'),
+    },
+  },
+  async ({ item_id, target_trip_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/items/${item_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ trip_id: target_trip_id }),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'merge_trips',
+  {
+    title: 'Merge Trips',
+    description: `Merge all items from a source trip into a target trip, then delete the source. Irreversible — confirm with user before calling.
+
+Example: merge_trips({ target_trip_id: "...", source_trip_id: "..." })`,
+    inputSchema: {
+      target_trip_id: z.string().uuid().describe('UUID of the trip to merge items INTO (kept)'),
+      source_trip_id: z.string().uuid().describe('UUID of the trip to merge FROM (deleted after)'),
+    },
+  },
+  async ({ target_trip_id, source_trip_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${target_trip_id}/merge`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ source_trip_id }),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'search_cover_image',
+  {
+    title: 'Search Cover Images',
+    description: `Search for cover images via Unsplash. Returns image URLs, thumbnails, and photographer credit. Pair with update_trip({ cover_image_url }) to set a cover.
+
+Example: search_cover_image({ query: "tokyo night city" })`,
+    inputSchema: {
+      query: z.string().min(1).describe('Search query (e.g. "tokyo night", "paris eiffel", "alpine skiing")'),
+      per_page: z.number().int().min(1).max(20).optional().describe('Number of results (default: 9)'),
+    },
+  },
+  async ({ query, per_page = 9 }) => {
+    const qs = new URLSearchParams({ q: query, per_page: String(per_page) })
+    const result = await apiFetch<{ data: unknown[]; meta: unknown }>(`/api/v1/images/search?${qs}`)
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'get_calendar_url',
+  {
+    title: 'Get Calendar Feed URL',
+    description: `Get your personal iCal calendar feed URL — a persistent, subscribable link you can add to any calendar app (Google Calendar, Apple Calendar, Fantastical) to see all upcoming trips auto-updated.`,
+  },
+  async () => {
+    const result = await apiFetch<{ data: { token: string; feed_url: string } }>('/api/v1/calendar/token')
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'regenerate_calendar_token',
+  {
+    title: 'Regenerate Calendar Token',
+    description: `Regenerate the calendar feed token. This invalidates the old URL and creates a new one. Use when the old URL has been shared accidentally.`,
+  },
+  async () => {
+    const res = await fetch(`${BASE_URL}/api/v1/calendar/token`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'list_senders',
+  {
+    title: 'List Allowed Email Senders',
+    description: `List all email addresses allowed to forward confirmation emails to your UBTRIPPIN inbox. Only emails from these addresses will be automatically parsed and added to your trips.`,
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown[]; meta: { count: number } }>('/api/v1/settings/senders')
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'add_sender',
+  {
+    title: 'Add Allowed Sender',
+    description: `Add an email address to the allowed senders list. Emails forwarded from this address will be parsed and added to trips automatically.
+
+Example: add_sender({ email: "me@gmail.com", label: "Personal" })`,
+    inputSchema: {
+      email: z.string().email().describe('Email address to allow'),
+      label: z.string().optional().describe('Optional label (e.g. "Personal", "Work", "Claude")'),
+    },
+  },
+  async ({ email, label }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/settings/senders`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ email, label }),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'delete_sender',
+  {
+    title: 'Remove Allowed Sender',
+    description: `Remove an email address from the allowed senders list. Future emails from this address will no longer be processed.`,
+    inputSchema: {
+      sender_id: z.string().uuid().describe('UUID of the sender entry to remove (get IDs from list_senders)'),
+    },
+  },
+  async ({ sender_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/settings/senders/${sender_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, sender_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )
 
