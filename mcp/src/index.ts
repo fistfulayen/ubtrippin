@@ -15,7 +15,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 const API_KEY = process.env.UBT_API_KEY
-const BASE_URL = (process.env.UBT_BASE_URL || 'https://ubtrippin.xyz').replace(/\/$/, '')
+const BASE_URL = (process.env.UBT_BASE_URL || 'https://www.ubtrippin.xyz').replace(/\/$/, '')
 
 // ---------------------------------------------------------------------------
 // Types

@@ -26,7 +26,7 @@ All API calls use a Bearer token:
 Authorization: Bearer ubt_k1_<your_key>
 ```
 
-Base URL: `https://ubtrippin.xyz`
+Base URL: `https://www.ubtrippin.xyz`
 
 **Rate limit:** 100 requests/minute per API key. HTTP 429 if exceeded — back off 60 seconds.
 

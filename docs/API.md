@@ -2,7 +2,7 @@
 
 The UB Trippin API is how your agent reads your travel data. Clean JSON, Bearer token auth, sensible errors. No browser required.
 
-**Base URL:** `https://ubtrippin.xyz/api/v1`
+**Base URL:** `https://www.ubtrippin.xyz/api/v1`
 
 ---
 
@@ -16,7 +16,7 @@ Authorization: Bearer ubt_your_key_here
 
 ### Getting an API Key
 
-1. Sign in to [ubtrippin.xyz](https://ubtrippin.xyz)
+1. Sign in to [ubtrippin.xyz](https://www.ubtrippin.xyz)
 2. Go to **Settings → API Keys**
 3. Click **New Key**, give it a name (e.g. "Claude", "My Agent", "Home Automation")
 4. Copy the key — **it's shown exactly once**
@@ -58,7 +58,7 @@ List all trips for the authenticated user, ordered by `start_date` descending (m
 #### Request
 
 ```bash
-curl https://ubtrippin.xyz/api/v1/trips \
+curl https://www.ubtrippin.xyz/api/v1/trips \
   -H "Authorization: Bearer ubt_your_key_here"
 ```
 
@@ -125,7 +125,7 @@ Fetch a single trip with its full item list.
 #### Request
 
 ```bash
-curl https://ubtrippin.xyz/api/v1/trips/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
+curl https://www.ubtrippin.xyz/api/v1/trips/a1b2c3d4-e5f6-7890-abcd-ef1234567890 \
   -H "Authorization: Bearer ubt_your_key_here"
 ```
 
@@ -257,7 +257,7 @@ Useful when you've stored an item ID and want to check its current state without
 #### Request
 
 ```bash
-curl https://ubtrippin.xyz/api/v1/items/c3d4e5f6-a7b8-9012-cdef-123456789012 \
+curl https://www.ubtrippin.xyz/api/v1/items/c3d4e5f6-a7b8-9012-cdef-123456789012 \
   -H "Authorization: Bearer ubt_your_key_here"
 ```
 
@@ -383,11 +383,11 @@ All Supabase tables have RLS enabled. The API uses a service-role client that by
 
 ```bash
 # List trips
-curl https://ubtrippin.xyz/api/v1/trips \
+curl https://www.ubtrippin.xyz/api/v1/trips \
   -H "Authorization: Bearer $UBT_API_KEY"
 
 # Get a specific trip with items
-curl https://ubtrippin.xyz/api/v1/trips/$TRIP_ID \
+curl https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID \
   -H "Authorization: Bearer $UBT_API_KEY"
 ```
 
@@ -398,7 +398,7 @@ import os
 import httpx
 
 API_KEY = os.environ["UBT_API_KEY"]
-BASE = "https://ubtrippin.xyz/api/v1"
+BASE = "https://www.ubtrippin.xyz/api/v1"
 
 headers = {"Authorization": f"Bearer {API_KEY}"}
 
@@ -426,7 +426,7 @@ print(f"Flights: {len(flights)}, Hotels: {len(hotels)}")
 
 ```javascript
 const API_KEY = process.env.UBT_API_KEY;
-const BASE = 'https://ubtrippin.xyz/api/v1';
+const BASE = 'https://www.ubtrippin.xyz/api/v1';
 
 const headers = { Authorization: `Bearer ${API_KEY}` };
 
