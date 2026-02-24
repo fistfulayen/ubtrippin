@@ -294,6 +294,196 @@ curl https://www.ubtrippin.xyz/api/v1/items/c3d4e5f6-a7b8-9012-cdef-123456789012
 
 ---
 
+### `POST /api/v1/trips`
+
+Create a new trip.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/trips \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Paris → New York","start_date":"2026-06-07","end_date":"2026-06-07","primary_location":"New York"}'
+```
+
+#### Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | string | ✅ | Trip name (1–200 chars) |
+| `start_date` | string (YYYY-MM-DD) | | Trip start date |
+| `end_date` | string (YYYY-MM-DD) | | Trip end date |
+| `primary_location` | string | | Main destination |
+| `notes` | string | | Free-text notes |
+
+#### Response
+
+`201 Created` with `{ data: Trip }`.
+
+---
+
+### `PATCH /api/v1/trips/:id`
+
+Update trip fields. All fields are optional; only provided fields are changed.
+
+#### Request
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"NYC June","share_enabled":true}'
+```
+
+#### Body
+
+Same fields as `POST /trips` (all optional), plus `cover_image_url` (string | null) and `share_enabled` (boolean).
+
+#### Response
+
+`200 OK` with `{ data: Trip }`.
+
+---
+
+### `DELETE /api/v1/trips/:id`
+
+Delete a trip and **all its items**. Irreversible.
+
+#### Request
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Response
+
+`204 No Content`.
+
+---
+
+### `POST /api/v1/trips/:id/items`
+
+Add a single item to a trip.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/items \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "flight",
+    "provider": "DL",
+    "confirmation_code": "H7MGEF",
+    "summary": "Delta Air Lines DL 263 from Paris CDG to New York JFK",
+    "start_date": "2026-06-07",
+    "end_date": "2026-06-07",
+    "start_ts": "2026-06-07T09:30:00Z",
+    "end_ts": "2026-06-07T17:46:00Z",
+    "start_location": "Paris CDG Terminal 2E",
+    "end_location": "New York JFK Terminal 4",
+    "traveler_names": ["Ian Rogers"],
+    "details_json": {
+      "flight_number": "DL 263",
+      "cabin_class": "Premium Economy",
+      "stops": 0
+    }
+  }'
+```
+
+#### Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kind` | string | ✅ | Item type: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `other` |
+| `start_date` | string (YYYY-MM-DD) | ✅ | Start date |
+| `end_date` | string (YYYY-MM-DD) | | End date |
+| `provider` | string | | Airline, hotel, etc. (max 200 chars) |
+| `confirmation_code` | string | | Booking confirmation (max 200 chars) — stored but never returned by GET |
+| `summary` | string | | Human-readable one-liner (max 1000 chars) |
+| `traveler_names` | string[] | | Names of travelers (max 20 entries) |
+| `start_ts` | string (ISO 8601) | | Start datetime UTC |
+| `end_ts` | string (ISO 8601) | | End datetime UTC |
+| `start_location` | string | | Departure / check-in location (max 300 chars) |
+| `end_location` | string | | Arrival / check-out location (max 300 chars) |
+| `details_json` | object | | Type-specific structured data (max 10KB) |
+| `status` | string | | `confirmed`, `pending`, `cancelled`, etc. |
+
+#### Response
+
+`201 Created` with `{ data: Item }`.
+
+---
+
+### `POST /api/v1/trips/:id/items/batch`
+
+Add up to 50 items in one call.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/items/batch \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"kind":"flight","start_date":"2026-06-07",...},{"kind":"hotel","start_date":"2026-06-07",...}]}'
+```
+
+#### Body
+
+```json
+{
+  "items": [ <ItemInput>, ... ]
+}
+```
+
+Max 50 items per request. Each item follows the same schema as `POST /trips/:id/items`.
+
+Validation errors include the item index: `items[2]: "kind" is required.`
+
+#### Response
+
+`201 Created` with `{ data: Item[], meta: { count: number } }`.
+
+---
+
+### `PATCH /api/v1/items/:id`
+
+Update fields on an existing item. All fields optional.
+
+#### Request
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/items/$ITEM_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"cancelled"}'
+```
+
+#### Response
+
+`200 OK` with `{ data: Item }`.
+
+---
+
+### `DELETE /api/v1/items/:id`
+
+Delete a single item. The parent trip is not affected.
+
+#### Request
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/items/$ITEM_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Response
+
+`204 No Content`.
+
+---
+
 ## Error Responses
 
 All errors follow the same shape:
@@ -310,6 +500,7 @@ All errors follow the same shape:
 | HTTP Status | Code | When |
 |---|---|---|
 | `400` | `invalid_param` | Malformed UUID or invalid parameter |
+| `400` | `invalid_json` | Request body is not valid JSON |
 | `401` | `unauthorized` | Missing, malformed, or invalid API key |
 | `404` | `not_found` | Trip or item doesn't exist, or belongs to another user |
 | `429` | `rate_limited` | Exceeded 100 req/min |
@@ -476,6 +667,7 @@ If you're wiring UB Trippin into a Claude agent as a tool:
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.1 | 2026-02-24 | Write endpoints: POST/PATCH/DELETE trips, POST/PATCH/DELETE items, batch insert |
 | v1.0 | 2026-02-23 | Initial release: GET trips, GET trips/:id, GET items/:id |
 
 ---

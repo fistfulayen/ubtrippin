@@ -217,14 +217,16 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.2.0' },
+  { name: 'ubtrippin', version: '1.3.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
 This server provides access to your UBTRIPPIN travel data and city guides.
 Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 
-Trips: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
+Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
+Write (trips): create_trip, update_trip, delete_trip
+Write (items): add_item, add_items, update_item, delete_item
 City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
     `.trim(),
@@ -419,6 +421,251 @@ server.registerTool(
         },
       ],
     }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Write Tools — Trips
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'create_trip',
+  {
+    title: 'Create Trip',
+    description: `Create a new trip. Returns the created trip with its assigned ID.
+
+Example:
+  create_trip({ title: "Paris → New York", start_date: "2026-06-07", end_date: "2026-06-07", primary_location: "New York" })`,
+    inputSchema: {
+      title: z.string().min(1).max(200).describe('Trip title (required, 1–200 chars)'),
+      start_date: z.string().optional().describe('Start date YYYY-MM-DD'),
+      end_date: z.string().optional().describe('End date YYYY-MM-DD'),
+      primary_location: z.string().optional().describe('Main destination (e.g. "Tokyo, Japan")'),
+      notes: z.string().optional().describe('Free-text notes'),
+    },
+  },
+  async (input) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(input),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'update_trip',
+  {
+    title: 'Update Trip',
+    description: `Update fields on an existing trip. All fields are optional — only provided fields are updated.
+
+Example:
+  update_trip({ trip_id: "...", title: "NYC June", share_enabled: true })`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip to update'),
+      title: z.string().min(1).max(200).optional().describe('New title'),
+      start_date: z.string().nullable().optional().describe('New start date YYYY-MM-DD (null to clear)'),
+      end_date: z.string().nullable().optional().describe('New end date YYYY-MM-DD (null to clear)'),
+      primary_location: z.string().nullable().optional().describe('New primary location (null to clear)'),
+      notes: z.string().nullable().optional().describe('New notes (null to clear)'),
+      cover_image_url: z.string().nullable().optional().describe('New cover image URL (null to clear)'),
+      share_enabled: z.boolean().optional().describe('Enable or disable public share link'),
+    },
+  },
+  async ({ trip_id, ...updates }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'delete_trip',
+  {
+    title: 'Delete Trip',
+    description: `Delete a trip and ALL its items. This is irreversible. Confirm with the user before calling.
+
+Returns: { deleted: true } on success.`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip to delete'),
+    },
+  },
+  async ({ trip_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, trip_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Write Tools — Items
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'add_item',
+  {
+    title: 'Add Item to Trip',
+    description: `Add a single travel item to a trip. The API is strict — all parsing and field extraction is your responsibility. Required: kind + start_date.
+
+Valid kinds: flight, hotel, car_rental, train, activity, restaurant, other
+
+Example (flight):
+  add_item({
+    trip_id: "...",
+    kind: "flight",
+    provider: "DL",
+    summary: "Delta DL 263 CDG → JFK",
+    start_date: "2026-06-07",
+    start_ts: "2026-06-07T09:30:00Z",
+    end_ts: "2026-06-07T17:46:00Z",
+    start_location: "Paris CDG Terminal 2E",
+    end_location: "New York JFK Terminal 4",
+    traveler_names: ["Ian Rogers"],
+    details_json: { flight_number: "DL 263", cabin_class: "Premium Economy" }
+  })`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      kind: z.enum(['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'other']).describe('Item type (required)'),
+      start_date: z.string().describe('Start date YYYY-MM-DD (required)'),
+      end_date: z.string().optional().describe('End date YYYY-MM-DD'),
+      provider: z.string().optional().describe('Airline, hotel, car company, etc.'),
+      confirmation_code: z.string().optional().describe('Booking confirmation code'),
+      summary: z.string().optional().describe('Human-readable one-liner'),
+      traveler_names: z.array(z.string()).optional().describe('Names of travelers on this item'),
+      start_ts: z.string().optional().describe('Start datetime ISO 8601 UTC'),
+      end_ts: z.string().optional().describe('End datetime ISO 8601 UTC'),
+      start_location: z.string().optional().describe('Departure / check-in location'),
+      end_location: z.string().optional().describe('Arrival / check-out location'),
+      details_json: z.record(z.unknown()).optional().describe('Type-specific structured data (max 10KB)'),
+      status: z.string().optional().describe('confirmed, pending, cancelled, etc.'),
+    },
+  },
+  async ({ trip_id, ...itemBody }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/items`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(itemBody),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'add_items',
+  {
+    title: 'Add Multiple Items to Trip (Batch)',
+    description: `Add up to 50 items to a trip in one call. Each item follows the same schema as add_item. Useful when importing a full itinerary at once.
+
+Body: { trip_id, items: [ <item>, ... ] }`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      items: z.array(z.object({
+        kind: z.enum(['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'other']),
+        start_date: z.string(),
+        end_date: z.string().optional(),
+        provider: z.string().optional(),
+        confirmation_code: z.string().optional(),
+        summary: z.string().optional(),
+        traveler_names: z.array(z.string()).optional(),
+        start_ts: z.string().optional(),
+        end_ts: z.string().optional(),
+        start_location: z.string().optional(),
+        end_location: z.string().optional(),
+        details_json: z.record(z.unknown()).optional(),
+        status: z.string().optional(),
+      })).min(1).max(50).describe('Array of items to add (1–50)'),
+    },
+  },
+  async ({ trip_id, items }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/items/batch`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ items }),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'update_item',
+  {
+    title: 'Update Trip Item',
+    description: `Update fields on an existing trip item. All fields optional — only provided fields are updated.
+
+Example: update_item({ item_id: "...", status: "cancelled" })`,
+    inputSchema: {
+      item_id: z.string().uuid().describe('UUID of the item to update'),
+      kind: z.enum(['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'other']).optional(),
+      start_date: z.string().nullable().optional(),
+      end_date: z.string().nullable().optional(),
+      provider: z.string().nullable().optional(),
+      summary: z.string().nullable().optional(),
+      traveler_names: z.array(z.string()).nullable().optional(),
+      start_ts: z.string().nullable().optional(),
+      end_ts: z.string().nullable().optional(),
+      start_location: z.string().nullable().optional(),
+      end_location: z.string().nullable().optional(),
+      details_json: z.record(z.unknown()).nullable().optional(),
+      status: z.string().nullable().optional(),
+      needs_review: z.boolean().nullable().optional(),
+    },
+  },
+  async ({ item_id, ...updates }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/items/${item_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    })
+    const result = await res.json()
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'delete_item',
+  {
+    title: 'Delete Trip Item',
+    description: `Delete a single trip item. The parent trip is not affected.
+
+Returns: { deleted: true } on success.`,
+    inputSchema: {
+      item_id: z.string().uuid().describe('UUID of the item to delete'),
+    },
+  },
+  async ({ item_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/items/${item_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, item_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )
 
