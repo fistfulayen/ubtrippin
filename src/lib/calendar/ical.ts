@@ -470,6 +470,8 @@ function buildCalendar(events: string[]): string {
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeIcsText(CALENDAR_NAME)}`,
+    'REFRESH-INTERVAL;VALUE=DURATION:PT15M',
+    'X-PUBLISHED-TTL:PT15M',
     ...events,
     'END:VCALENDAR',
   ]

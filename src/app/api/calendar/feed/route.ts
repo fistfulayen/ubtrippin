@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     headers: {
       'Content-Type': 'text/calendar; charset=utf-8',
       ETag: etag,
-      'Cache-Control': 'private, max-age=300',
+      'Cache-Control': 'private, max-age=60, must-revalidate',
     },
   })
 }
