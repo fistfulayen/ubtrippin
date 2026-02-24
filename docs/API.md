@@ -452,6 +452,8 @@ Validation errors include the item index: `items[2]: "kind" is required.`
 
 Update fields on an existing item. All fields optional.
 
+To **move an item to a different trip**, include `trip_id` in the body. The destination trip must belong to the same user. The `auto_expand_trip_dates` DB trigger adjusts the target trip's date range automatically.
+
 #### Request
 
 ```bash
@@ -460,6 +462,21 @@ curl -X PATCH https://www.ubtrippin.xyz/api/v1/items/$ITEM_ID \
   -H "Content-Type: application/json" \
   -d '{"status":"cancelled"}'
 ```
+
+#### Move to another trip
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/items/$ITEM_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"trip_id":"b2c3d4e5-f6a7-8901-bcde-f12345678901"}'
+```
+
+#### Additional Field
+
+| Field | Type | Description |
+|---|---|---|
+| `trip_id` | UUID | Move this item to a different trip (must be owned by you) |
 
 #### Response
 
@@ -481,6 +498,269 @@ curl -X DELETE https://www.ubtrippin.xyz/api/v1/items/$ITEM_ID \
 #### Response
 
 `204 No Content`.
+
+---
+
+---
+
+### `POST /api/v1/trips/:id/merge`
+
+Merge a source trip into a target trip. All items from the source trip are moved to the target, then the source trip is deleted. The `auto_expand_trip_dates` DB trigger expands the target trip's date range to accommodate any moved items.
+
+Both trips must belong to the authenticated user.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/trips/$TARGET_TRIP_ID/merge \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source_trip_id":"b2c3d4e5-f6a7-8901-bcde-f12345678901"}'
+```
+
+#### Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `source_trip_id` | UUID | ✅ | Trip whose items will be moved into the target (then deleted) |
+
+#### Response
+
+`200 OK`:
+
+```json
+{
+  "data": {
+    "trip": {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "title": "Japan Spring 2026",
+      "start_date": "2026-04-01",
+      "end_date": "2026-04-15",
+      "...": "..."
+    },
+    "items": [
+      { "id": "...", "kind": "flight", "..." : "..." },
+      { "id": "...", "kind": "hotel",  "..." : "..." }
+    ]
+  },
+  "meta": {
+    "items_moved": 3
+  }
+}
+```
+
+#### Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `invalid_param` | `source_trip_id` is not a valid UUID, or equals the target trip ID |
+| `404` | `not_found` | Either trip not found or not owned by you |
+
+---
+
+### `GET /api/v1/images/search`
+
+Search for landscape photos via Unsplash. Intended for populating trip cover images. Results are cached for 5 minutes per query on the server side.
+
+#### Request
+
+```bash
+curl "https://www.ubtrippin.xyz/api/v1/images/search?q=tokyo" \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Query Parameters
+
+| Param | Required | Description |
+|---|---|---|
+| `q` | ✅ | Search query (1–200 chars) |
+
+#### Response
+
+`200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "url": "https://images.unsplash.com/photo-...?w=1080&fit=max",
+      "thumb": "https://images.unsplash.com/photo-...?w=200&fit=max",
+      "credit": {
+        "name": "Jezael Melgoza",
+        "link": "https://unsplash.com/@jezael"
+      }
+    }
+  ],
+  "meta": {
+    "query": "tokyo",
+    "count": 9
+  }
+}
+```
+
+Returns up to 9 landscape-oriented results. Photo credits are provided in compliance with the Unsplash API guidelines.
+
+#### Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `invalid_param` | `q` is missing or exceeds 200 chars |
+| `502` | `internal_error` | Unsplash API request failed |
+
+---
+
+### `GET /api/v1/calendar/token`
+
+Get the current calendar feed token and iCal URL for the authenticated user.
+
+#### Request
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/calendar/token \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Response
+
+`200 OK` — no token yet:
+
+```json
+{
+  "data": {
+    "token": null,
+    "feed_url": null
+  }
+}
+```
+
+`200 OK` — token exists:
+
+```json
+{
+  "data": {
+    "token": "abc123xyz...",
+    "feed_url": "https://www.ubtrippin.xyz/api/calendar/feed?token=abc123xyz..."
+  }
+}
+```
+
+---
+
+### `POST /api/v1/calendar/token`
+
+Generate or regenerate the calendar feed token. If a token already exists, it is replaced with a new one. Any previously shared calendar URLs will stop working.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/calendar/token \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+No request body required.
+
+#### Response
+
+`201 Created`:
+
+```json
+{
+  "data": {
+    "token": "newtoken123...",
+    "feed_url": "https://www.ubtrippin.xyz/api/calendar/feed?token=newtoken123..."
+  }
+}
+```
+
+---
+
+### `GET /api/v1/settings/senders`
+
+List all allowed email senders for the authenticated user. Senders are email addresses from which the app will process forwarded travel confirmations.
+
+#### Request
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/settings/senders \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Response
+
+`200 OK`:
+
+```json
+{
+  "data": [
+    {
+      "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+      "user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "email": "alice@example.com",
+      "name": "Alice",
+      "created_at": "2026-02-10T14:23:11Z"
+    }
+  ],
+  "meta": {
+    "count": 1
+  }
+}
+```
+
+---
+
+### `POST /api/v1/settings/senders`
+
+Add an email address to your allowed senders list.
+
+#### Request
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/settings/senders \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","name":"Alice"}'
+```
+
+#### Body
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | string | ✅ | Valid email address (max 254 chars) |
+| `name` | string | | Display name (max 200 chars, HTML stripped) |
+
+#### Response
+
+`201 Created` with `{ data: Sender }`.
+
+#### Errors
+
+| Status | Code | When |
+|---|---|---|
+| `400` | `invalid_param` | `email` is missing or invalid |
+| `409` | `conflict` | This email address is already in your allowed senders list |
+
+---
+
+### `DELETE /api/v1/settings/senders/:id`
+
+Remove an email address from your allowed senders list.
+
+#### Request
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/settings/senders/$SENDER_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### Response
+
+`204 No Content`.
+
+#### Errors
+
+| Status | Code | When |
+|---|---|---|
+| `404` | `not_found` | Sender not found or not owned by you |
 
 ---
 
@@ -667,6 +947,7 @@ If you're wiring UB Trippin into a Claude agent as a tool:
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.2 | 2026-02-24 | Feature parity — move item, merge trips, cover image search, calendar token, allowed senders |
 | v1.1 | 2026-02-24 | Write endpoints: POST/PATCH/DELETE trips, POST/PATCH/DELETE items, batch insert |
 | v1.0 | 2026-02-23 | Initial release: GET trips, GET trips/:id, GET items/:id |
 

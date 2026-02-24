@@ -92,6 +92,8 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
     const supabase = createClient()
     await supabase.from('trip_items').delete().eq('id', item.id)
     setDeleteOpen(false)
+    // Regenerate trip name in the background (fire-and-forget)
+    fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
     router.refresh()
   }
 
@@ -101,6 +103,9 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
     const supabase = createClient()
     await supabase.from('trip_items').update({ trip_id: moveTarget }).eq('id', item.id)
     setMoveOpen(false)
+    // Regenerate names on both source and target trips (fire-and-forget)
+    fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
+    fetch(`/api/v1/trips/${moveTarget}/rename`, { method: 'POST' }).catch(() => {})
     router.refresh()
   }
 

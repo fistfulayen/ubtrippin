@@ -5,6 +5,7 @@ import { WelcomeEmail } from '@/components/email/welcome'
 import { createSecretClient } from '@/lib/supabase/server'
 import { createClient } from '@/lib/supabase/server'
 import { getResendClient } from '@/lib/resend/client'
+import { generateTripName } from '@/lib/trips/naming'
 
 export async function sendWelcomeEmail(
   userId: string,
@@ -53,4 +54,36 @@ export async function dismissFirstTripBanner(): Promise<void> {
     .from('profiles')
     .update({ onboarding_completed: true })
     .eq('id', user.id)
+}
+
+/**
+ * Re-generates the trip title based on remaining items.
+ * Called after item deletion or move to keep the title accurate.
+ */
+export async function regenerateTripName(tripId: string): Promise<void> {
+  const supabase = createSecretClient()
+
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('id, user_id, title')
+    .eq('id', tripId)
+    .single()
+
+  if (!trip) return
+
+  const { data: items } = await supabase
+    .from('trip_items')
+    .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
+    .eq('trip_id', tripId)
+    .order('start_date', { ascending: true })
+
+  if (!items || items.length === 0) return
+
+  const newTitle = await generateTripName(items, trip.title)
+  if (newTitle && newTitle !== trip.title) {
+    await supabase
+      .from('trips')
+      .update({ title: newTitle })
+      .eq('id', tripId)
+  }
 }

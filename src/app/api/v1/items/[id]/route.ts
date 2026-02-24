@@ -131,7 +131,7 @@ export async function PATCH(
   }
   const clean = result.data
 
-  if (Object.keys(clean).length === 0) {
+  if (Object.keys(clean).length === 0 && body.trip_id === undefined) {
     return NextResponse.json(
       { error: { code: 'invalid_param', message: 'No updatable fields provided.' } },
       { status: 400 }
@@ -155,8 +155,35 @@ export async function PATCH(
     )
   }
 
-  // 7. Build update — only allowed fields, no mass assignment
+  // 7. Handle trip_id (move item to another trip) — validate separately
+  let targetTripId: string | undefined
+  if (body.trip_id !== undefined) {
+    if (!isValidUUID(body.trip_id)) {
+      return NextResponse.json(
+        { error: { code: 'invalid_param', message: '"trip_id" must be a valid UUID.' } },
+        { status: 400 }
+      )
+    }
+    // Verify target trip belongs to this user
+    const { data: targetTrip } = await supabase
+      .from('trips')
+      .select('id')
+      .eq('id', body.trip_id as string)
+      .eq('user_id', auth.userId)
+      .single()
+
+    if (!targetTrip) {
+      return NextResponse.json(
+        { error: { code: 'not_found', message: 'Target trip not found or not owned by you.' } },
+        { status: 404 }
+      )
+    }
+    targetTripId = body.trip_id as string
+  }
+
+  // 8. Build update — only allowed fields, no mass assignment
   const updates: Record<string, unknown> = {}
+  if (targetTripId !== undefined) updates.trip_id = targetTripId
   if (clean.kind !== undefined) updates.kind = clean.kind
   if (clean.provider !== undefined) updates.provider = clean.provider
   if (clean.confirmation_code !== undefined) updates.confirmation_code = clean.confirmation_code
