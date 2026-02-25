@@ -11,6 +11,7 @@ import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
+import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
 
 const BATCH_MAX = 50
 
@@ -174,6 +175,16 @@ export async function POST(
       { error: { code: 'internal_error', message: 'Failed to create items.' } },
       { status: 500 }
     )
+  }
+
+  for (const item of items ?? []) {
+    void applyNoVaultEntryFlag({
+      userId: auth.userId,
+      tripItemId: item.id as string,
+      providerName: (item.provider as string | null) ?? null,
+    }).catch((err) => {
+      console.error('[items/batch loyalty-flag]', err)
+    })
   }
 
   const sanitized = (items ?? []).map((item) => sanitizeItem(item as Record<string, unknown>))

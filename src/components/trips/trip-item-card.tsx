@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { formatTime, getLocalTimes, cn } from '@/lib/utils'
+import { getLocalTimes, cn } from '@/lib/utils'
 import {
   Plane,
   Building,
@@ -48,6 +48,40 @@ import {
 interface TripItemCardProps {
   item: TripItem
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
+}
+
+function loyaltyChip(loyaltyFlag: unknown): { text: string; className: string } | null {
+  if (!loyaltyFlag || typeof loyaltyFlag !== 'object') return null
+  const flag = loyaltyFlag as Record<string, unknown>
+  const status = typeof flag.status === 'string' ? flag.status : null
+  const program = typeof flag.program === 'string'
+    ? flag.program
+    : typeof flag.provider_name === 'string'
+    ? flag.provider_name
+    : 'Loyalty'
+
+  if (status === 'missing_from_booking') {
+    return {
+      text: `${program} not in booking - check?`,
+      className: 'bg-amber-100 text-amber-800',
+    }
+  }
+
+  if (status === 'compatible_available') {
+    return {
+      text: `${program} available for this booking`,
+      className: 'bg-blue-100 text-blue-800',
+    }
+  }
+
+  if (status === 'applied') {
+    return {
+      text: `${program} applied`,
+      className: 'bg-emerald-100 text-emerald-800',
+    }
+  }
+
+  return null
 }
 
 const kindIcons: Record<string, typeof Plane> = {
@@ -86,6 +120,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
   const providerLogoUrl = item.provider
     ? getProviderLogoUrl(item.provider, item.kind)
     : null
+  const loyalty = loyaltyChip(item.loyalty_flag)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -170,6 +205,14 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
               <h4 className="mt-1 font-semibold text-gray-900">
                 {item.provider || item.summary || 'Untitled'}
               </h4>
+
+              {loyalty && (
+                <div className="mt-1.5">
+                  <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', loyalty.className)}>
+                    {loyalty.text}
+                  </span>
+                </div>
+              )}
 
               {/* Time and location */}
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">

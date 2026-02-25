@@ -135,6 +135,7 @@ export interface Database {
           status: TripItemStatus
           confidence: number
           needs_review: boolean
+          loyalty_flag: Json | null
           source_email_id: string | null
           created_at: string
           updated_at: string
@@ -158,6 +159,7 @@ export interface Database {
           status?: TripItemStatus
           confidence?: number
           needs_review?: boolean
+          loyalty_flag?: Json | null
           source_email_id?: string | null
           created_at?: string
           updated_at?: string
@@ -181,6 +183,7 @@ export interface Database {
           status?: TripItemStatus
           confidence?: number
           needs_review?: boolean
+          loyalty_flag?: Json | null
           source_email_id?: string | null
           created_at?: string
           updated_at?: string

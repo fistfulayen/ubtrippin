@@ -14,6 +14,7 @@ import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
+import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
 
 const ITEM_SELECT = `id,
        trip_id,
@@ -150,6 +151,16 @@ export async function POST(
       { error: { code: 'internal_error', message: 'Failed to create item.' } },
       { status: 500 }
     )
+  }
+
+  if (item) {
+    void applyNoVaultEntryFlag({
+      userId: trip.user_id,
+      tripItemId: item.id,
+      providerName: item.provider,
+    }).catch((err) => {
+      console.error('[items/loyalty-flag]', err)
+    })
   }
 
   // 8. Fire notification to trip owner when a collaborator adds an item

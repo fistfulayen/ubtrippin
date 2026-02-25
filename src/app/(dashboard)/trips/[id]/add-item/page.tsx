@@ -63,7 +63,7 @@ export default function AddItemPage({ params }: AddItemPageProps) {
       ? new Date(`${end_date}T${end_time}`).toISOString()
       : null
 
-    const { error: insertError } = await supabase.from('trip_items').insert({
+    const { data: insertedItem, error: insertError } = await supabase.from('trip_items').insert({
       user_id: user.id,
       trip_id: tripId,
       kind,
@@ -80,12 +80,35 @@ export default function AddItemPage({ params }: AddItemPageProps) {
       status: 'confirmed',
       confidence: 1.0,
       needs_review: false,
-    })
+    }).select('id, provider').single()
 
     if (insertError) {
       setError(insertError.message)
       setLoading(false)
       return
+    }
+
+    if (insertedItem?.id && provider.trim()) {
+      try {
+        const lookupRes = await fetch(`/api/v1/me/loyalty/lookup?provider=${encodeURIComponent(provider)}`)
+        if (lookupRes.ok) {
+          const lookupPayload = await lookupRes.json() as { exact_match?: boolean; compatible_program?: unknown }
+          if (!lookupPayload.exact_match && !lookupPayload.compatible_program) {
+            await supabase
+              .from('trip_items')
+              .update({
+                loyalty_flag: {
+                  status: 'no_vault_entry',
+                  provider_name: provider.trim(),
+                  flagged_at: new Date().toISOString(),
+                },
+              })
+              .eq('id', insertedItem.id)
+          }
+        }
+      } catch {
+        // non-blocking
+      }
     }
 
     router.push(`/trips/${tripId}`)

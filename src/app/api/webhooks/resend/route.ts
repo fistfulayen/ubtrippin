@@ -18,6 +18,9 @@ import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
 import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
 import { trackFirstForward, trackTripCreated } from '@/lib/activation'
+import { applyEmailLoyaltyFlag } from '@/lib/loyalty-flag'
+import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
+import { resolveProviderKey } from '@/lib/loyalty-matching'
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
@@ -236,6 +239,58 @@ export async function POST(request: NextRequest) {
         .eq('id', sourceEmail.id)
 
       if (extractionResult.items.length === 0) {
+        const signupMatch = await detectLoyaltySignupEmail({
+          supabase,
+          subject: fullEmail.subject || '',
+          body: `${fullEmail.text || ''}\n${fullEmail.html || ''}\n${attachmentText || ''}`,
+          fallbackProviderDomain: fromEmail.split('@')[1] || '',
+        })
+
+        if (signupMatch?.provider_name && signupMatch.program_number) {
+          const travelerName =
+            signupMatch.traveler_name?.trim() ||
+            userProfile?.full_name?.trim() ||
+            'Traveler'
+
+          await upsertLoyaltyFromSignup({
+            supabase,
+            userId,
+            travelerName,
+            providerType: signupMatch.provider_type,
+            providerName: signupMatch.provider_name,
+            providerKey: signupMatch.provider_key,
+            programNumber: signupMatch.program_number,
+          })
+
+          await supabase
+            .from('source_emails')
+            .update({
+              parse_status: 'completed',
+              parse_error: null,
+              extracted_json: {
+                doc_type: 'loyalty_signup',
+                items: [],
+                loyalty_signup: {
+                  provider_name: signupMatch.provider_name,
+                  provider_key: signupMatch.provider_key,
+                },
+              },
+            })
+            .eq('id', sourceEmail.id)
+
+          return NextResponse.json({
+            message: 'Loyalty signup email processed',
+            email_id: sourceEmail.id,
+            items_created: 0,
+          })
+        }
+
+        await sendUnclearEmailReply({
+          to: fromEmail,
+          name: userProfile?.full_name ?? null,
+          resend,
+        })
+
         return NextResponse.json({
           message: 'No travel items extracted',
           email_id: sourceEmail.id,
@@ -377,6 +432,13 @@ export async function POST(request: NextRequest) {
           continue
         }
 
+        await applyEmailLoyaltyFlag({
+          userId,
+          tripItemId: tripItem.id,
+          providerName: item.provider,
+          rawEmailText: `${fullEmail.subject || ''}\n${fullEmail.text || ''}\n${attachmentText || ''}`,
+        })
+
         createdItems.push({ tripId: confirmedTripId, itemId: tripItem.id })
       }
 
@@ -477,6 +539,162 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+interface LoyaltySignupMatch {
+  provider_name: string
+  provider_key: string
+  provider_type: 'airline' | 'hotel' | 'car_rental' | 'other'
+  program_number: string
+  traveler_name: string | null
+}
+
+function extractLoyaltyProgramNumber(input: string): string | null {
+  const focusedPatterns = [
+    /(?:membership|member|loyalty|frequent flyer|rewards|program)\s*(?:number|#|id)?\s*[:#-]?\s*([A-Z0-9]{6,20})/i,
+    /your\s+[a-z\s]{0,20}number\s+is\s+([A-Z0-9]{6,20})/i,
+    /number:\s*([A-Z0-9]{6,20})/i,
+  ]
+
+  for (const pattern of focusedPatterns) {
+    const match = input.match(pattern)
+    if (match?.[1]) return match[1].toUpperCase()
+  }
+
+  return null
+}
+
+function looksLikeLoyaltySignup(subject: string, body: string): boolean {
+  const subjectPatterns = [
+    /welcome to/i,
+    /enrollment confirmation/i,
+    /membership confirmation/i,
+    /your .* number/i,
+    /you('| a)?re enrolled/i,
+  ]
+
+  const bodySignals = /(membership|member number|frequent flyer|loyalty|rewards program)/i
+  return subjectPatterns.some((pattern) => pattern.test(subject)) || bodySignals.test(body)
+}
+
+async function detectLoyaltySignupEmail(params: {
+  supabase: ReturnType<typeof createSecretClient>
+  subject: string
+  body: string
+  fallbackProviderDomain: string
+}): Promise<LoyaltySignupMatch | null> {
+  if (!looksLikeLoyaltySignup(params.subject, params.body)) return null
+
+  const programNumber = extractLoyaltyProgramNumber(`${params.subject}\n${params.body}`)
+  if (!programNumber) return null
+
+  const { data: providers } = await params.supabase
+    .from('provider_catalog')
+    .select('provider_key, provider_name, provider_type')
+
+  const providerRows = (providers ?? []) as Array<{
+    provider_key: string
+    provider_name: string
+    provider_type: 'airline' | 'hotel' | 'car_rental' | 'other'
+  }>
+
+  const haystack = `${params.subject}\n${params.body}`.toLowerCase()
+  const directMatch = providerRows.find((provider) =>
+    haystack.includes(provider.provider_name.toLowerCase())
+  )
+
+  if (directMatch) {
+    return {
+      provider_name: directMatch.provider_name,
+      provider_key: directMatch.provider_key,
+      provider_type: directMatch.provider_type,
+      program_number: programNumber,
+      traveler_name: null,
+    }
+  }
+
+  const domainHint = params.fallbackProviderDomain.split('.')[0] || ''
+  const resolvedProviderKey = resolveProviderKey(domainHint)
+  if (!resolvedProviderKey) return null
+
+  const fallback = providerRows.find((provider) => provider.provider_key === resolvedProviderKey)
+  if (!fallback) return null
+
+  return {
+    provider_name: fallback.provider_name,
+    provider_key: fallback.provider_key,
+    provider_type: fallback.provider_type,
+    program_number: programNumber,
+    traveler_name: null,
+  }
+}
+
+async function upsertLoyaltyFromSignup(params: {
+  supabase: ReturnType<typeof createSecretClient>
+  userId: string
+  travelerName: string
+  providerType: 'airline' | 'hotel' | 'car_rental' | 'other'
+  providerName: string
+  providerKey: string
+  programNumber: string
+}) {
+  const normalizedNumber = params.programNumber.trim()
+  if (!normalizedNumber) return
+
+  const { data: existing } = await params.supabase
+    .from('loyalty_programs')
+    .select('id, program_number_encrypted')
+    .eq('user_id', params.userId)
+    .eq('provider_key', params.providerKey)
+
+  for (const row of existing ?? []) {
+    const record = row as { id: string; program_number_encrypted: string }
+    if (decryptLoyaltyNumber(record.program_number_encrypted).trim().toUpperCase() === normalizedNumber.toUpperCase()) {
+      return
+    }
+  }
+
+  const { count } = await params.supabase
+    .from('loyalty_programs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', params.userId)
+
+  const { data: profile } = await params.supabase
+    .from('profiles')
+    .select('tier, subscription_tier')
+    .eq('id', params.userId)
+    .maybeSingle()
+
+  const plan = profile as { tier?: string | null; subscription_tier?: string | null } | null
+  const isPro = plan?.tier === 'pro' || plan?.subscription_tier === 'pro'
+  if (!isPro && (count ?? 0) >= 3) return
+
+  await params.supabase
+    .from('loyalty_programs')
+    .insert({
+      user_id: params.userId,
+      traveler_name: params.travelerName,
+      provider_type: params.providerType,
+      provider_name: params.providerName,
+      provider_key: params.providerKey,
+      program_number_encrypted: encryptLoyaltyNumber(normalizedNumber),
+      program_number_masked: maskLoyaltyNumber(normalizedNumber),
+      preferred: false,
+    })
+}
+
+async function sendUnclearEmailReply(params: {
+  to: string
+  name: string | null
+  resend: ReturnType<typeof getResendClient>
+}) {
+  const displayName = params.name?.trim() || 'there'
+  await params.resend.emails.send({
+    from: 'UBTRIPPIN <trips@ubtrippin.xyz>',
+    to: params.to,
+    subject: "We couldn't process your forwarded email",
+    text: `Hi ${displayName}, we received your email but couldn't figure out what to do with it. If you were trying to add a booking, try forwarding the confirmation email from the airline/hotel/car rental. If you were trying to add a loyalty program, forward your membership welcome email.`,
+  })
 }
 
 async function sendConfirmationEmail(

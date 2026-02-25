@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       {
         error: {
           code: 'pro_required',
-          message: 'Free tier supports up to 3 loyalty programs. Upgrade to Pro for unlimited vault entries.',
+          message: 'Free tier limit reached. Upgrade to Pro for unlimited loyalty programs.',
         },
       },
       { status: 403 }
