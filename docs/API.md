@@ -911,6 +911,264 @@ Response:
 
 ---
 
+## Profile & Loyalty Vault
+
+These endpoints store traveler preferences and loyalty numbers so agents can apply them during booking.
+
+### `GET /api/v1/me/profile`
+
+Get the authenticated user's traveler profile.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/me/profile \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": {
+    "id": "<user_uuid>",
+    "seat_preference": "window",
+    "meal_preference": "no_preference",
+    "airline_alliance": "star_alliance",
+    "hotel_brand_preference": "Marriott",
+    "home_airport": "CDG",
+    "currency_preference": "EUR",
+    "notes": "Prefer morning departures.",
+    "created_at": "2026-02-25T08:00:00Z",
+    "updated_at": "2026-02-25T08:00:00Z",
+    "loyalty_count": 3
+  }
+}
+```
+
+### `PUT /api/v1/me/profile`
+
+Update any subset of traveler preference fields. Omitted fields are unchanged.
+
+```bash
+curl -X PUT https://www.ubtrippin.xyz/api/v1/me/profile \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "seat_preference": "aisle",
+    "airline_alliance": "oneworld",
+    "home_airport": "JFK"
+  }'
+```
+
+```json
+{
+  "data": {
+    "id": "<user_uuid>",
+    "seat_preference": "aisle",
+    "meal_preference": "no_preference",
+    "airline_alliance": "oneworld",
+    "hotel_brand_preference": "Marriott",
+    "home_airport": "JFK",
+    "currency_preference": "EUR",
+    "notes": "Prefer morning departures.",
+    "created_at": "2026-02-25T08:00:00Z",
+    "updated_at": "2026-02-25T09:10:00Z",
+    "loyalty_count": 3
+  }
+}
+```
+
+### `GET /api/v1/me/loyalty`
+
+List loyalty programs in the vault (includes plaintext `program_number` for agent use).
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/me/loyalty \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "<program_uuid>",
+      "user_id": "<user_uuid>",
+      "traveler_name": "Ian Rogers",
+      "provider_type": "airline",
+      "provider_name": "United MileagePlus",
+      "provider_key": "united",
+      "program_number_masked": "MP•••••2847",
+      "program_number": "MP123452847",
+      "status_tier": "gold",
+      "preferred": true,
+      "notes": null,
+      "created_at": "2026-02-25T08:10:00Z",
+      "updated_at": "2026-02-25T08:10:00Z",
+      "alliance_group": "star_alliance"
+    }
+  ],
+  "meta": { "count": 1 }
+}
+```
+
+### `POST /api/v1/me/loyalty`
+
+Add a loyalty program to the vault.
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/me/loyalty \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "traveler_name": "Ian Rogers",
+    "provider_type": "hotel",
+    "provider_name": "Marriott Bonvoy",
+    "provider_key": "marriott_bonvoy",
+    "program_number": "1234567890",
+    "status_tier": "titanium",
+    "preferred": true
+  }'
+```
+
+```json
+{
+  "data": {
+    "id": "<program_uuid>",
+    "user_id": "<user_uuid>",
+    "traveler_name": "Ian Rogers",
+    "provider_type": "hotel",
+    "provider_name": "Marriott Bonvoy",
+    "provider_key": "marriott_bonvoy",
+    "program_number_masked": "12•••••890",
+    "program_number": "1234567890",
+    "status_tier": "titanium",
+    "preferred": true,
+    "notes": null,
+    "created_at": "2026-02-25T08:12:00Z",
+    "updated_at": "2026-02-25T08:12:00Z",
+    "alliance_group": null
+  }
+}
+```
+
+### `PATCH /api/v1/me/loyalty/:id`
+
+Update one loyalty entry (number, tier, preferred, notes, traveler name).
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/me/loyalty/$PROGRAM_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status_tier": "platinum",
+    "preferred": true,
+    "notes": "Primary program for Europe travel."
+  }'
+```
+
+```json
+{
+  "data": {
+    "id": "<program_uuid>",
+    "provider_name": "United MileagePlus",
+    "provider_key": "united",
+    "program_number_masked": "MP•••••2847",
+    "program_number": "MP123452847",
+    "status_tier": "platinum",
+    "preferred": true,
+    "notes": "Primary program for Europe travel."
+  }
+}
+```
+
+### `DELETE /api/v1/me/loyalty/:id`
+
+Delete a loyalty entry.
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/me/loyalty/$PROGRAM_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Returns `204 No Content`.
+
+### `GET /api/v1/me/loyalty/lookup?provider=:provider_key`
+
+Lookup a loyalty number for a provider, with alliance fallback.
+
+```bash
+curl "https://www.ubtrippin.xyz/api/v1/me/loyalty/lookup?provider=airfrance" \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "exact_match": false,
+  "compatible_program": {
+    "provider_name": "Delta SkyMiles",
+    "provider_key": "delta",
+    "program_number_masked": "DL•••••8901",
+    "program_number": "DL123458901",
+    "traveler_name": "Ian Rogers"
+  },
+  "alliance": "skyteam"
+}
+```
+
+### `GET /api/v1/me/loyalty/export`
+
+Export the full loyalty vault as JSON.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/me/loyalty/export \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "exported_at": "2026-02-25T09:30:00Z",
+  "user_id": "<user_uuid>",
+  "count": 2,
+  "programs": [
+    {
+      "id": "<program_uuid>",
+      "provider_name": "United MileagePlus",
+      "provider_key": "united",
+      "program_number_masked": "MP•••••2847",
+      "program_number": "MP123452847"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/loyalty/providers`
+
+Get the provider catalog used for normalized `provider_key` values and alliance matching.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/loyalty/providers \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "provider_key": "united",
+      "provider_name": "United MileagePlus",
+      "provider_type": "airline",
+      "alliance_group": "star_alliance"
+    },
+    {
+      "provider_key": "marriott_bonvoy",
+      "provider_name": "Marriott Bonvoy",
+      "provider_type": "hotel",
+      "alliance_group": null
+    }
+  ],
+  "meta": { "count": 2 }
+}
+```
+
+---
+
 ## Error Responses
 
 All errors follow the same shape:

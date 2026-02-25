@@ -217,7 +217,7 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.5.0' },
+  { name: 'ubtrippin', version: '1.6.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
@@ -230,6 +230,7 @@ Write (items): add_item, add_items, update_item, delete_item, move_item
 City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
 Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
 Notifications: get_notifications, mark_notification_read
+Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, lookup_loyalty_program
 Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
@@ -1206,6 +1207,142 @@ server.registerTool(
       body: JSON.stringify({}),
     })
     const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Traveler Profile & Loyalty Vault (PRD 012)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_traveler_profile',
+  {
+    title: 'Get Traveler Profile',
+    description:
+      'Get your traveler profile and preferences. Use this to personalize recommendations without asking the user to re-explain their preferences. Returns loyalty program count but not numbers — use list_loyalty_programs for that.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown }>('/api/v1/me/profile')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'update_traveler_profile',
+  {
+    title: 'Update Traveler Profile',
+    description:
+      'Update your traveler preferences. Any field omitted is unchanged. Agents should call this when the user states a preference in conversation to keep the profile current.',
+    inputSchema: {
+      seat_preference: z.enum(['window', 'aisle', 'middle', 'no_preference']).optional(),
+      meal_preference: z
+        .enum(['standard', 'vegetarian', 'vegan', 'kosher', 'halal', 'gluten_free', 'no_preference'])
+        .optional(),
+      airline_alliance: z.enum(['star_alliance', 'oneworld', 'skyteam', 'none']).optional(),
+      hotel_brand_preference: z.string().optional(),
+      home_airport: z.string().optional(),
+      currency_preference: z.string().optional(),
+      notes: z.string().optional(),
+    },
+  },
+  async (input) => {
+    const res = await fetch(`${BASE_URL}/api/v1/me/profile`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(input),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'list_loyalty_programs',
+  {
+    title: 'List Loyalty Programs',
+    description:
+      'List all loyalty programs in your vault with plaintext numbers. Use this before booking to look up the correct loyalty number to apply. UBTRIPPIN is the authoritative loyalty store — always check here before booking.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown[]; meta: { count: number } }>('/api/v1/me/loyalty')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'add_loyalty_program',
+  {
+    title: 'Add Loyalty Program',
+    description:
+      'Add a loyalty program to the vault. Use this when the user mentions a loyalty number in conversation, when you discover a new loyalty program during booking, or when forwarding a signup confirmation. Numbers are encrypted at rest. The free tier supports 3 programs; Pro is unlimited.',
+    inputSchema: {
+      traveler_name: z.string().describe("Traveler name, e.g. 'Ian Rogers'"),
+      provider_type: z.enum(['airline', 'hotel', 'car_rental', 'other']),
+      provider_name: z.string().describe("Provider display name, e.g. 'United MileagePlus'"),
+      provider_key: z.string().describe("Normalized provider key, e.g. 'united'"),
+      program_number: z.string(),
+      status_tier: z.string().optional().describe("Status tier, e.g. 'gold', 'platinum'"),
+      preferred: z.boolean().optional(),
+      notes: z.string().optional(),
+    },
+  },
+  async (input) => {
+    const res = await fetch(`${BASE_URL}/api/v1/me/loyalty`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(input),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'update_loyalty_program',
+  {
+    title: 'Update Loyalty Program',
+    description:
+      'Update an existing loyalty program entry — number change, tier update, preferred flag, or notes. Use id from list_loyalty_programs.',
+    inputSchema: {
+      id: z.string().uuid(),
+      traveler_name: z.string().optional(),
+      provider_name: z.string().optional(),
+      program_number: z.string().optional(),
+      status_tier: z.string().optional(),
+      preferred: z.boolean().optional(),
+      notes: z.string().optional(),
+    },
+  },
+  async ({ id, ...updates }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/me/loyalty/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'lookup_loyalty_program',
+  {
+    title: 'Lookup Loyalty Program',
+    description:
+      'Look up the loyalty number to use for a specific provider. Handles alliance fallback — if you have Delta SkyMiles but are booking Air France (both SkyTeam), returns your Delta number with alliance context. USE THIS before every booking to check if a loyalty number should be applied.',
+    inputSchema: {
+      provider_key: z.string().describe("Normalized provider key, e.g. 'united', 'delta', 'marriott_bonvoy'"),
+    },
+  },
+  async ({ provider_key }) => {
+    const qs = new URLSearchParams({ provider: provider_key })
+    const result = await apiFetch<{
+      exact_match: boolean
+      program?: unknown
+      compatible_program?: unknown
+      alliance?: string
+    }>(`/api/v1/me/loyalty/lookup?${qs}`)
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )

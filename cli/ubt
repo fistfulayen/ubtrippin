@@ -451,6 +451,324 @@ print(f'Marked read: {d.get(\"id\",\"?\")[:8]} (read_at: {d.get(\"read_at\",\"?\
 "
 }
 
+cmd_profile_show() {
+  local profile_json loyalty_json
+  profile_json=$(_api "${APP_URL}/api/v1/me/profile")
+  loyalty_json=$(_api "${APP_URL}/api/v1/me/loyalty")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    python3 -c "
+import json, sys
+profile = json.loads(sys.argv[1])
+loyalty = json.loads(sys.argv[2])
+print(json.dumps({'profile': profile.get('data'), 'loyalty': loyalty.get('data', [])}, indent=2))
+" "$profile_json" "$loyalty_json"
+    return
+  fi
+
+  python3 -c "
+import json, sys
+profile_payload = json.loads(sys.argv[1])
+loyalty_payload = json.loads(sys.argv[2])
+profile = profile_payload.get('data') or {}
+programs = loyalty_payload.get('data') or []
+
+def mask_number(raw):
+    if not raw:
+        return 'N/A'
+    if len(raw) <= 4:
+        return '*' * len(raw)
+    return raw[:2] + '*' * (len(raw) - 5) + raw[-3:]
+
+print('=== Traveler Profile ===')
+print(f\"Seat:     {profile.get('seat_preference') or 'no_preference'}\")
+print(f\"Meal:     {profile.get('meal_preference') or 'no_preference'}\")
+print(f\"Alliance: {profile.get('airline_alliance') or 'none'}\")
+print(f\"Hotel:    {profile.get('hotel_brand_preference') or '-'}\")
+print(f\"Airport:  {profile.get('home_airport') or '-'}\")
+print(f\"Currency: {profile.get('currency_preference') or 'USD'}\")
+notes = profile.get('notes')
+if notes:
+    print(f\"Notes:    {notes}\")
+print()
+print(f\"=== Loyalty Vault ({len(programs)} programs) ===\")
+if not programs:
+    print('No loyalty programs saved.')
+    sys.exit(0)
+
+for i, p in enumerate(programs, start=1):
+    number = p.get('program_number_masked') or mask_number(p.get('program_number', ''))
+    tier = p.get('status_tier')
+    tier_str = f' [{tier}]' if tier else ''
+    print(f\"{i}. {p.get('provider_name', '?')} — {p.get('traveler_name', '?')} — {number}{tier_str}\")
+" "$profile_json" "$loyalty_json"
+}
+
+cmd_profile_set() {
+  local field="${1:?Usage: ubt profile set <field> <value>}"
+  shift
+  local value="${*}"
+  if [ -z "$value" ]; then
+    echo "Usage: ubt profile set <field> <value>" >&2
+    exit 1
+  fi
+
+  local api_field=""
+  case "$field" in
+    seat) api_field="seat_preference" ;;
+    meal) api_field="meal_preference" ;;
+    alliance) api_field="airline_alliance" ;;
+    hotel) api_field="hotel_brand_preference" ;;
+    airport) api_field="home_airport" ;;
+    currency) api_field="currency_preference" ;;
+    notes) api_field="notes" ;;
+    *)
+      echo "Invalid field: $field" >&2
+      echo "Valid fields: seat, meal, alliance, hotel, airport, currency, notes" >&2
+      exit 1
+      ;;
+  esac
+
+  local body
+  body=$(python3 -c "import json,sys; print(json.dumps({sys.argv[1]: sys.argv[2]}))" "$api_field" "$value")
+  local result
+  result=$(_api -X PUT "${APP_URL}/api/v1/me/profile" -d "$body")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f\"Error: {data['error']['message']}\")
+    sys.exit(1)
+print('Updated traveler profile.')
+"
+}
+
+cmd_profile_loyalty_list() {
+  local result
+  result=$(_api "${APP_URL}/api/v1/me/loyalty")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+programs = payload.get('data', [])
+print(f'=== Loyalty Vault ({len(programs)} programs) ===')
+if not programs:
+    print('No loyalty programs saved.')
+    sys.exit(0)
+for i, p in enumerate(programs, start=1):
+    number = p.get('program_number_masked') or 'N/A'
+    tier = p.get('status_tier')
+    tier_str = f' [{tier}]' if tier else ''
+    print(f\"{i}. {p.get('provider_name', '?')} — {p.get('traveler_name', '?')} — {number}{tier_str}\")
+"
+}
+
+cmd_profile_loyalty_add() {
+  local traveler_name provider_type provider_name provider_key program_number status_tier
+  read -r -p "Traveler name: " traveler_name
+  read -r -p "Provider type (airline/hotel/car_rental/other): " provider_type
+  read -r -p "Provider name: " provider_name
+  read -r -p "Provider key (normalized, e.g. united): " provider_key
+  read -r -p "Program number: " program_number
+  read -r -p "Status tier (optional): " status_tier
+
+  local body
+  body=$(python3 -c "
+import json, sys
+traveler_name, provider_type, provider_name, provider_key, program_number, status_tier = sys.argv[1:]
+payload = {
+    'traveler_name': traveler_name,
+    'provider_type': provider_type,
+    'provider_name': provider_name,
+    'provider_key': provider_key,
+    'program_number': program_number,
+}
+if status_tier.strip():
+    payload['status_tier'] = status_tier.strip()
+print(json.dumps(payload))
+" "$traveler_name" "$provider_type" "$provider_name" "$provider_key" "$program_number" "$status_tier")
+
+  local result
+  result=$(_api -X POST "${APP_URL}/api/v1/me/loyalty" -d "$body")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+d = payload.get('data', {})
+print(f\"Added loyalty program: {d.get('provider_name', '?')} ({d.get('id', '')[:8]}...)\")
+"
+}
+
+cmd_profile_loyalty_edit() {
+  local program_id="${1:?Usage: ubt profile loyalty edit <id>}"
+  local list_result current
+  list_result=$(_api "${APP_URL}/api/v1/me/loyalty")
+  current=$(python3 -c "
+import json, sys
+payload = json.loads(sys.argv[1])
+target = sys.argv[2]
+programs = payload.get('data', [])
+for p in programs:
+    if p.get('id') == target:
+        print(json.dumps(p))
+        break
+" "$list_result" "$program_id")
+
+  if [ -z "$current" ]; then
+    echo "Loyalty program not found: $program_id" >&2
+    exit 1
+  fi
+
+  python3 -c "
+import json, sys
+p = json.loads(sys.argv[1])
+print('Current values:')
+print(f\"  traveler_name: {p.get('traveler_name', '')}\")
+print(f\"  provider_name: {p.get('provider_name', '')}\")
+print(f\"  program_number: {p.get('program_number_masked', 'N/A')}\")
+print(f\"  status_tier: {p.get('status_tier') or ''}\")
+print(f\"  preferred: {p.get('preferred')}\")
+print(f\"  notes: {p.get('notes') or ''}\")
+" "$current"
+
+  local traveler_name provider_name program_number status_tier preferred notes
+  read -r -p "Traveler name (blank=keep): " traveler_name
+  read -r -p "Provider name (blank=keep): " provider_name
+  read -r -p "Program number (blank=keep): " program_number
+  read -r -p "Status tier (blank=keep, '-' to clear): " status_tier
+  read -r -p "Preferred (blank=keep, true/false): " preferred
+  read -r -p "Notes (blank=keep, '-' to clear): " notes
+
+  local body
+  body=$(python3 -c "
+import json, sys
+traveler_name, provider_name, program_number, status_tier, preferred, notes = sys.argv[1:]
+payload = {}
+if traveler_name.strip():
+    payload['traveler_name'] = traveler_name.strip()
+if provider_name.strip():
+    payload['provider_name'] = provider_name.strip()
+if program_number.strip():
+    payload['program_number'] = program_number.strip()
+if status_tier.strip():
+    payload['status_tier'] = None if status_tier.strip() == '-' else status_tier.strip()
+if preferred.strip():
+    raw = preferred.strip().lower()
+    if raw in {'true','t','yes','y','1'}:
+        payload['preferred'] = True
+    elif raw in {'false','f','no','n','0'}:
+        payload['preferred'] = False
+if notes.strip():
+    payload['notes'] = None if notes.strip() == '-' else notes.strip()
+print(json.dumps(payload))
+" "$traveler_name" "$provider_name" "$program_number" "$status_tier" "$preferred" "$notes")
+
+  if [ "$body" = "{}" ]; then
+    echo "No changes provided."
+    return
+  fi
+
+  local result
+  result=$(_api -X PATCH "${APP_URL}/api/v1/me/loyalty/${program_id}" -d "$body")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+print('Updated loyalty program.')
+"
+}
+
+cmd_profile_loyalty_delete() {
+  local program_id="${1:?Usage: ubt profile loyalty delete <id>}"
+  local confirm
+  read -r -p "Delete loyalty program ${program_id}? [y/N]: " confirm
+  case "${confirm}" in
+    y|Y|yes|YES) ;;
+    *) echo "Canceled."; return ;;
+  esac
+
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${APP_URL}/api/v1/me/loyalty/${program_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+
+  if [ "$status" = "204" ]; then
+    echo "Deleted."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_profile_loyalty_lookup() {
+  local provider_key="${1:?Usage: ubt profile loyalty lookup <provider_key>}"
+  local result
+  result=$(_api "${APP_URL}/api/v1/me/loyalty/lookup?provider=${provider_key}")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+if payload.get('exact_match') and payload.get('program'):
+    p = payload['program']
+    print('Exact match found:')
+    print(f\"  Provider: {p.get('provider_name')}\")
+    print(f\"  Traveler: {p.get('traveler_name')}\")
+    print(f\"  Number:   {p.get('program_number_masked') or p.get('program_number')}\")
+    if p.get('status_tier'):
+        print(f\"  Tier:     {p.get('status_tier')}\")
+    sys.exit(0)
+cp = payload.get('compatible_program')
+if cp:
+    print('Alliance-compatible program found:')
+    print(f\"  Alliance: {payload.get('alliance')}\")
+    print(f\"  Provider: {cp.get('provider_name')}\")
+    print(f\"  Traveler: {cp.get('traveler_name')}\")
+    print(f\"  Number:   {cp.get('program_number_masked') or cp.get('program_number')}\")
+    if cp.get('status_tier'):
+        print(f\"  Tier:     {cp.get('status_tier')}\")
+    sys.exit(0)
+print('No loyalty match found.')
+"
+}
+
+cmd_profile_loyalty_export() {
+  _api "${APP_URL}/api/v1/me/loyalty/export"
+}
+
 # Usage
 usage() {
   cat <<EOF
@@ -475,6 +793,14 @@ Commands:
   collab remove <trip_id> <collab_id>   Remove a collaborator *
   notifications list [--unread]         List notifications *
   notifications read <id>               Mark a notification as read *
+  profile show                          Show traveler profile + loyalty vault *
+  profile set <field> <value>           Update one traveler profile field *
+  profile loyalty list                  List loyalty programs (masked) *
+  profile loyalty add                   Add a loyalty program (interactive) *
+  profile loyalty edit <id>             Edit a loyalty program (interactive) *
+  profile loyalty delete <id>           Delete a loyalty program *
+  profile loyalty lookup <provider_key> Lookup by provider (alliance fallback aware) *
+  profile loyalty export                Export loyalty vault JSON *
   users                                 List all users (admin)
   health                                Check service health
   rls-check                             Verify RLS policies
@@ -498,6 +824,9 @@ Examples:
   ubt collab remove <trip_id> <collab_id>
   ubt notifications list --unread
   ubt notifications read <notification_id>
+  ubt profile show
+  ubt profile set seat window
+  ubt profile loyalty lookup united
 EOF
 }
 
@@ -552,6 +881,24 @@ case "${1:-}" in
       list) cmd_notifications_list "${3:-}" ;;
       read) cmd_notifications_read "${3:?Usage: ubt notifications read <notification_id>}" ;;
       *)    usage ;;
+    esac
+    ;;
+  profile)
+    case "${2:-}" in
+      show) cmd_profile_show ;;
+      set) cmd_profile_set "${@:3}" ;;
+      loyalty)
+        case "${3:-}" in
+          list)   cmd_profile_loyalty_list ;;
+          add)    cmd_profile_loyalty_add ;;
+          edit)   cmd_profile_loyalty_edit "${4:-}" ;;
+          delete) cmd_profile_loyalty_delete "${4:-}" ;;
+          lookup) cmd_profile_loyalty_lookup "${4:-}" ;;
+          export) cmd_profile_loyalty_export ;;
+          *)      usage ;;
+        esac
+        ;;
+      *) usage ;;
     esac
     ;;
   users)    cmd_users ;;

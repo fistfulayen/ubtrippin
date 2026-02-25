@@ -127,6 +127,22 @@ curl https://ubtrippin.xyz/api/v1/trips \
 
 ---
 
+## Traveler Profile & Loyalty Vault
+
+UBTRIPPIN stores persistent traveler preferences (seat, meal, alliance, home airport, currency) plus loyalty programs in a vault your agent can read at booking time.
+
+- Profile data keeps recommendations and booking defaults personalized without repeated prompts.
+- The loyalty vault is the authoritative database of record for loyalty numbers.
+- Agents can call MCP tools like `get_traveler_profile` and `lookup_loyalty_program` before every booking.
+
+CLI example:
+
+```bash
+ubt profile loyalty lookup united
+```
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
