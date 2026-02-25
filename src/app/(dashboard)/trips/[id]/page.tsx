@@ -20,8 +20,9 @@ export default async function TripPage({ params }: TripPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Fetch trip (RLS handles owner + collaborator access)
-  const { data: trip, error } = await supabase
+  // Fetch trip (explicit user filter + RLS as backup)
+  const secretClient1 = createSecretClient()
+  const { data: trip, error } = await secretClient1
     .from('trips')
     .select('*')
     .eq('id', id)
@@ -53,18 +54,22 @@ export default async function TripPage({ params }: TripPageProps) {
     }
   }
 
-  const { data: items } = await supabase
+  const { data: items } = await secretClient1
     .from('trip_items')
     .select('*')
     .eq('trip_id', id)
+    .eq('user_id', trip.user_id)
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
 
   // Get all user's trips for move item dialog
-  const { data: allTrips } = await supabase
-    .from('trips')
-    .select('id, title, start_date')
-    .order('start_date', { ascending: false })
+  const { data: allTrips } = user
+    ? await secretClient1
+        .from('trips')
+        .select('id, title, start_date')
+        .eq('user_id', user.id)
+        .order('start_date', { ascending: false })
+    : { data: null }
 
   // Fetch collaborators (only for owner — service client to bypass per-row RLS)
   const secretClient = createSecretClient()

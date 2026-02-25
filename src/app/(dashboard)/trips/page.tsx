@@ -33,10 +33,13 @@ export default async function TripsPage() {
     ).catch(() => {}) // swallow errors to not break page
   }
 
-  const { data: trips } = await supabase
-    .from('trips')
-    .select('*, trip_items(id, kind, needs_review, provider, details_json)')
-    .order('start_date', { ascending: true })
+  const { data: trips } = user
+    ? await supabase
+        .from('trips')
+        .select('*, trip_items(id, kind, needs_review, provider, details_json)')
+        .eq('user_id', user.id)
+        .order('start_date', { ascending: true })
+    : { data: null }
 
   // Fetch shared trips (trips where user is a collaborator, not owner)
   const { data: sharedCollabs } = user
