@@ -10,12 +10,17 @@ import {
   Section,
   Text,
 } from '@react-email/components'
+import { AgentCallout } from './AgentCallout'
 
 interface NudgeDay1EmailProps {
   userName?: string
+  forwardingAddress?: string
 }
 
-export function NudgeDay1Email({ userName = 'there' }: NudgeDay1EmailProps) {
+export function NudgeDay1Email({
+  userName = 'there',
+  forwardingAddress = 'trips@ubtrippin.xyz',
+}: NudgeDay1EmailProps) {
   return (
     <Html>
       <Head />
@@ -32,7 +37,7 @@ export function NudgeDay1Email({ userName = 'there' }: NudgeDay1EmailProps) {
           </Text>
 
           <Section style={codeBox}>
-            <Text style={codeText}>trips@ubtrippin.xyz</Text>
+            <Text style={codeText}>{forwardingAddress}</Text>
           </Section>
 
           <Text style={text}>
@@ -51,14 +56,7 @@ export function NudgeDay1Email({ userName = 'there' }: NudgeDay1EmailProps) {
             </Link>
           </Section>
 
-          <Hr style={hr} />
-
-          <Text style={footer}>
-            <Link href="https://ubtrippin.xyz/docs/agents" style={footerLink}>
-              Use an AI agent?
-            </Link>{' '}
-            Connect it to UBTRIPPIN for hands-free itinerary management.
-          </Text>
+          <AgentCallout />
 
           <Text style={footer}>
             <Link href="https://ubtrippin.xyz" style={footerLink}>

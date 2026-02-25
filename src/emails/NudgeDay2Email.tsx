@@ -10,12 +10,17 @@ import {
   Section,
   Text,
 } from '@react-email/components'
+import { AgentCallout } from './AgentCallout'
 
 interface NudgeDay2EmailProps {
   userName?: string
+  forwardingAddress?: string
 }
 
-export function NudgeDay2Email({ userName = 'there' }: NudgeDay2EmailProps) {
+export function NudgeDay2Email({
+  userName = 'there',
+  forwardingAddress = 'trips@ubtrippin.xyz',
+}: NudgeDay2EmailProps) {
   return (
     <Html>
       <Head />
@@ -27,43 +32,35 @@ export function NudgeDay2Email({ userName = 'there' }: NudgeDay2EmailProps) {
           <Text style={text}>Hi {userName},</Text>
 
           <Text style={text}>
-            Once you forward a booking confirmation, UBTRIPPIN automatically
-            extracts your flights, hotels, restaurants, and activities and
-            organises them into a clean itinerary.
+            Still haven't forwarded a trip to UBTRIPPIN? Once you do, this is
+            what you get: your flights, hotels, and activities all organised into
+            a clean itinerary — automatically extracted from whatever booking
+            emails you forward.
           </Text>
 
           <Text style={text}>
-            No forms to fill in. No dates to type. Just forward the email and
-            your trip appears.
+            No forms. No dates to type. Forward the email, your trip appears.
           </Text>
 
           <Hr style={hr} />
 
           <Section style={buttonContainer}>
             <Link href="https://ubtrippin.xyz/trips/demo" style={button}>
-              See a demo trip
+              See a demo trip →
             </Link>
           </Section>
 
           <Hr style={hr} />
 
           <Text style={text}>
-            Ready to add your own?{' '}
-            <strong>Forward any booking email to:</strong>
+            Ready to add your own? Forward any booking email to:
           </Text>
 
           <Section style={codeBox}>
-            <Text style={codeText}>trips@ubtrippin.xyz</Text>
+            <Text style={codeText}>{forwardingAddress}</Text>
           </Section>
 
-          <Hr style={hr} />
-
-          <Text style={footer}>
-            <Link href="https://ubtrippin.xyz/docs/agents" style={footerLink}>
-              Use an AI agent?
-            </Link>{' '}
-            Connect it to UBTRIPPIN for hands-free itinerary management.
-          </Text>
+          <AgentCallout />
 
           <Text style={footer}>
             <Link href="https://ubtrippin.xyz" style={footerLink}>

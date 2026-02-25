@@ -10,12 +10,17 @@ import {
   Section,
   Text,
 } from '@react-email/components'
+import { AgentCallout } from './AgentCallout'
 
 interface NudgeDay3EmailProps {
   userName?: string
+  forwardingAddress?: string
 }
 
-export function NudgeDay3Email({ userName = 'there' }: NudgeDay3EmailProps) {
+export function NudgeDay3Email({
+  userName = 'there',
+  forwardingAddress = 'trips@ubtrippin.xyz',
+}: NudgeDay3EmailProps) {
   return (
     <Html>
       <Head />
@@ -28,30 +33,29 @@ export function NudgeDay3Email({ userName = 'there' }: NudgeDay3EmailProps) {
 
           <Text style={text}>
             Getting your first trip into UBTRIPPIN is easier than it sounds.
-            Here are a few ways to do it:
+            A few ways to do it:
           </Text>
 
           <Text style={text}>
             <strong>Option 1 — Forward a booking email</strong>
             <br />
-            Send any confirmation from airlines, hotels, or booking sites to{' '}
-            <Link href="https://ubtrippin.xyz/trips" style={link}>
-              trips@ubtrippin.xyz
-            </Link>
-            . Takes 30 seconds.
+            Send any confirmation (airline, hotel, Airbnb) to{' '}
+            <strong>{forwardingAddress}</strong>. Takes 30 seconds. This is the
+            main way UBTRIPPIN works.
           </Text>
 
           <Text style={text}>
             <strong>Option 2 — Import a file</strong>
             <br />
-            Have a PDF itinerary or calendar export? Upload it directly from{' '}
-            your trips page and UBTRIPPIN will parse it for you.
+            Have a TripIt CSV or ICS export? Upload it from your trips page and
+            your itineraries appear instantly.
           </Text>
 
           <Text style={text}>
             <strong>Option 3 — Create a trip manually</strong>
             <br />
-            Add a trip by hand from the trips page — no email needed.
+            Add flights, hotels, and activities by hand from the trips page —
+            no email needed.
           </Text>
 
           <Hr style={hr} />
@@ -62,14 +66,7 @@ export function NudgeDay3Email({ userName = 'there' }: NudgeDay3EmailProps) {
             </Link>
           </Section>
 
-          <Hr style={hr} />
-
-          <Text style={footer}>
-            <Link href="https://ubtrippin.xyz/docs/agents" style={footerLink}>
-              Use an AI agent?
-            </Link>{' '}
-            Connect it to UBTRIPPIN for hands-free itinerary management.
-          </Text>
+          <AgentCallout />
 
           <Text style={footer}>
             <Link href="https://ubtrippin.xyz" style={footerLink}>
@@ -108,11 +105,6 @@ const text = {
   fontSize: '16px',
   lineHeight: '1.5',
   margin: '0 0 16px',
-}
-
-const link = {
-  color: '#4f46e5',
-  textDecoration: 'underline',
 }
 
 const hr = {
