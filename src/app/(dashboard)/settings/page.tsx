@@ -4,6 +4,7 @@ import { AllowedSendersList } from '@/components/settings/allowed-senders-list'
 import { AddSenderForm } from '@/components/settings/add-sender-form'
 import { ApiKeysSection } from '@/components/settings/api-keys-section'
 import { CalendarFeedSection } from '@/components/settings/calendar-feed-section'
+import { SettingsNav } from '@/components/settings/settings-nav'
 import { Mail, User, Info, Key, Rss } from 'lucide-react'
 import { UserAvatar } from '@/components/user-avatar'
 import type { Profile, AllowedSender } from '@/types/database'
@@ -39,6 +40,8 @@ export default async function SettingsPage() {
           Manage your account and email settings
         </p>
       </div>
+
+      <SettingsNav />
 
       {/* Account info */}
       <Card>
