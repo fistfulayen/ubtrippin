@@ -3,7 +3,7 @@ import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
-import { MapPin, Calendar, AlertCircle } from 'lucide-react'
+import { MapPin, Calendar, AlertCircle, Users } from 'lucide-react'
 import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -22,6 +22,8 @@ interface TripCardProps {
   itemCount: number
   needsReview?: boolean
   isPast?: boolean
+  isShared?: boolean
+  sharedByName?: string
 }
 
 function getAirlineLogos(items?: TripItem[]): string[] {
@@ -50,7 +52,7 @@ function getAirlineLogos(items?: TripItem[]): string[] {
   return logos.slice(0, 3) // Max 3 airline logos
 }
 
-export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps) {
+export function TripCard({ trip, itemCount, needsReview, isPast, isShared, sharedByName }: TripCardProps) {
   const airlineLogos = getAirlineLogos(trip.trip_items)
 
   return (
@@ -129,11 +131,16 @@ export function TripCard({ trip, itemCount, needsReview, isPast }: TripCardProps
             <span className="text-gray-500">
               {itemCount} {itemCount === 1 ? 'item' : 'items'}
             </span>
-            {trip.travelers && trip.travelers.length > 0 && (
+            {isShared && sharedByName ? (
+              <span className="flex items-center gap-1 text-indigo-600">
+                <Users className="h-3.5 w-3.5" />
+                {sharedByName}
+              </span>
+            ) : trip.travelers && trip.travelers.length > 0 ? (
               <span className="text-gray-500">
                 {trip.travelers.length} {trip.travelers.length === 1 ? 'traveler' : 'travelers'}
               </span>
-            )}
+            ) : null}
           </div>
         </CardContent>
       </Card>

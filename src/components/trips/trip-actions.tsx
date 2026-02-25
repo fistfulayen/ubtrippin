@@ -21,9 +21,11 @@ import type { Trip } from '@/types/database'
 interface TripActionsProps {
   trip: Trip
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
+  /** Whether the current user is the trip owner (default: true for backward compat) */
+  isOwner?: boolean
 }
 
-export function TripActions({ trip, allTrips }: TripActionsProps) {
+export function TripActions({ trip, allTrips, isOwner = true }: TripActionsProps) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
   const [merging, setMerging] = useState(false)
@@ -82,7 +84,7 @@ export function TripActions({ trip, allTrips }: TripActionsProps) {
         </Button>
       </Link>
 
-      {otherTrips.length > 0 && (
+      {isOwner && otherTrips.length > 0 && (
         <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
@@ -130,39 +132,41 @@ export function TripActions({ trip, allTrips }: TripActionsProps) {
         </Dialog>
       )}
 
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Trip</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete &quot;{trip.title}&quot;? This will also delete all
-              items in this trip. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDeleteOpen(false)}
-              disabled={deleting}
-            >
-              Cancel
+      {isOwner && (
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-            >
-              {deleting ? 'Deleting...' : 'Delete Trip'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Trip</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete &quot;{trip.title}&quot;? This will also delete all
+                items in this trip. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete Trip'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

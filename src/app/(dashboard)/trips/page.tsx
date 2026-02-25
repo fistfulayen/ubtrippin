@@ -38,6 +38,27 @@ export default async function TripsPage() {
     .select('*, trip_items(id, kind, needs_review, provider, details_json)')
     .order('start_date', { ascending: true })
 
+  // Fetch shared trips (trips where user is a collaborator, not owner)
+  const { data: sharedCollabs } = user
+    ? await supabase
+        .from('trip_collaborators')
+        .select('trip_id, role, inviter:profiles!invited_by (full_name, email)')
+        .eq('user_id', user.id)
+        .not('accepted_at', 'is', null)
+    : { data: null }
+
+  // Build a map of trip_id → inviter name for "Shared by" labels
+  const sharedTripMap = new Map<string, string>()
+  for (const collab of sharedCollabs ?? []) {
+    const inv = collab.inviter as { full_name?: string; email?: string } | null
+    sharedTripMap.set(collab.trip_id, inv?.full_name || inv?.email || 'someone')
+  }
+
+  // All owned trip IDs (to distinguish shared)
+  const ownedTripIds = new Set(
+    (trips ?? []).filter((t) => t.user_id === user?.id).map((t) => t.id)
+  )
+
   // Three trip states: current (started, not ended), upcoming (not started), past (ended)
   const today = new Date().toISOString().split('T')[0]
   const currentTrips = trips?.filter(
@@ -98,16 +119,21 @@ export default async function TripsPage() {
                 Current Trip{currentTrips.length > 1 ? 's' : ''}
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {currentTrips.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    itemCount={trip.trip_items?.length ?? 0}
-                    needsReview={
-                      trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false
-                    }
-                  />
-                ))}
+                {currentTrips.map((trip) => {
+                  const shared = !ownedTripIds.has(trip.id)
+                  return (
+                    <TripCard
+                      key={trip.id}
+                      trip={trip}
+                      itemCount={trip.trip_items?.length ?? 0}
+                      needsReview={
+                        !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
+                      }
+                      isShared={shared}
+                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                    />
+                  )
+                })}
               </div>
             </section>
           )}
@@ -119,16 +145,21 @@ export default async function TripsPage() {
                 Upcoming
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {upcomingTrips.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    itemCount={trip.trip_items?.length ?? 0}
-                    needsReview={
-                      trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false
-                    }
-                  />
-                ))}
+                {upcomingTrips.map((trip) => {
+                  const shared = !ownedTripIds.has(trip.id)
+                  return (
+                    <TripCard
+                      key={trip.id}
+                      trip={trip}
+                      itemCount={trip.trip_items?.length ?? 0}
+                      needsReview={
+                        !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
+                      }
+                      isShared={shared}
+                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                    />
+                  )
+                })}
               </div>
             </section>
           )}
@@ -140,15 +171,20 @@ export default async function TripsPage() {
                 Past Trips
               </h2>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {pastTrips.map((trip) => (
-                  <TripCard
-                    key={trip.id}
-                    trip={trip}
-                    itemCount={trip.trip_items?.length ?? 0}
-                    needsReview={false}
-                    isPast
-                  />
-                ))}
+                {pastTrips.map((trip) => {
+                  const shared = !ownedTripIds.has(trip.id)
+                  return (
+                    <TripCard
+                      key={trip.id}
+                      trip={trip}
+                      itemCount={trip.trip_items?.length ?? 0}
+                      needsReview={false}
+                      isPast
+                      isShared={shared}
+                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                    />
+                  )
+                })}
               </div>
             </section>
           )}

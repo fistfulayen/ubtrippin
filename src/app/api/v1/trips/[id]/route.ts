@@ -34,11 +34,7 @@ export async function GET(
 
   const supabase = createSecretClient()
 
-  // 4. Fetch the trip (must belong to this user)
-  const { data: trip, error: tripError } = await supabase
-    .from('trips')
-    .select(
-      `id,
+  const TRIP_FIELDS = `id,
        title,
        start_date,
        end_date,
@@ -49,12 +45,40 @@ export async function GET(
        share_enabled,
        created_at,
        updated_at`
-    )
+
+  // 4. Fetch the trip — accessible to owner or accepted collaborator
+  const { data: trip, error: tripError } = await supabase
+    .from('trips')
+    .select(TRIP_FIELDS)
     .eq('id', tripId)
     .eq('user_id', auth.userId)
-    .single()
+    .maybeSingle()
 
-  if (tripError || !trip) {
+  // If not owner, check collaborator access
+  let collabRole: string | null = null
+  let effectiveTrip = trip
+
+  if (!trip) {
+    const { data: collab } = await supabase
+      .from('trip_collaborators')
+      .select('role')
+      .eq('trip_id', tripId)
+      .eq('user_id', auth.userId)
+      .not('accepted_at', 'is', null)
+      .maybeSingle()
+
+    if (collab) {
+      collabRole = collab.role
+      const { data: sharedTrip } = await supabase
+        .from('trips')
+        .select(TRIP_FIELDS)
+        .eq('id', tripId)
+        .single()
+      effectiveTrip = sharedTrip
+    }
+  }
+
+  if (tripError || !effectiveTrip) {
     return NextResponse.json(
       { error: { code: 'not_found', message: 'Trip not found.' } },
       { status: 404 }
@@ -85,7 +109,6 @@ export async function GET(
        updated_at`
     )
     .eq('trip_id', tripId)
-    .eq('user_id', auth.userId)
     .order('start_date', { ascending: true })
 
   if (itemsError) {
@@ -97,11 +120,12 @@ export async function GET(
   }
 
   const sanitizedItems = (items ?? []).map(sanitizeItem)
-  const sanitizedTrip = sanitizeTrip(trip as Record<string, unknown>)
+  const sanitizedTrip = sanitizeTrip(effectiveTrip as Record<string, unknown>)
 
   return NextResponse.json({
     data: {
       ...sanitizedTrip,
+      role: collabRole ?? 'owner',
       items: sanitizedItems,
     },
     meta: { item_count: sanitizedItems.length },

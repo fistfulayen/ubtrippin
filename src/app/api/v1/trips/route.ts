@@ -30,24 +30,48 @@ export async function GET(request: NextRequest) {
   const limited = rateLimitResponse(auth.keyHash)
   if (limited) return limited
 
-  // 3. Fetch trips for this user (service client, filter by user_id)
   const supabase = createSecretClient()
 
-  const { data: trips, error } = await supabase
+  // 3a. Fetch owned trips
+  const { data: ownedTrips, error: ownedError } = await supabase
     .from('trips')
     .select(TRIP_SELECT)
     .eq('user_id', auth.userId)
     .order('start_date', { ascending: false, nullsFirst: false })
 
-  if (error) {
-    console.error('[v1/trips] Supabase error:', error)
+  if (ownedError) {
+    console.error('[v1/trips] Supabase error (owned):', ownedError)
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to fetch trips.' } },
       { status: 500 }
     )
   }
 
-  const sanitized = (trips ?? []).map(sanitizeTrip)
+  // 3b. Fetch shared trips (collaborator, accepted)
+  const { data: sharedCollabs } = await supabase
+    .from('trip_collaborators')
+    .select(`trip:trips (${TRIP_SELECT}), role`)
+    .eq('user_id', auth.userId)
+    .not('accepted_at', 'is', null)
+
+  type SharedTripRow = Record<string, unknown> & { _collab_role: string }
+  const sharedTrips: SharedTripRow[] = (sharedCollabs ?? [])
+    .filter((c) => c.trip)
+    .map((c) => ({
+      ...(c.trip as unknown as Record<string, unknown>),
+      _collab_role: c.role as string,
+    }))
+
+  // 3c. Merge — owned trips first, then shared (deduplicate by id)
+  const ownedIds = new Set((ownedTrips ?? []).map((t) => t.id))
+  const newShared = sharedTrips.filter((t) => !ownedIds.has(t.id as string))
+
+  const allTrips = [
+    ...(ownedTrips ?? []).map((t) => ({ ...t, _collab_role: 'owner' })),
+    ...newShared,
+  ]
+
+  const sanitized = allTrips.map(sanitizeTrip)
 
   return NextResponse.json({
     data: sanitized,
