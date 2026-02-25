@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSecretClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
@@ -33,8 +33,9 @@ export default async function TripsPage() {
     ).catch(() => {}) // swallow errors to not break page
   }
 
+  const secretClient = createSecretClient()
   const { data: trips } = user
-    ? await supabase
+    ? await secretClient
         .from('trips')
         .select('*, trip_items(id, kind, needs_review, provider, details_json)')
         .eq('user_id', user.id)
