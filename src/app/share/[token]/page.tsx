@@ -1,4 +1,4 @@
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { formatDateRange, formatDate, getKindIcon } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'

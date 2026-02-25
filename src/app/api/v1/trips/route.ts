@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeTripInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { trackTripCreated } from '@/lib/activation'
 
 const TRIP_SELECT = `id,

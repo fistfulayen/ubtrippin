@@ -5,7 +5,7 @@
  * Keys are stored as SHA-256 hashes; the plain-text key is never persisted.
  */
 
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
 

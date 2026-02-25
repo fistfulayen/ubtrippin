@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { generateTripName } from '@/lib/trips/naming'
 

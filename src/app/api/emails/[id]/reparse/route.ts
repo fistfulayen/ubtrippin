@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
 import { assignToTrip, updateTripDates, collectTravelerNames } from '@/lib/trips/assignment'
 import { isValidUUID } from '@/lib/validation'

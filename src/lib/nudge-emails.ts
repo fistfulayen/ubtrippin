@@ -8,7 +8,7 @@
  */
 
 import { render } from '@react-email/components'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { getResendClient } from '@/lib/resend/client'
 import { NudgeDay1Email } from '@/emails/NudgeDay1Email'
 import { NudgeDay2Email } from '@/emails/NudgeDay2Email'

@@ -1,4 +1,4 @@
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Globe, Star, MapPin, ExternalLink, Bookmark } from 'lucide-react'

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createSecretClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { createEmailSnippet } from '@/lib/ai/example-selection'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 import type { Json } from '@/types/database'

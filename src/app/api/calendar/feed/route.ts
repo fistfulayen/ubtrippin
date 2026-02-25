@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { generateFeedICal } from '@/lib/calendar/ical'
 import type { Trip, TripItem } from '@/types/database'
 

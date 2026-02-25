@@ -2,7 +2,7 @@
 
 import { render } from '@react-email/components'
 import { WelcomeEmail } from '@/components/email/welcome'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
 import { getResendClient } from '@/lib/resend/client'
 import { generateTripName } from '@/lib/trips/naming'
@@ -121,6 +121,44 @@ export async function sendCollaboratorInvite(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tripId, inviteToken }),
   }).catch(() => {})
+
+  return { success: true }
+}
+
+/**
+ * Removes a collaborator from a trip.
+ * Owner-only operation executed on the server.
+ */
+export async function removeCollaborator(
+  tripId: string,
+  collabId: string
+): Promise<{ error?: string; success?: boolean }> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'You must be signed in.' }
+
+  const sc = createSecretClient()
+
+  // Owner check using service client to avoid relying on client-provided IDs.
+  const { data: trip } = await sc
+    .from('trips')
+    .select('id')
+    .eq('id', tripId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!trip) return { error: 'Not authorized.' }
+
+  const { error } = await sc
+    .from('trip_collaborators')
+    .delete()
+    .eq('id', collabId)
+    .eq('trip_id', tripId)
+
+  if (error) return { error: 'Failed to remove collaborator.' }
 
   return { success: true }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
 import { getResendClient } from '@/lib/resend/client'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'

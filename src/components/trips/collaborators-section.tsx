@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { sendCollaboratorInvite } from '@/app/(dashboard)/trips/actions'
+import {
+  removeCollaborator,
+  sendCollaboratorInvite,
+} from '@/app/(dashboard)/trips/actions'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -76,12 +78,7 @@ export function CollaboratorsSection({
   const handleRemove = async (collabId: string) => {
     setRemoving(collabId)
     try {
-      const supabase = createClient()
-      await supabase
-        .from('trip_collaborators')
-        .delete()
-        .eq('id', collabId)
-        .eq('trip_id', tripId)
+      await removeCollaborator(tripId, collabId)
 
       router.refresh()
     } finally {

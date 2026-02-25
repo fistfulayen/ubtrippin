@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import crypto from 'crypto'
 
 const BASE_URL = 'https://www.ubtrippin.xyz'

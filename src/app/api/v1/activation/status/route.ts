@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 
 export const dynamic = 'force-dynamic'
 

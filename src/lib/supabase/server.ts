@@ -28,20 +28,3 @@ export async function createClient() {
     }
   )
 }
-
-// Secret key client for webhook processing (bypasses RLS)
-export function createSecretClient() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return createServerClient<any>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SECRET_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return []
-        },
-        setAll() {},
-      },
-    }
-  )
-}

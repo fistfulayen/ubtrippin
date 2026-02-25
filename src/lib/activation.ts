@@ -7,7 +7,7 @@
  *   second_trip_at    — second trip created
  */
 
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 
 /**
  * Called when the email ingest webhook successfully processes an email for a user.

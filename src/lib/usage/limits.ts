@@ -1,4 +1,4 @@
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 
 export type SubscriptionTier = 'free' | 'pro'
 

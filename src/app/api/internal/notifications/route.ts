@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient, createSecretClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 
 export async function GET(_request: NextRequest) {
   const supabase = await createClient()

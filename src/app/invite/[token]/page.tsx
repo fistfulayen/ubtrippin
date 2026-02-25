@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'

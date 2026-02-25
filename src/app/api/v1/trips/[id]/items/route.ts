@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 
 const ITEM_SELECT = `id,
