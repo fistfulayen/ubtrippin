@@ -5,14 +5,19 @@
  *   1. Inbound webhook rejects requests missing Svix headers
  *   2. Inbound webhook rejects requests with invalid signature
  *   3. Inbound webhook accepts a correctly-signed payload (200 or 202)
+ *   4. (P1) All fixture email payloads are accepted with valid signatures
  *
  * We sign the payload with the RESEND_WEBHOOK_SECRET using the svix library —
  * same library the server uses to verify. This tests the full handler logic
  * without requiring actual email delivery.
+ *
+ * Add real email fixture payloads to e2e/fixtures/email-payloads/ by forwarding
+ * booking confirmation emails — see that directory's README.md.
  */
 
 import { test, expect } from '@playwright/test'
 import { Webhook } from 'svix'
+import { loadAllFixtures, toWebhookBody } from '../helpers/email-fixture'
 
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'https://www.ubtrippin.xyz'
 const WEBHOOK_URL = `${BASE_URL}/api/webhooks/resend`
@@ -95,4 +100,50 @@ test.describe('Inbound webhook — signed payload', () => {
     // A 200/202/404 all mean the signature was accepted and the handler ran — not a 400 rejection
     expect([200, 202, 404]).toContain(res.status())
   })
+})
+
+// ─── P1: Fixture library parametrized tests ──────────────────────────────────
+
+test.describe('Inbound webhook — fixture library (P1)', () => {
+  test('fixture payloads have correct structure', () => {
+    const fixtures = loadAllFixtures()
+    // We expect at least our synthetic fixtures to be present
+    expect(fixtures.length).toBeGreaterThan(0)
+
+    for (const { name, payload } of fixtures) {
+      expect(payload.type, `${name}: type`).toBe('email.received')
+      expect(payload.data, `${name}: data`).toBeDefined()
+      expect(payload.data.email_id, `${name}: email_id`).toBeTruthy()
+      expect(payload.data.from, `${name}: from`).toBeTruthy()
+      expect(Array.isArray(payload.data.to), `${name}: to is array`).toBe(true)
+      expect(payload.data.subject, `${name}: subject`).toBeTruthy()
+    }
+  })
+
+  // Parametrized: each fixture payload is sent to the webhook with a valid signature.
+  // Requires RESEND_WEBHOOK_SECRET — skips gracefully if absent.
+  const fixtures = loadAllFixtures()
+  for (const { name, payload } of fixtures) {
+    test(`fixture [${name}] accepted by webhook endpoint`, async ({ request }) => {
+      if (!WEBHOOK_SECRET) {
+        test.skip()
+        return
+      }
+
+      const body = toWebhookBody(payload)
+      const headers = signPayload(WEBHOOK_SECRET, body)
+
+      const res = await request.post(WEBHOOK_URL, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        data: body,
+      })
+
+      // Valid signature should never return 400/401 (header/sig rejection)
+      // 200, 202, or 404 (no matching user for test email_id) are all acceptable
+      expect([200, 202, 404]).toContain(res.status())
+    })
+  }
 })

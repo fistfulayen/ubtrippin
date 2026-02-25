@@ -1,0 +1,17 @@
+{
+  "_meta": {
+    "provider": "Eurostar",
+    "type": "train_confirmation",
+    "synthetic": true,
+    "notes": "Replace with real forwarded payload from a Eurostar booking confirmation email."
+  },
+  "type": "email.received",
+  "created_at": "2026-02-25T10:10:00.000Z",
+  "data": {
+    "email_id": "fixture-eurostar-train-001",
+    "from": "bookings@eurostar.com",
+    "to": ["trips@ubtrippin.xyz"],
+    "subject": "Your Eurostar e-ticket — London St Pancras to Paris Nord, 9017, Apr 10",
+    "message_id": "<fixture-eurostar-train-001@eurostar.com>"
+  }
+}

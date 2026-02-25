@@ -1,4 +1,4 @@
-import { createClient, createSecretClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
@@ -33,17 +33,10 @@ export default async function TripsPage() {
     ).catch(() => {}) // swallow errors to not break page
   }
 
-  // Use service client + explicit user_id filter — cookie-based RLS
-  // fails intermittently on Vercel (auth.uid() returns null in some
-  // server component renders despite getUser() succeeding).
-  const sc = createSecretClient()
-  const { data: trips } = user
-    ? await sc
-        .from('trips')
-        .select('*, trip_items(id, kind, needs_review, provider, details_json)')
-        .eq('user_id', user.id)
-        .order('start_date', { ascending: true })
-    : { data: null }
+  const { data: trips } = await supabase
+    .from('trips')
+    .select('*, trip_items(id, kind, needs_review, provider, details_json)')
+    .order('start_date', { ascending: true })
 
   // Fetch shared trips (trips where user is a collaborator, not owner)
   const { data: sharedCollabs } = user
