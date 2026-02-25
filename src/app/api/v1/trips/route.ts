@@ -8,6 +8,7 @@ import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeTripInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/server'
+import { trackTripCreated } from '@/lib/activation'
 
 const TRIP_SELECT = `id,
        title,
@@ -128,6 +129,11 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+
+  // Track activation milestone (idempotent, fire-and-forget)
+  trackTripCreated(auth.userId).catch((err) =>
+    console.error('[activation] trackTripCreated failed:', err)
+  )
 
   return NextResponse.json({ data: sanitizeTrip(trip as Record<string, unknown>) }, { status: 201 })
 }

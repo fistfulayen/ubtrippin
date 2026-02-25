@@ -46,12 +46,19 @@ export function OnboardingCard() {
           <p className="text-sm text-gray-600">
             Forward any booking confirmation to:
           </p>
-          <div className="flex items-center rounded-lg bg-white border border-[#cbd5e1] px-4 py-2 shadow-sm">
-            <code className="font-mono text-sm font-semibold text-[#4f46e5]">
+          <div className="flex items-center rounded-lg bg-[#f5f3ff] border-2 border-[#a5b4fc] px-4 py-3 shadow-sm">
+            <code className="font-mono text-sm font-bold text-[#4f46e5]">
               trips@ubtrippin.xyz
             </code>
             <CopyButton text="trips@ubtrippin.xyz" />
           </div>
+
+          <Link
+            href="/trips/demo"
+            className="inline-flex items-center text-sm font-medium text-[#4f46e5] hover:text-[#3730a3] transition-colors"
+          >
+            See a demo trip →
+          </Link>
 
           <div className="flex justify-center py-2">
             <Image

@@ -17,6 +17,7 @@ import { sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
 import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
+import { trackFirstForward, trackTripCreated } from '@/lib/activation'
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
@@ -207,6 +208,11 @@ export async function POST(request: NextRequest) {
       // Count this extraction against the user's monthly limit
       await incrementExtractionCount(userId)
 
+      // Track that this user forwarded their first email (idempotent)
+      trackFirstForward(userId).catch((err) =>
+        console.error('[activation] trackFirstForward failed:', err)
+      )
+
       // Extract sender domain for example matching
       const senderDomain = fromEmail.split('@')[1]?.toLowerCase()
 
@@ -289,6 +295,11 @@ export async function POST(request: NextRequest) {
             }
 
             tripId = newTrip.id
+
+            // Track activation milestone (idempotent)
+            trackTripCreated(userId).catch((err) =>
+              console.error('[activation] trackTripCreated failed:', err)
+            )
 
             // Fetch and set cover image for the new trip
             const location = primaryLocation || item.end_location || item.start_location
