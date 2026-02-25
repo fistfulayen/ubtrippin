@@ -51,14 +51,24 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', request.nextUrl.pathname)
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    // CRITICAL: Copy refreshed auth cookies to the redirect response.
+    // Without this, getClaims() token refresh is lost and auth breaks.
+    supabaseResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
+      redirect.cookies.set(name, value, options)
+    })
+    return redirect
   }
 
   // If user is logged in and trying to access login page, redirect to trips
   if (request.nextUrl.pathname === '/login' && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/trips'
-    return NextResponse.redirect(url)
+    const redirect = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
+      redirect.cookies.set(name, value, options)
+    })
+    return redirect
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
