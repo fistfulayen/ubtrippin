@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- Users only see their own notifications
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "notifications_owner_select" ON notifications;
+DROP POLICY IF EXISTS "notifications_owner_update" ON notifications;
+
 CREATE POLICY "notifications_owner_select" ON notifications
   FOR SELECT USING (user_id = auth.uid());
 
@@ -22,7 +25,7 @@ CREATE POLICY "notifications_owner_update" ON notifications
   FOR UPDATE USING (user_id = auth.uid());
 
 -- Indexes
-CREATE INDEX notifications_user_unread ON notifications (user_id, created_at DESC)
+CREATE INDEX IF NOT EXISTS notifications_user_unread ON notifications (user_id, created_at DESC)
   WHERE read_at IS NULL;
 
-CREATE INDEX notifications_user_created ON notifications (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS notifications_user_created ON notifications (user_id, created_at DESC);
