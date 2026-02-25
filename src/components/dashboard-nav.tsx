@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
+import { NotificationBell } from '@/components/notifications/notification-bell'
 import type { User } from '@supabase/supabase-js'
 import type { Profile } from '@/types/database'
 
@@ -75,7 +76,8 @@ export function DashboardNav({ user, profile }: DashboardNavProps) {
           </div>
 
           {/* User menu (desktop) */}
-          <div className="hidden md:flex md:items-center md:gap-4">
+          <div className="hidden md:flex md:items-center md:gap-3">
+            <NotificationBell />
             <div className="flex items-center gap-3">
               <UserAvatar src={profile?.avatar_url} name={profile?.full_name} email={user.email} size="sm" />
               <span className="text-sm text-gray-700">

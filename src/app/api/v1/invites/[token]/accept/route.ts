@@ -115,9 +115,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     .eq('id', invite.invited_by)
     .single()
 
+  const tripData = invite.trip as { id?: string; title?: string; primary_location?: string } | null
+  const tripLabel = tripData?.primary_location || tripData?.title || 'your trip'
+
   if (ownerProfile?.email) {
-    const tripData = invite.trip as { title?: string; primary_location?: string } | null
-    const tripLabel = tripData?.primary_location || tripData?.title || 'your trip'
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ubtrippin.com'
     const tripUrl = `${appUrl}/trips/${invite.trip_id}`
 
@@ -126,8 +127,30 @@ export async function POST(request: NextRequest, { params }: Params) {
       accepterName,
       tripLabel,
       tripUrl,
-    }).catch((err: Error) => console.error('[accept notification]', err))
+    }).catch((err: Error) => console.error('[accept notification email]', err))
   }
+
+  // In-app notification for trip owner (fire-and-forget)
+  void (async () => {
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: invite.invited_by,
+          type: 'invite_accepted',
+          trip_id: invite.trip_id,
+          actor_id: user.id,
+          data: {
+            trip_title: tripData?.title || tripLabel,
+            actor_name: accepterName,
+            role: invite.role,
+          },
+        })
+      if (error) console.error('[accept notification in-app]', error)
+    } catch (err) {
+      console.error('[accept notification in-app]', err)
+    }
+  })()
 
   return NextResponse.json({
     data: {

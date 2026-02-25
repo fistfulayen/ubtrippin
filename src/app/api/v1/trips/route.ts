@@ -54,12 +54,12 @@ export async function GET(request: NextRequest) {
     .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
 
-  type SharedTripRow = Record<string, unknown> & { _collab_role: string }
+  type SharedTripRow = Record<string, unknown> & { role: string }
   const sharedTrips: SharedTripRow[] = (sharedCollabs ?? [])
     .filter((c) => c.trip)
     .map((c) => ({
       ...(c.trip as unknown as Record<string, unknown>),
-      _collab_role: c.role as string,
+      role: c.role as string,
     }))
 
   // 3c. Merge — owned trips first, then shared (deduplicate by id)
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
   const newShared = sharedTrips.filter((t) => !ownedIds.has(t.id as string))
 
   const allTrips = [
-    ...(ownedTrips ?? []).map((t) => ({ ...t, _collab_role: 'owner' })),
+    ...(ownedTrips ?? []).map((t) => ({ ...t, role: 'owner' })),
     ...newShared,
   ]
 

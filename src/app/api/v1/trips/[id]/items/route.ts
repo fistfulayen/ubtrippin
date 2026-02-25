@@ -1,6 +1,10 @@
 /**
  * POST /api/v1/trips/:id/items — Add a single item to a trip
  *
+ * Accessible by: trip owner + accepted editors (collaborators)
+ * Items are stored under the trip owner's user_id for UI compatibility.
+ * When a collaborator adds an item, the trip owner receives a notification.
+ *
  * Response: { data: Item }
  */
 
@@ -71,13 +75,12 @@ export async function POST(
 
   const supabase = createSecretClient()
 
-  // 6. Verify trip ownership
+  // 6. Resolve trip access: owner OR accepted editor collaborator
   const { data: trip } = await supabase
     .from('trips')
-    .select('id')
+    .select('id, user_id, title')
     .eq('id', tripId)
-    .eq('user_id', auth.userId)
-    .single()
+    .maybeSingle()
 
   if (!trip) {
     return NextResponse.json(
@@ -86,11 +89,41 @@ export async function POST(
     )
   }
 
-  // 7. Insert — only explicit fields, no mass assignment
+  const isOwner = trip.user_id === auth.userId
+  let isEditor = false
+
+  if (!isOwner) {
+    // Check collaborator editor access
+    const { data: collab } = await supabase
+      .from('trip_collaborators')
+      .select('role')
+      .eq('trip_id', tripId)
+      .eq('user_id', auth.userId)
+      .not('accepted_at', 'is', null)
+      .maybeSingle()
+
+    if (!collab) {
+      return NextResponse.json(
+        { error: { code: 'not_found', message: 'Trip not found.' } },
+        { status: 404 }
+      )
+    }
+
+    if (collab.role === 'viewer') {
+      return NextResponse.json(
+        { error: { code: 'forbidden', message: 'Viewers cannot add items to a trip.' } },
+        { status: 403 }
+      )
+    }
+
+    isEditor = true
+  }
+
+  // 7. Insert — items stored under trip owner's user_id for UI compatibility
   const { data: item, error } = await supabase
     .from('trip_items')
     .insert({
-      user_id: auth.userId,
+      user_id: trip.user_id,   // always the trip owner
       trip_id: tripId,
       kind: clean.kind!,
       start_date: clean.start_date ?? null,
@@ -117,6 +150,41 @@ export async function POST(
       { error: { code: 'internal_error', message: 'Failed to create item.' } },
       { status: 500 }
     )
+  }
+
+  // 8. Fire notification to trip owner when a collaborator adds an item
+  if (isEditor && item) {
+    // Get collaborator's display name
+    const { data: actorProfile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', auth.userId)
+      .maybeSingle()
+
+    const actorName = actorProfile?.full_name || actorProfile?.email || 'A collaborator'
+    const summary = clean.summary || `${clean.kind} entry`
+
+    void (async () => {
+      try {
+        const { error } = await supabase
+          .from('notifications')
+          .insert({
+            user_id: trip.user_id,
+            type: 'entry_added',
+            trip_id: tripId,
+            actor_id: auth.userId,
+            data: {
+              trip_title: trip.title,
+              actor_name: actorName,
+              entry_summary: summary,
+              entry_kind: clean.kind,
+            },
+          })
+        if (error) console.error('[items/notifications]', error)
+      } catch (err) {
+        console.error('[items/notifications]', err)
+      }
+    })()
   }
 
   return NextResponse.json(
