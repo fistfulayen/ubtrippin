@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { sendCollaboratorInvite } from '@/app/(dashboard)/trips/actions'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -50,56 +51,12 @@ export function CollaboratorsSection({
     setInviteError(null)
 
     try {
-      const supabase = createClient()
+      const result = await sendCollaboratorInvite(tripId, email, role)
 
-      // Check for existing invite
-      const cleanEmail = email.trim().toLowerCase()
-      const { data: existing } = await supabase
-        .from('trip_collaborators')
-        .select('id, accepted_at')
-        .eq('trip_id', tripId)
-        .eq('invited_email', cleanEmail)
-        .maybeSingle()
-
-      if (existing) {
-        setInviteError(
-          existing.accepted_at
-            ? 'This person is already a collaborator.'
-            : 'An invite is already pending for this email.'
-        )
+      if (result.error) {
+        setInviteError(result.error)
         return
       }
-
-      // Generate token client-side (32 char alphanumeric)
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-      const arr = crypto.getRandomValues(new Uint8Array(32))
-      const inviteToken = Array.from(arr, (b) => chars[b % chars.length]).join('')
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setInviteError('You must be signed in.'); return }
-
-      const { error } = await supabase
-        .from('trip_collaborators')
-        .insert({
-          trip_id: tripId,
-          role,
-          invited_email: cleanEmail,
-          invited_by: user.id,
-          invite_token: inviteToken,
-        })
-
-      if (error) {
-        setInviteError('Failed to send invite. Please try again.')
-        return
-      }
-
-      // Trigger server-side email send (non-blocking)
-      fetch('/api/internal/send-invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tripId, inviteToken }),
-        credentials: 'include',
-      }).catch(() => {/* swallow */})
 
       setInviteSuccess(true)
       setTimeout(() => {

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createSecretClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TripHeader } from '@/components/trips/trip-header'
 import { TripTimeline } from '@/components/trips/trip-timeline'
@@ -19,7 +19,8 @@ export default async function TripPage({ params }: TripPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const { data: trip, error } = await supabase
+  const sc = createSecretClient()
+  const { data: trip, error } = await sc
     .from('trips')
     .select('*')
     .eq('id', id)
@@ -36,7 +37,7 @@ export default async function TripPage({ params }: TripPageProps) {
   let inviterName: string | null = null
 
   if (!isOwner && user) {
-    const { data: collab } = await supabase
+    const { data: collab } = await sc
       .from('trip_collaborators')
       .select('role, inviter:profiles!invited_by (full_name, email)')
       .eq('trip_id', id)
@@ -50,7 +51,7 @@ export default async function TripPage({ params }: TripPageProps) {
     }
   }
 
-  const { data: items } = await supabase
+  const { data: items } = await sc
     .from('trip_items')
     .select('*')
     .eq('trip_id', id)
@@ -59,15 +60,16 @@ export default async function TripPage({ params }: TripPageProps) {
 
   // Get all user's trips for move item dialog
   const { data: allTrips } = user
-    ? await supabase
+    ? await sc
         .from('trips')
         .select('id, title, start_date')
+        .eq('user_id', user.id)
         .order('start_date', { ascending: false })
     : { data: null }
 
-  // Fetch collaborators (owner sees all via collab_owner_select RLS policy)
+  // Fetch collaborators
   const { data: collaborators } = isOwner
-    ? await supabase
+    ? await sc
         .from('trip_collaborators')
         .select('id, user_id, role, invited_email, accepted_at, created_at')
         .eq('trip_id', id)

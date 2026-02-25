@@ -57,6 +57,75 @@ export async function dismissFirstTripBanner(): Promise<void> {
 }
 
 /**
+ * Send a collaborator invite — inserts row + triggers email.
+ * Moved from client component to server action to avoid browser RLS issues.
+ */
+export async function sendCollaboratorInvite(
+  tripId: string,
+  email: string,
+  role: string
+): Promise<{ error?: string; success?: boolean }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'You must be signed in.' }
+
+  const sc = createSecretClient()
+  const cleanEmail = email.trim().toLowerCase()
+
+  // Verify user owns the trip
+  const { data: trip } = await sc
+    .from('trips')
+    .select('id, user_id')
+    .eq('id', tripId)
+    .eq('user_id', user.id)
+    .single()
+  if (!trip) return { error: 'Trip not found.' }
+
+  // Check for existing invite
+  const { data: existing } = await sc
+    .from('trip_collaborators')
+    .select('id, accepted_at')
+    .eq('trip_id', tripId)
+    .eq('invited_email', cleanEmail)
+    .maybeSingle()
+
+  if (existing) {
+    return {
+      error: existing.accepted_at
+        ? 'This person is already a collaborator.'
+        : 'An invite is already pending for this email.',
+    }
+  }
+
+  // Generate token
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  const arr = new Uint8Array(32)
+  crypto.getRandomValues(arr)
+  const inviteToken = Array.from(arr, (b) => chars[b % chars.length]).join('')
+
+  const { error } = await sc
+    .from('trip_collaborators')
+    .insert({
+      trip_id: tripId,
+      role,
+      invited_email: cleanEmail,
+      invited_by: user.id,
+      invite_token: inviteToken,
+    })
+
+  if (error) return { error: 'Failed to send invite. Please try again.' }
+
+  // Trigger email (non-blocking)
+  fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'}/api/internal/send-invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tripId, inviteToken }),
+  }).catch(() => {})
+
+  return { success: true }
+}
+
+/**
  * Re-generates the trip title based on remaining items.
  * Called after item deletion or move to keep the title accurate.
  */
