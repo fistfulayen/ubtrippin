@@ -764,6 +764,153 @@ curl -X DELETE https://www.ubtrippin.xyz/api/v1/settings/senders/$SENDER_ID \
 
 ---
 
+### Collaboration
+
+#### `GET /api/v1/trips/:id/collaborators`
+
+List all collaborators on a trip. **Owner only.**
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/collaborators \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "<collab_uuid>",
+      "user_id": "<user_uuid_or_null>",
+      "role": "editor",
+      "invited_email": "friend@example.com",
+      "accepted_at": "2026-02-25T05:00:00Z",
+      "created_at": "2026-02-25T04:33:00Z"
+    }
+  ],
+  "meta": { "count": 1 }
+}
+```
+
+`accepted_at` is `null` for pending invites. `user_id` is `null` until the invite is accepted by a new user.
+
+---
+
+#### `POST /api/v1/trips/:id/collaborators`
+
+Invite a collaborator. Sends an invite email. **Owner only. Requires Pro.**
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/collaborators \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "friend@example.com", "role": "editor" }'
+```
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `email` | string | ✅ | Email address to invite |
+| `role` | string | ✅ | `editor` or `viewer` |
+
+Returns `201` with the created collaborator record.
+
+---
+
+#### `PATCH /api/v1/trips/:id/collaborators/:collab_id`
+
+Change a collaborator's role. **Owner only.**
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/collaborators/$COLLAB_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "role": "viewer" }'
+```
+
+---
+
+#### `DELETE /api/v1/trips/:id/collaborators/:collab_id`
+
+Remove a collaborator. Trip disappears from their dashboard immediately. **Owner only.**
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/trips/$TRIP_ID/collaborators/$COLLAB_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Returns `204 No Content`.
+
+---
+
+### Notifications
+
+Notifications are fired when collaborators accept invites or add items to your trips.
+
+#### `GET /api/v1/notifications`
+
+List notifications for the authenticated user.
+
+**Query params:**
+
+| Param | Default | Notes |
+|-------|---------|-------|
+| `unread` | `false` | Set `true` to return only unread |
+| `limit` | `20` | Max 100 |
+
+```bash
+curl "https://www.ubtrippin.xyz/api/v1/notifications?unread=true" \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "<uuid>",
+      "type": "entry_added",
+      "trip_id": "<trip_uuid>",
+      "actor_id": "<user_uuid>",
+      "data": {
+        "actor_name": "Hedvig Lindqvist",
+        "item_summary": "Osteria dell'Angelo",
+        "item_kind": "restaurant"
+      },
+      "read_at": null,
+      "created_at": "2026-02-25T04:45:00Z"
+    }
+  ],
+  "meta": { "count": 1, "unread_count": 1 }
+}
+```
+
+**Notification types:**
+
+| type | When |
+|------|------|
+| `invite_accepted` | A collaborator accepted your invite |
+| `entry_added` | A collaborator added an item to your trip |
+
+---
+
+#### `PATCH /api/v1/notifications/:id`
+
+Mark a notification as read.
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/notifications/$NOTIFICATION_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Response:
+```json
+{ "data": { "id": "<uuid>", "read_at": "2026-02-25T05:00:00Z" } }
+```
+
+---
+
 ## Error Responses
 
 All errors follow the same shape:
@@ -947,6 +1094,7 @@ If you're wiring UB Trippin into a Claude agent as a tool:
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.3 | 2026-02-25 | Collaborative trips — invite system, collaborator CRUD, notifications, `role` field in trip list |
 | v1.2 | 2026-02-24 | Feature parity — move item, merge trips, cover image search, calendar token, allowed senders |
 | v1.1 | 2026-02-24 | Write endpoints: POST/PATCH/DELETE trips, POST/PATCH/DELETE items, batch insert |
 | v1.0 | 2026-02-23 | Initial release: GET trips, GET trips/:id, GET items/:id |

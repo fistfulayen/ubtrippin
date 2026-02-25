@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TripHeader } from '@/components/trips/trip-header'
 import { TripTimeline } from '@/components/trips/trip-timeline'
@@ -20,9 +19,8 @@ export default async function TripPage({ params }: TripPageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Fetch trip (explicit user filter + RLS as backup)
-  const secretClient1 = createSecretClient()
-  const { data: trip, error } = await secretClient1
+  // Fetch trip via RLS (owner OR accepted collaborator)
+  const { data: trip, error } = await supabase
     .from('trips')
     .select('*')
     .eq('id', id)
@@ -39,8 +37,7 @@ export default async function TripPage({ params }: TripPageProps) {
   let inviterName: string | null = null
 
   if (!isOwner && user) {
-    const secretClient = createSecretClient()
-    const { data: collab } = await secretClient
+    const { data: collab } = await supabase
       .from('trip_collaborators')
       .select('role, inviter:profiles!invited_by (full_name, email)')
       .eq('trip_id', id)
@@ -54,27 +51,24 @@ export default async function TripPage({ params }: TripPageProps) {
     }
   }
 
-  const { data: items } = await secretClient1
+  const { data: items } = await supabase
     .from('trip_items')
     .select('*')
     .eq('trip_id', id)
-    .eq('user_id', trip.user_id)
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
 
   // Get all user's trips for move item dialog
   const { data: allTrips } = user
-    ? await secretClient1
+    ? await supabase
         .from('trips')
         .select('id, title, start_date')
-        .eq('user_id', user.id)
         .order('start_date', { ascending: false })
     : { data: null }
 
-  // Fetch collaborators (only for owner — service client to bypass per-row RLS)
-  const secretClient = createSecretClient()
+  // Fetch collaborators (owner sees all via collab_owner_select policy)
   const { data: collaborators } = isOwner
-    ? await secretClient
+    ? await supabase
         .from('trip_collaborators')
         .select('id, user_id, role, invited_email, accepted_at, created_at')
         .eq('trip_id', id)

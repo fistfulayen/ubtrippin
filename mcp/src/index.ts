@@ -217,7 +217,7 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.4.0' },
+  { name: 'ubtrippin', version: '1.5.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
@@ -228,9 +228,15 @@ Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
 Write (trips): create_trip, update_trip, delete_trip, merge_trips
 Write (items): add_item, add_items, update_item, delete_item, move_item
 City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
+Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
+Notifications: get_notifications, mark_notification_read
 Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
+
+Collaborative trips appear automatically in list_trips — trips where you are owner or accepted collaborator.
+The role field in trip data indicates your access level: "owner", "editor", or "viewer".
+Editors can add/update items; viewers can read only; owner has full control.
     `.trim(),
   }
 )
@@ -1046,6 +1052,159 @@ server.registerTool(
     if (res.status === 204) {
       return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, sender_id }) }] }
     }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Collaboration Tools (PRD 009)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'list_collaborators',
+  {
+    title: 'List Trip Collaborators',
+    description: `List all collaborators on a trip you own. Returns each collaborator's email, role (editor/viewer), and whether they have accepted the invite.
+
+Requires: owner of the trip.`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+    },
+  },
+  async ({ trip_id }) => {
+    const result = await apiFetch<{ data: unknown[]; meta: { count: number } }>(
+      `/api/v1/trips/${trip_id}/collaborators`
+    )
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'invite_collaborator',
+  {
+    title: 'Invite a Collaborator',
+    description: `Invite someone to collaborate on a trip you own. An invite email is sent to the recipient.
+
+- role "editor": can add and edit trip items
+- role "viewer": read-only access to the trip
+
+If the recipient doesn't have a UBTRIPPIN account, they'll be invited to create one and the trip will be waiting for them.
+
+Requires Pro tier to send invites.`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      email: z.string().email().describe('Email address of the person to invite'),
+      role: z.enum(['editor', 'viewer']).default('editor').describe('Access level — editor can add items, viewer is read-only'),
+    },
+  },
+  async ({ trip_id, email, role }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/collaborators`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ email, role }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'update_collaborator_role',
+  {
+    title: 'Update Collaborator Role',
+    description: `Change a collaborator's role on a trip you own. Can promote viewer → editor or demote editor → viewer.
+
+Requires: owner of the trip.`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      collaborator_id: z.string().uuid().describe('UUID of the collaborator record (from list_collaborators)'),
+      role: z.enum(['editor', 'viewer']).describe('New role for the collaborator'),
+    },
+  },
+  async ({ trip_id, collaborator_id, role }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/collaborators/${collaborator_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ role }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'remove_collaborator',
+  {
+    title: 'Remove a Collaborator',
+    description: `Remove a collaborator from a trip you own. The trip will disappear from their dashboard immediately.
+
+Requires: owner of the trip.`,
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      collaborator_id: z.string().uuid().describe('UUID of the collaborator record (from list_collaborators)'),
+    },
+  },
+  async ({ trip_id, collaborator_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/collaborators/${collaborator_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, collaborator_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Notification Tools (PRD 009)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_notifications',
+  {
+    title: 'Get Notifications',
+    description: `Fetch recent notifications for your account.
+
+Notification types:
+- invite_accepted  — a collaborator accepted your trip invite
+- entry_added      — a collaborator added an item to your trip
+
+Poll this periodically or after receiving an invite email to see in-app events.`,
+    inputSchema: {
+      unread_only: z.boolean().optional().default(false).describe('If true, only return unread notifications'),
+      limit: z.number().int().min(1).max(100).optional().default(20).describe('Max notifications to return (default 20)'),
+    },
+  },
+  async ({ unread_only, limit }) => {
+    const params = new URLSearchParams()
+    if (unread_only) params.set('unread', 'true')
+    if (limit) params.set('limit', String(limit))
+    const qs = params.toString() ? `?${params}` : ''
+    const result = await apiFetch<{ data: unknown[]; meta: { count: number; unread_count: number } }>(
+      `/api/v1/notifications${qs}`
+    )
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'mark_notification_read',
+  {
+    title: 'Mark Notification Read',
+    description: `Mark a single notification as read. Use the notification ID from get_notifications.`,
+    inputSchema: {
+      notification_id: z.string().uuid().describe('UUID of the notification to mark as read'),
+    },
+  },
+  async ({ notification_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/notifications/${notification_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({}),
+    })
     const result = await res.json()
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }

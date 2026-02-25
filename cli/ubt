@@ -349,6 +349,108 @@ cmd_rls_check() {
   supabase inspect db policies --linked 2>/dev/null || echo "Use 'supabase inspect db policies --linked' manually"
 }
 
+cmd_collab_list() {
+  local trip_id="${1:?Usage: ubt collab list <trip_id>}"
+  _api "${APP_URL}/api/v1/trips/${trip_id}/collaborators" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f'Error: {data[\"error\"][\"message\"]}')
+    sys.exit(1)
+collabs = data.get('data', [])
+count = data.get('meta', {}).get('count', len(collabs))
+if not collabs:
+    print('No collaborators on this trip.')
+    sys.exit(0)
+print(f'Collaborators ({count}):')
+for c in collabs:
+    accepted = 'accepted' if c.get('accepted_at') else 'pending'
+    role = c.get('role', '?')
+    email = c.get('invited_email', '?')
+    cid = c.get('id', '')[:8]
+    print(f'  {cid}  {email:<35} [{role}] {accepted}')
+"
+}
+
+cmd_collab_invite() {
+  local trip_id="${1:?Usage: ubt collab invite <trip_id> <email> [role]}"
+  local email="${2:?Usage: ubt collab invite <trip_id> <email> [role]}"
+  local role="${3:-editor}"
+  echo "Inviting ${email} to trip ${trip_id:0:8} as ${role}..."
+  _api -X POST "${APP_URL}/api/v1/trips/${trip_id}/collaborators" \
+    -d "{\"email\": \"${email}\", \"role\": \"${role}\"}" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f'Error: {data[\"error\"][\"message\"]}')
+    sys.exit(1)
+d = data.get('data', {})
+print(f'Invited: {d.get(\"invited_email\")} as {d.get(\"role\")} (invite id: {str(d.get(\"id\",\"\"))[:8]}...)')
+print('Invite email sent.')
+"
+}
+
+cmd_collab_remove() {
+  local trip_id="${1:?Usage: ubt collab remove <trip_id> <collaborator_id>}"
+  local collab_id="${2:?Usage: ubt collab remove <trip_id> <collaborator_id>}"
+  echo "Removing collaborator ${collab_id:0:8} from trip ${trip_id:0:8}..."
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${APP_URL}/api/v1/trips/${trip_id}/collaborators/${collab_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+  if [ "$status" = "204" ] || [ "$status" = "200" ]; then
+    echo "Removed."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_notifications_list() {
+  local unread_flag="${1:-}"
+  local qs=""
+  if [ "$unread_flag" = "--unread" ]; then
+    qs="?unread=true"
+  fi
+  _api "${APP_URL}/api/v1/notifications${qs}" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f'Error: {data[\"error\"][\"message\"]}')
+    sys.exit(1)
+notifications = data.get('data', [])
+meta = data.get('meta', {})
+unread = meta.get('unread_count', 0)
+if not notifications:
+    print(f'No notifications. (unread: {unread})')
+    sys.exit(0)
+print(f'Notifications ({len(notifications)}, unread: {unread}):')
+for n in notifications:
+    read_status = '' if n.get('read_at') else ' [UNREAD]'
+    ntype = n.get('type', '?')
+    nid = n.get('id', '')[:8]
+    created = (n.get('created_at') or '')[:16]
+    trip_id = (n.get('trip_id') or '')[:8]
+    ddata = n.get('data', {}) or {}
+    detail = ddata.get('actor_name') or ddata.get('item_summary') or ''
+    print(f'  {nid}  {ntype:<25} {created}  trip:{trip_id}  {detail}{read_status}')
+"
+}
+
+cmd_notifications_read() {
+  local notification_id="${1:?Usage: ubt notifications read <notification_id>}"
+  _api -X PATCH "${APP_URL}/api/v1/notifications/${notification_id}" -d '{}' | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+if 'error' in data:
+    print(f'Error: {data[\"error\"][\"message\"]}')
+    sys.exit(1)
+d = data.get('data', {})
+print(f'Marked read: {d.get(\"id\",\"?\")[:8]} (read_at: {d.get(\"read_at\",\"?\")[:19]})')
+"
+}
+
 # Usage
 usage() {
   cat <<EOF
@@ -357,20 +459,25 @@ ubt — UB Trippin CLI
 Usage: ubt <command> [args]
 
 Commands:
-  trips list [user_id]           List all trips (optionally filter by user)
-  trips show <trip_id>           Show trip details + items
-  trips merge <target> <source>  Merge source trip into target (deletes source) *
-  items list <trip_id>           List items in a trip
-  items move <item_id> <trip_id> Move item to another trip *
-  calendar get                   Get your iCal feed URL *
-  calendar regen                 Regenerate calendar token (invalidates old URL) *
-  image search <query>           Search Unsplash for cover images *
-  senders list                   List allowed email senders *
-  senders add <email> [label]    Add an allowed sender *
-  senders remove <id>            Remove an allowed sender *
-  users                          List all users (admin)
-  health                         Check service health
-  rls-check                      Verify RLS policies
+  trips list [user_id]                  List all trips (owned + shared)
+  trips show <trip_id>                  Show trip details + items
+  trips merge <target> <source>         Merge source trip into target (deletes source) *
+  items list <trip_id>                  List items in a trip
+  items move <item_id> <trip_id>        Move item to another trip *
+  calendar get                          Get your iCal feed URL *
+  calendar regen                        Regenerate calendar token (invalidates old URL) *
+  image search <query>                  Search Unsplash for cover images *
+  senders list                          List allowed email senders *
+  senders add <email> [label]           Add an allowed sender *
+  senders remove <id>                   Remove an allowed sender *
+  collab list <trip_id>                 List collaborators on a trip you own *
+  collab invite <trip_id> <email> [role] Invite a collaborator (editor or viewer) *
+  collab remove <trip_id> <collab_id>   Remove a collaborator *
+  notifications list [--unread]         List notifications *
+  notifications read <id>               Mark a notification as read *
+  users                                 List all users (admin)
+  health                                Check service health
+  rls-check                             Verify RLS policies
 
 Commands marked * require UBT_API_KEY in ~/.ubt/config or env.
 
@@ -386,6 +493,11 @@ Examples:
   ubt senders list
   ubt image search "paris eiffel tower"
   FORMAT=json ubt items list <trip_id>
+  ubt collab list <trip_id>
+  ubt collab invite <trip_id> friend@example.com editor
+  ubt collab remove <trip_id> <collab_id>
+  ubt notifications list --unread
+  ubt notifications read <notification_id>
 EOF
 }
 
@@ -425,6 +537,21 @@ case "${1:-}" in
     case "${2:-}" in
       search) cmd_image_search "${3:?Usage: ubt image search <query>}" ;;
       *)      usage ;;
+    esac
+    ;;
+  collab)
+    case "${2:-}" in
+      list)   cmd_collab_list "${3:?Usage: ubt collab list <trip_id>}" ;;
+      invite) cmd_collab_invite "${3:-}" "${4:-}" "${5:-}" ;;
+      remove) cmd_collab_remove "${3:-}" "${4:-}" ;;
+      *)      usage ;;
+    esac
+    ;;
+  notifications)
+    case "${2:-}" in
+      list) cmd_notifications_list "${3:-}" ;;
+      read) cmd_notifications_read "${3:?Usage: ubt notifications read <notification_id>}" ;;
+      *)    usage ;;
     esac
     ;;
   users)    cmd_users ;;
