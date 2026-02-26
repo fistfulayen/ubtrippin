@@ -15,6 +15,7 @@ import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const ITEM_SELECT = `id,
        trip_id,
@@ -79,7 +80,7 @@ export async function POST(
   // 6. Resolve trip access: owner OR accepted editor collaborator
   const { data: trip } = await supabase
     .from('trips')
-    .select('id, user_id, title')
+    .select('id, user_id, title, primary_location')
     .eq('id', tripId)
     .maybeSingle()
 
@@ -196,6 +197,22 @@ export async function POST(
         console.error('[items/notifications]', err)
       }
     })()
+  }
+
+  if (item) {
+    void dispatchWebhookEvent({
+      userId: trip.user_id as string,
+      tripId,
+      event: 'item.created',
+      data: {
+        trip: {
+          id: trip.id,
+          title: trip.title,
+          primary_location: trip.primary_location,
+        },
+        item: sanitizeItem(item as Record<string, unknown>),
+      },
+    }).catch((err) => console.error('[webhooks] item.created dispatch failed:', err))
   }
 
   return NextResponse.json(

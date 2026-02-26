@@ -12,6 +12,7 @@ import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const BATCH_MAX = 50
 
@@ -131,7 +132,7 @@ export async function POST(
   // 7. Verify trip ownership (once for the batch)
   const { data: trip } = await supabase
     .from('trips')
-    .select('id')
+    .select('id, user_id, title, primary_location')
     .eq('id', tripId)
     .eq('user_id', auth.userId)
     .single()
@@ -188,6 +189,22 @@ export async function POST(
   }
 
   const sanitized = (items ?? []).map((item) => sanitizeItem(item as Record<string, unknown>))
+
+  if (sanitized.length > 0 && trip) {
+    void dispatchWebhookEvent({
+      userId: trip.user_id as string,
+      tripId,
+      event: 'items.batch_created',
+      data: {
+        trip: {
+          id: trip.id,
+          title: trip.title,
+          primary_location: trip.primary_location,
+        },
+        items: sanitized,
+      },
+    }).catch((err) => console.error('[webhooks] items.batch_created dispatch failed:', err))
+  }
 
   return NextResponse.json(
     { data: sanitized, meta: { count: sanitized.length } },

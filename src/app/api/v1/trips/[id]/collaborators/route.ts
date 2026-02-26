@@ -10,10 +10,18 @@ import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 import { sendCollaboratorInviteEmail } from '@/lib/email/collaborator-invite'
 import { customAlphabet } from 'nanoid'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const nanoid = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 32)
 
 type Params = { params: Promise<{ id: string }> }
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@')
+  if (!local || !domain) return '***'
+  const head = local.slice(0, 2)
+  return `${head}${'•'.repeat(Math.max(1, local.length - 2))}@${domain}`
+}
 
 export async function GET(request: NextRequest, { params }: Params) {
   const auth = await validateApiKey(request)
@@ -186,6 +194,26 @@ export async function POST(request: NextRequest, { params }: Params) {
     tripLabel,
     inviteUrl,
   }).catch((err: Error) => console.error('[invite email]', err))
+
+  void dispatchWebhookEvent({
+    userId: auth.userId,
+    tripId,
+    event: 'collaborator.invited',
+    data: {
+      trip: {
+        id: trip.id,
+        title: trip.title,
+        primary_location: trip.primary_location,
+      },
+      collaborator: {
+        id: collab.id,
+        role: collab.role,
+        invited_email_masked: maskEmail(collab.invited_email as string),
+        accepted_at: collab.accepted_at,
+        created_at: collab.created_at,
+      },
+    },
+  }).catch((err) => console.error('[webhooks] collaborator.invited dispatch failed:', err))
 
   return NextResponse.json({ data: collab }, { status: 201 })
 }

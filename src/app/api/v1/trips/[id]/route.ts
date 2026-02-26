@@ -10,6 +10,7 @@ import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeItem, sanitizeTripInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 export async function GET(
   request: NextRequest,
@@ -234,6 +235,15 @@ export async function PATCH(
     )
   }
 
+  void dispatchWebhookEvent({
+    userId: auth.userId,
+    tripId,
+    event: 'trip.updated',
+    data: {
+      trip: sanitizeTrip(updatedTrip as Record<string, unknown>),
+    },
+  }).catch((err) => console.error('[webhooks] trip.updated dispatch failed:', err))
+
   return NextResponse.json({ data: sanitizeTrip(updatedTrip as Record<string, unknown>) })
 }
 
@@ -263,7 +273,19 @@ export async function DELETE(
   // 4. Verify ownership before deleting
   const { data: existing } = await supabase
     .from('trips')
-    .select('id')
+    .select(
+      `id,
+       title,
+       start_date,
+       end_date,
+       primary_location,
+       travelers,
+       notes,
+       cover_image_url,
+       share_enabled,
+       created_at,
+       updated_at`
+    )
     .eq('id', tripId)
     .eq('user_id', auth.userId)
     .single()
@@ -274,6 +296,15 @@ export async function DELETE(
       { status: 404 }
     )
   }
+
+  void dispatchWebhookEvent({
+    userId: auth.userId,
+    tripId,
+    event: 'trip.deleted',
+    data: {
+      trip: sanitizeTrip(existing as Record<string, unknown>),
+    },
+  }).catch((err) => console.error('[webhooks] trip.deleted dispatch failed:', err))
 
   // 5. Delete (FK constraint cascades to trip_items)
   const { error } = await supabase

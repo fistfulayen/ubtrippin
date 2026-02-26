@@ -8,8 +8,16 @@ import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 type Params = { params: Promise<{ id: string; uid: string }> }
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@')
+  if (!local || !domain) return '***'
+  const head = local.slice(0, 2)
+  return `${head}${'•'.repeat(Math.max(1, local.length - 2))}@${domain}`
+}
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const auth = await validateApiKey(request)
@@ -49,7 +57,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   // Verify ownership
   const { data: trip } = await supabase
     .from('trips')
-    .select('id')
+    .select('id, user_id, title, primary_location')
     .eq('id', tripId)
     .eq('user_id', auth.userId)
     .single()
@@ -99,7 +107,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   // Verify ownership
   const { data: trip } = await supabase
     .from('trips')
-    .select('id')
+    .select('id, user_id, title, primary_location')
     .eq('id', tripId)
     .eq('user_id', auth.userId)
     .single()
@@ -107,6 +115,20 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!trip) {
     return NextResponse.json(
       { error: { code: 'not_found', message: 'Trip not found or you are not the owner.' } },
+      { status: 404 }
+    )
+  }
+
+  const { data: collaborator } = await supabase
+    .from('trip_collaborators')
+    .select('id, role, invited_email, accepted_at, created_at')
+    .eq('id', collabId)
+    .eq('trip_id', tripId)
+    .maybeSingle()
+
+  if (!collaborator) {
+    return NextResponse.json(
+      { error: { code: 'not_found', message: 'Collaborator not found.' } },
       { status: 404 }
     )
   }
@@ -124,6 +146,26 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       { status: 500 }
     )
   }
+
+  void dispatchWebhookEvent({
+    userId: trip.user_id as string,
+    tripId,
+    event: 'collaborator.removed',
+    data: {
+      trip: {
+        id: trip.id,
+        title: trip.title,
+        primary_location: trip.primary_location,
+      },
+      collaborator: {
+        id: collaborator.id,
+        role: collaborator.role,
+        invited_email_masked: maskEmail(collaborator.invited_email as string),
+        accepted_at: collaborator.accepted_at,
+        created_at: collaborator.created_at,
+      },
+    },
+  }).catch((err) => console.error('[webhooks] collaborator.removed dispatch failed:', err))
 
   return new NextResponse(null, { status: 204 })
 }

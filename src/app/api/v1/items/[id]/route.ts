@@ -10,6 +10,7 @@ import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 export async function GET(
   request: NextRequest,
@@ -91,6 +92,16 @@ const ITEM_SELECT = `id,
        needs_review,
        created_at,
        updated_at`
+
+async function fetchTripSummary(tripId: string) {
+  const supabase = createSecretClient()
+  const { data } = await supabase
+    .from('trips')
+    .select('id, user_id, title, primary_location')
+    .eq('id', tripId)
+    .maybeSingle()
+  return data
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -216,6 +227,23 @@ export async function PATCH(
     )
   }
 
+  const trip = await fetchTripSummary(updatedItem.trip_id as string)
+  if (trip) {
+    void dispatchWebhookEvent({
+      userId: trip.user_id as string,
+      tripId: updatedItem.trip_id as string,
+      event: 'item.updated',
+      data: {
+        trip: {
+          id: trip.id,
+          title: trip.title,
+          primary_location: trip.primary_location,
+        },
+        item: sanitizeItem(updatedItem as Record<string, unknown>),
+      },
+    }).catch((err) => console.error('[webhooks] item.updated dispatch failed:', err))
+  }
+
   return NextResponse.json({ data: sanitizeItem(updatedItem as Record<string, unknown>) })
 }
 
@@ -245,7 +273,7 @@ export async function DELETE(
   // 4. Verify ownership before deleting
   const { data: existing } = await supabase
     .from('trip_items')
-    .select('id')
+    .select(ITEM_SELECT)
     .eq('id', itemId)
     .eq('user_id', auth.userId)
     .single()
@@ -270,6 +298,24 @@ export async function DELETE(
       { error: { code: 'internal_error', message: 'Failed to delete item.' } },
       { status: 500 }
     )
+  }
+
+  const deletedItem = sanitizeItem(existing as Record<string, unknown>)
+  const trip = await fetchTripSummary(existing.trip_id as string)
+  if (trip) {
+    void dispatchWebhookEvent({
+      userId: trip.user_id as string,
+      tripId: existing.trip_id as string,
+      event: 'item.deleted',
+      data: {
+        trip: {
+          id: trip.id,
+          title: trip.title,
+          primary_location: trip.primary_location,
+        },
+        item: deletedItem,
+      },
+    }).catch((err) => console.error('[webhooks] item.deleted dispatch failed:', err))
   }
 
   return new NextResponse(null, { status: 204 })

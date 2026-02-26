@@ -9,6 +9,7 @@ import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeTripInput } from '@/lib/api/sanitize'
 import { createSecretClient } from '@/lib/supabase/service'
 import { trackTripCreated } from '@/lib/activation'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const TRIP_SELECT = `id,
        title,
@@ -134,6 +135,15 @@ export async function POST(request: NextRequest) {
   trackTripCreated(auth.userId).catch((err) =>
     console.error('[activation] trackTripCreated failed:', err)
   )
+
+  void dispatchWebhookEvent({
+    userId: auth.userId,
+    tripId: trip.id as string,
+    event: 'trip.created',
+    data: {
+      trip: sanitizeTrip(trip as Record<string, unknown>),
+    },
+  }).catch((err) => console.error('[webhooks] trip.created dispatch failed:', err))
 
   return NextResponse.json({ data: sanitizeTrip(trip as Record<string, unknown>) }, { status: 201 })
 }

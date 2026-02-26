@@ -9,8 +9,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { sendInviteAcceptedEmail } from '@/lib/email/collaborator-invite'
+import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 type Params = { params: Promise<{ token: string }> }
+
+function maskEmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@')
+  if (!local || !domain) return '***'
+  const head = local.slice(0, 2)
+  return `${head}${'•'.repeat(Math.max(1, local.length - 2))}@${domain}`
+}
 
 export async function POST(request: NextRequest, { params }: Params) {
   const { token } = await params
@@ -151,6 +159,25 @@ export async function POST(request: NextRequest, { params }: Params) {
       console.error('[accept notification in-app]', err)
     }
   })()
+
+  void dispatchWebhookEvent({
+    userId: invite.invited_by,
+    tripId: invite.trip_id,
+    event: 'collaborator.accepted',
+    data: {
+      trip: {
+        id: invite.trip_id,
+        title: tripData?.title || null,
+        primary_location: tripData?.primary_location || null,
+      },
+      collaborator: {
+        id: updated.id,
+        role: updated.role,
+        invited_email_masked: maskEmail(updated.invited_email as string),
+        accepted_at: updated.accepted_at,
+      },
+    },
+  }).catch((err) => console.error('[webhooks] collaborator.accepted dispatch failed:', err))
 
   return NextResponse.json({
     data: {
