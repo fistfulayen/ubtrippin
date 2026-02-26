@@ -53,7 +53,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const { data, error } = await supabase
     .from('webhook_deliveries')
-    .select('id, webhook_id, event, status, attempts, last_attempt_at, last_response_code, last_response_body, created_at')
+    .select('id, webhook_id, event, payload, status, attempts, last_attempt_at, last_response_code, last_response_body, created_at')
     .eq('webhook_id', id)
     .order('created_at', { ascending: false })
     .limit(limit)

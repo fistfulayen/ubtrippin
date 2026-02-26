@@ -92,6 +92,30 @@ interface CityGuideWithEntries extends CityGuide {
   entries: GuideEntry[]
 }
 
+interface Webhook {
+  id: string
+  url: string
+  description: string | null
+  secret_masked: string
+  events: string[]
+  enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+interface WebhookDelivery {
+  id: string
+  webhook_id: string
+  event: string
+  payload: Record<string, unknown>
+  status: 'pending' | 'success' | 'failed'
+  attempts: number
+  last_attempt_at: string | null
+  last_response_code: number | null
+  last_response_body: string | null
+  created_at: string
+}
+
 // ---------------------------------------------------------------------------
 // API client helpers
 // ---------------------------------------------------------------------------
@@ -217,7 +241,7 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.6.0' },
+  { name: 'ubtrippin', version: '1.7.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
@@ -231,7 +255,7 @@ City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_gu
 Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
 Notifications: get_notifications, mark_notification_read
 Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, lookup_loyalty_program
-Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender
+Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender, list_webhooks, register_webhook, delete_webhook, test_webhook, list_deliveries
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
 
@@ -1054,6 +1078,100 @@ server.registerTool(
       return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, sender_id }) }] }
     }
     const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'list_webhooks',
+  {
+    title: 'List Webhooks',
+    description: 'List all registered webhook endpoints for your account.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: Webhook[]; meta: { count: number } }>('/api/v1/webhooks')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'register_webhook',
+  {
+    title: 'Register Webhook',
+    description:
+      'Register a new webhook endpoint with optional event filters. If events is empty or omitted, all supported events are sent.',
+    inputSchema: {
+      url: z.string().url().describe('HTTPS endpoint URL to receive webhook events'),
+      events: z.array(z.string()).optional().describe('Event names to subscribe to'),
+      secret: z.string().min(1).max(200).describe('Signing secret for HMAC verification'),
+      description: z.string().max(200).optional().describe('Optional description for the endpoint'),
+    },
+  },
+  async ({ url, events, secret, description }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/webhooks`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ url, events, secret, description }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'delete_webhook',
+  {
+    title: 'Delete Webhook',
+    description: 'Delete a webhook endpoint and cancel pending deliveries.',
+    inputSchema: {
+      webhook_id: z.string().uuid().describe('UUID of the webhook to delete'),
+    },
+  },
+  async ({ webhook_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/webhooks/${webhook_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, webhook_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'test_webhook',
+  {
+    title: 'Test Webhook',
+    description: 'Queue a synthetic ping delivery for a webhook endpoint.',
+    inputSchema: {
+      webhook_id: z.string().uuid().describe('UUID of the webhook to test'),
+    },
+  },
+  async ({ webhook_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/webhooks/${webhook_id}/test`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'list_deliveries',
+  {
+    title: 'List Webhook Deliveries',
+    description: 'List recent delivery logs for a specific webhook endpoint.',
+    inputSchema: {
+      webhook_id: z.string().uuid().describe('UUID of the webhook'),
+    },
+  },
+  async ({ webhook_id }) => {
+    const result = await apiFetch<{ data: WebhookDelivery[]; meta: { count: number; limit: number; tier: string } }>(
+      `/api/v1/webhooks/${webhook_id}/deliveries`
+    )
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )

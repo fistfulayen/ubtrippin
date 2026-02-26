@@ -323,6 +323,199 @@ cmd_senders_remove() {
   fi
 }
 
+cmd_webhooks_list() {
+  local result
+  result=$(_api "${APP_URL}/api/v1/webhooks")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+webhooks = payload.get('data', [])
+if not webhooks:
+    print('No webhooks configured.')
+    sys.exit(0)
+print(f'Webhooks ({len(webhooks)}):')
+for w in webhooks:
+    events = w.get('events') or []
+    events_str = str(len(events)) if events else 'all'
+    status = 'enabled' if w.get('enabled') else 'disabled'
+    desc = w.get('description') or ''
+    print(f\"  {w['id'][:8]}  {status:<8} events:{events_str:<4} {w.get('url','')}\")
+    if desc:
+        print(f\"           {desc}\")
+"
+}
+
+cmd_webhooks_add() {
+  local url="${1:?Usage: ubt webhooks add <url> [--events a,b,c] [--secret <s>] [--description <text>]}"
+  shift
+
+  local events=""
+  local secret=""
+  local description=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --events)
+        events="${2:-}"
+        shift 2
+        ;;
+      --secret)
+        secret="${2:-}"
+        shift 2
+        ;;
+      --description)
+        description="${2:-}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1" >&2
+        echo "Usage: ubt webhooks add <url> [--events a,b,c] [--secret <s>] [--description <text>]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  if [ -z "$secret" ]; then
+    secret=$(python3 -c "import secrets; print(secrets.token_hex(16))")
+    echo "Generated secret: $secret"
+  fi
+
+  local body
+  body=$(python3 -c "
+import json, sys
+url, events_csv, secret, description = sys.argv[1:]
+payload = {'url': url, 'secret': secret}
+if events_csv.strip():
+    payload['events'] = [e.strip() for e in events_csv.split(',') if e.strip()]
+if description.strip():
+    payload['description'] = description.strip()
+print(json.dumps(payload))
+" "$url" "$events" "$secret" "$description")
+
+  local result
+  result=$(_api -X POST "${APP_URL}/api/v1/webhooks" -d "$body")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+w = payload.get('data', {})
+print('Webhook registered:')
+print(f\"  id:  {w.get('id')}\")
+print(f\"  url: {w.get('url')}\")
+print(f\"  secret_masked: {w.get('secret_masked')}\")
+"
+}
+
+cmd_webhooks_show() {
+  local webhook_id="${1:?Usage: ubt webhooks show <id>}"
+  local result
+  result=$(_api "${APP_URL}/api/v1/webhooks/${webhook_id}")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+w = payload.get('data', {})
+events = w.get('events') or []
+print('Webhook:')
+print(f\"  id:           {w.get('id')}\")
+print(f\"  url:          {w.get('url')}\")
+print(f\"  description:  {w.get('description') or '-'}\")
+print(f\"  enabled:      {w.get('enabled')}\")
+print(f\"  events:       {', '.join(events) if events else 'all'}\")
+print(f\"  secret:       {w.get('secret_masked')}\")
+print(f\"  created_at:   {w.get('created_at')}\")
+print(f\"  updated_at:   {w.get('updated_at')}\")
+"
+}
+
+cmd_webhooks_delete() {
+  local webhook_id="${1:?Usage: ubt webhooks delete <id>}"
+  echo "Deleting webhook ${webhook_id:0:8}..."
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${APP_URL}/api/v1/webhooks/${webhook_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+  if [ "$status" = "204" ]; then
+    echo "Deleted."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_webhooks_test() {
+  local webhook_id="${1:?Usage: ubt webhooks test <id>}"
+  local result
+  result=$(_api -X POST "${APP_URL}/api/v1/webhooks/${webhook_id}/test")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+print('Test ping queued.')
+"
+}
+
+cmd_webhooks_deliveries() {
+  local webhook_id="${1:?Usage: ubt webhooks deliveries <id>}"
+  local result
+  result=$(_api "${APP_URL}/api/v1/webhooks/${webhook_id}/deliveries")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+deliveries = payload.get('data', [])
+if not deliveries:
+    print('No deliveries found.')
+    sys.exit(0)
+print(f'Deliveries ({len(deliveries)}):')
+for d in deliveries:
+    code = d.get('last_response_code')
+    code_str = str(code) if code is not None else '-'
+    created = (d.get('created_at') or '')[:19]
+    print(f\"  {d.get('id','')[:8]}  {created}  {d.get('event',''):<22} {d.get('status',''):<8} code:{code_str}\")
+"
+}
+
 cmd_image_search() {
   local query="${1:?Usage: ubt image search <query>}"
   _api "${APP_URL}/api/v1/images/search?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('$query'))")" | python3 -c "
@@ -788,6 +981,12 @@ Commands:
   senders list                          List allowed email senders *
   senders add <email> [label]           Add an allowed sender *
   senders remove <id>                   Remove an allowed sender *
+  webhooks list                         List registered webhooks *
+  webhooks add <url> [--events a,b] [--secret s] [--description text]  Add webhook *
+  webhooks show <id>                    Show webhook details *
+  webhooks delete <id>                  Delete a webhook *
+  webhooks test <id>                    Send test ping *
+  webhooks deliveries <id>              List delivery logs *
   collab list <trip_id>                 List collaborators on a trip you own *
   collab invite <trip_id> <email> [role] Invite a collaborator (editor or viewer) *
   collab remove <trip_id> <collab_id>   Remove a collaborator *
@@ -817,6 +1016,8 @@ Examples:
   ubt items move <item_id> <target_trip_id>
   ubt calendar get
   ubt senders list
+  ubt webhooks list
+  ubt webhooks add https://example.com/webhooks/ubt --events item.created,item.updated
   ubt image search "paris eiffel tower"
   FORMAT=json ubt items list <trip_id>
   ubt collab list <trip_id>
@@ -860,6 +1061,17 @@ case "${1:-}" in
       add)    cmd_senders_add "${3:-}" "${4:-}" ;;
       remove) cmd_senders_remove "${3:?Usage: ubt senders remove <sender_id>}" ;;
       *)      usage ;;
+    esac
+    ;;
+  webhooks)
+    case "${2:-}" in
+      list)       cmd_webhooks_list ;;
+      add)        shift 2; cmd_webhooks_add "$@" ;;
+      show)       cmd_webhooks_show "${3:-}" ;;
+      delete)     cmd_webhooks_delete "${3:-}" ;;
+      test)       cmd_webhooks_test "${3:-}" ;;
+      deliveries) cmd_webhooks_deliveries "${3:-}" ;;
+      *)          usage ;;
     esac
     ;;
   image)

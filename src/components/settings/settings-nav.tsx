@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 const items = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Traveler Profile' },
+  { href: '/settings/webhooks', label: 'Webhooks' },
 ]
 
 export function SettingsNav() {

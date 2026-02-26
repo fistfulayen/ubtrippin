@@ -1253,6 +1253,66 @@ All Supabase tables have RLS enabled. The API uses a service-role client that by
 
 ---
 
+## Webhooks
+
+Webhook endpoints let you register callback URLs for trip/item/collaborator events.
+
+### `GET /api/v1/webhooks`
+
+List all registered webhooks for the authenticated user.
+
+### `POST /api/v1/webhooks`
+
+Register a webhook endpoint.
+
+Request body:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `url` | string | ✅ | HTTPS callback URL |
+| `secret` | string | ✅ | Signing secret (1–200 chars) |
+| `events` | string[] | | Event filter list; empty/omitted means all events |
+| `description` | string \| null | | Optional description |
+
+### `GET /api/v1/webhooks/:id`
+
+Get details for a webhook.
+
+### `PATCH /api/v1/webhooks/:id`
+
+Update webhook fields (`url`, `description`, `events`, `enabled`, `secret`).
+
+### `DELETE /api/v1/webhooks/:id`
+
+Delete webhook and cancel pending deliveries.
+
+Returns `204 No Content` on success.
+
+### `POST /api/v1/webhooks/:id/test`
+
+Queue a synthetic `ping` delivery.
+
+### `GET /api/v1/webhooks/:id/deliveries`
+
+List recent delivery logs for a webhook.
+
+Response includes:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | UUID | Delivery ID |
+| `event` | string | Event name |
+| `payload` | object | Event payload sent to endpoint |
+| `status` | string | `pending`, `success`, `failed` |
+| `attempts` | number | Attempt count |
+| `last_response_code` | number \| null | Last HTTP status from receiver |
+| `last_response_body` | string \| null | Last response body from receiver |
+| `created_at` | string | Created timestamp |
+
+See [WEBHOOKS.md](./WEBHOOKS.md) for full event list, signature verification, and retry behavior.
+
+---
+
 ## Integration Examples
 
 ### curl
@@ -1352,6 +1412,7 @@ If you're wiring UB Trippin into a Claude agent as a tool:
 
 | Version | Date | Notes |
 |---|---|---|
+| v1.4 | 2026-02-26 | Webhooks — endpoint registration, test ping, delivery logs |
 | v1.3 | 2026-02-25 | Collaborative trips — invite system, collaborator CRUD, notifications, `role` field in trip list |
 | v1.2 | 2026-02-24 | Feature parity — move item, merge trips, cover image search, calendar token, allowed senders |
 | v1.1 | 2026-02-24 | Write endpoints: POST/PATCH/DELETE trips, POST/PATCH/DELETE items, batch insert |
