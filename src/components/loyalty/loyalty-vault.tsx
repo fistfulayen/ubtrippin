@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
+import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
 
 type ProviderType = 'airline' | 'hotel' | 'car_rental' | 'other'
@@ -33,6 +34,7 @@ interface ProviderCatalogItem {
 
 interface LoyaltyVaultProps {
   isPro: boolean
+  fullName?: string | null
   initialPrograms: LoyaltyProgram[]
   initialProviders: ProviderCatalogItem[]
 }
@@ -62,11 +64,12 @@ function providerLabel(type: ProviderType): string {
   return type
 }
 
-export function LoyaltyVault({ isPro, initialPrograms, initialProviders }: LoyaltyVaultProps) {
+export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProviders }: LoyaltyVaultProps) {
   const [saving, setSaving] = useState(false)
   const [programs, setPrograms] = useState<LoyaltyProgram[]>(initialPrograms)
   const [providers] = useState<ProviderCatalogItem[]>(initialProviders)
   const [revealedIds, setRevealedIds] = useState<Record<string, boolean>>({})
+  const [brokenLogoIds, setBrokenLogoIds] = useState<Record<string, boolean>>({})
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
@@ -81,6 +84,42 @@ export function LoyaltyVault({ isPro, initialPrograms, initialProviders }: Loyal
     () => providers.filter((provider) => provider.provider_type === form.provider_type),
     [providers, form.provider_type]
   )
+  const userFullName = fullName?.trim().toLowerCase() ?? ''
+
+  const sortedPrograms = useMemo(
+    () =>
+      [...programs].sort((a, b) =>
+        a.provider_name.localeCompare(b.provider_name, undefined, { sensitivity: 'base' })
+      ),
+    [programs]
+  )
+
+  const groupedPrograms = useMemo(() => {
+    const groups = new Map<string, LoyaltyProgram[]>()
+
+    for (const program of sortedPrograms) {
+      const travelerName = program.traveler_name.trim()
+      const key = travelerName || program.traveler_name
+      const entries = groups.get(key)
+      if (entries) {
+        entries.push(program)
+      } else {
+        groups.set(key, [program])
+      }
+    }
+
+    return Array.from(groups.entries())
+      .map(([travelerName, entries]) => ({ travelerName, entries }))
+      .sort((a, b) => {
+        const aIsUser = userFullName && a.travelerName.trim().toLowerCase() === userFullName
+        const bIsUser = userFullName && b.travelerName.trim().toLowerCase() === userFullName
+        if (aIsUser && !bIsUser) return -1
+        if (!aIsUser && bIsUser) return 1
+        return a.travelerName.localeCompare(b.travelerName, undefined, { sensitivity: 'base' })
+      })
+  }, [sortedPrograms, userFullName])
+
+  const hasMultipleTravelers = groupedPrograms.length > 1
 
   function nextProviderKey(providerType: ProviderType, providerName: string): string {
     const catalogMatch = providers.find(
@@ -113,7 +152,10 @@ export function LoyaltyVault({ isPro, initialPrograms, initialProviders }: Loyal
   }
 
   function openAdd() {
-    setForm(EMPTY_FORM)
+    setForm({
+      ...EMPTY_FORM,
+      traveler_name: fullName?.trim() ?? '',
+    })
     setProviderKeyTouched(false)
     setError(null)
     setAddOpen(true)
@@ -202,6 +244,79 @@ export function LoyaltyVault({ isPro, initialPrograms, initialProviders }: Loyal
     setEditOpen(false)
   }
 
+  function renderProgramCard(program: LoyaltyProgram) {
+    const logoUrl = !brokenLogoIds[program.id]
+      ? getProviderLogoUrl(program.provider_key, program.provider_type)
+      : null
+    const fallbackLetter = program.provider_name.trim().charAt(0).toUpperCase() || '?'
+
+    return (
+      <Card key={program.id}>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-md bg-slate-100 text-xs font-semibold text-slate-600">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={`${program.provider_name} logo`}
+                      className="h-6 w-6 rounded-md object-cover"
+                      onError={() =>
+                        setBrokenLogoIds((prev) => ({
+                          ...prev,
+                          [program.id]: true,
+                        }))
+                      }
+                    />
+                  ) : (
+                    fallbackLetter
+                  )}
+                </div>
+                <p className="font-semibold text-gray-900">{program.provider_name}</p>
+                <span className="text-gray-300">|</span>
+                <p className="text-gray-700">{program.traveler_name}</p>
+                <Badge variant="outline" className="capitalize">
+                  {providerLabel(program.provider_type)}
+                </Badge>
+                {program.status_tier && <Badge>{program.status_tier}</Badge>}
+                {program.preferred && program.alliance_group && program.alliance_group !== 'none' && (
+                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                    <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
+                    Preferred
+                  </Badge>
+                )}
+              </div>
+              <p className="font-mono text-sm text-gray-700">
+                {revealedIds[program.id] ? program.program_number : program.program_number_masked}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleCopy(program)}>
+                <Copy className="mr-1 h-3.5 w-3.5" />
+                Copy
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRevealedIds((prev) => ({ ...prev, [program.id]: !prev[program.id] }))}
+              >
+                {revealedIds[program.id] ? <EyeOff className="mr-1 h-3.5 w-3.5" /> : <Eye className="mr-1 h-3.5 w-3.5" />}
+                {revealedIds[program.id] ? 'Hide' : 'Reveal'}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => openEdit(program)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(program)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-4">
       {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -227,55 +342,32 @@ export function LoyaltyVault({ isPro, initialPrograms, initialProviders }: Loyal
         </div>
       )}
 
-      <div className="space-y-3">
-        {programs.map((program) => (
-          <Card key={program.id}>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-gray-900">{program.provider_name}</p>
-                    <span className="text-gray-300">|</span>
-                    <p className="text-gray-700">{program.traveler_name}</p>
-                    <Badge variant="outline" className="capitalize">
-                      {providerLabel(program.provider_type)}
-                    </Badge>
-                    {program.status_tier && <Badge>{program.status_tier}</Badge>}
-                    {program.preferred && program.alliance_group && program.alliance_group !== 'none' && (
-                      <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                        <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                        Preferred
-                      </Badge>
+      <div className="space-y-4">
+        {hasMultipleTravelers
+          ? groupedPrograms.map((group) => {
+              const isCurrentUser =
+                userFullName && group.travelerName.trim().toLowerCase() === userFullName
+              return (
+                <section key={group.travelerName} className="space-y-3">
+                  <div className="px-1">
+                    <h3 className="text-sm font-semibold text-gray-900">
+                      {isCurrentUser ? 'Your Programs' : group.travelerName}
+                    </h3>
+                    {isCurrentUser && (
+                      <p className="text-xs text-gray-500">{group.travelerName}</p>
                     )}
                   </div>
-                  <p className="font-mono text-sm text-gray-700">
-                    {revealedIds[program.id] ? program.program_number : program.program_number_masked}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => handleCopy(program)}>
-                    <Copy className="mr-1 h-3.5 w-3.5" />
-                    Copy
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setRevealedIds((prev) => ({ ...prev, [program.id]: !prev[program.id] }))}
-                  >
-                    {revealedIds[program.id] ? <EyeOff className="mr-1 h-3.5 w-3.5" /> : <Eye className="mr-1 h-3.5 w-3.5" />}
-                    {revealedIds[program.id] ? 'Hide' : 'Reveal'}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(program)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(program)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                  <div className="space-y-3">
+                    {group.entries.map((program) => renderProgramCard(program))}
+                  </div>
+                </section>
+              )
+            })
+          : (
+            <div className="space-y-3">
+              {sortedPrograms.map((program) => renderProgramCard(program))}
+            </div>
+          )}
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

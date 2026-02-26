@@ -75,11 +75,11 @@ export default async function LoyaltyProgramsPage() {
 
   const { data: planData } = await supabase
     .from('profiles')
-    .select('subscription_tier')
+    .select('subscription_tier, full_name')
     .eq('id', user.id)
     .maybeSingle()
 
-  const plan = planData as { subscription_tier?: string | null } | null
+  const plan = planData as { subscription_tier?: string | null; full_name?: string | null } | null
   const isPro = plan?.subscription_tier === 'pro'
 
   return (
@@ -102,6 +102,7 @@ export default async function LoyaltyProgramsPage() {
         <CardContent>
           <LoyaltyVault
             isPro={isPro}
+            fullName={plan?.full_name ?? null}
             initialPrograms={loyaltyData.programs}
             initialProviders={loyaltyData.providers}
           />
