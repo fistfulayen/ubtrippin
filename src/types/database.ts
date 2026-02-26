@@ -347,6 +347,93 @@ export interface Database {
           created_at?: string
         }
       }
+      feedback: {
+        Row: {
+          id: string
+          user_id: string
+          type: 'bug' | 'feature' | 'general'
+          title: string
+          body: string
+          page_url: string | null
+          status: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
+          votes: number
+          admin_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          type?: 'bug' | 'feature' | 'general'
+          title: string
+          body: string
+          page_url?: string | null
+          status?: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
+          votes?: number
+          admin_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: 'bug' | 'feature' | 'general'
+          title?: string
+          body?: string
+          page_url?: string | null
+          status?: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
+          votes?: number
+          admin_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      feedback_votes: {
+        Row: {
+          id: string
+          feedback_id: string
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feedback_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feedback_id?: string
+          user_id?: string
+          created_at?: string
+        }
+      }
+      feedback_comments: {
+        Row: {
+          id: string
+          feedback_id: string
+          user_id: string
+          body: string
+          is_team: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          feedback_id: string
+          user_id: string
+          body: string
+          is_team?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          feedback_id?: string
+          user_id?: string
+          body?: string
+          is_team?: boolean
+          created_at?: string
+        }
+      }
       extraction_corrections: {
         Row: {
           id: string
@@ -414,6 +501,9 @@ export type AuditLog = Database['public']['Tables']['audit_logs']['Row']
 export type TripPdf = Database['public']['Tables']['trip_pdfs']['Row']
 export type ExtractionExample = Database['public']['Tables']['extraction_examples']['Row']
 export type ExtractionCorrection = Database['public']['Tables']['extraction_corrections']['Row']
+export type Feedback = Database['public']['Tables']['feedback']['Row']
+export type FeedbackVote = Database['public']['Tables']['feedback_votes']['Row']
+export type FeedbackComment = Database['public']['Tables']['feedback_comments']['Row']
 
 // Trip with items for display
 export interface TripWithItems extends Trip {
