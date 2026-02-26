@@ -1,14 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Star, Pencil, Trash2, Copy, Eye, EyeOff, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Star, Pencil, Trash2, Copy, Eye, EyeOff, Plus, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
 
 type ProviderType = 'airline' | 'hotel' | 'car_rental' | 'other'
@@ -59,9 +57,74 @@ const EMPTY_FORM: LoyaltyFormState = {
   preferred: false,
 }
 
+const AIRLINE_IATA_BY_PROVIDER_KEY: Record<string, string> = {
+  delta: 'DL',
+  air_france: 'AF',
+  united: 'UA',
+  american: 'AA',
+  alaska: 'AS',
+  spirit: 'NK',
+  finnair: 'AY',
+  airbaltic: 'BT',
+  sas: 'SK',
+  la_compagnie: 'B0',
+  miles_and_more: 'LH',
+}
+
+const FALLBACK_BG_CLASSES = [
+  'bg-blue-100 text-blue-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700',
+  'bg-cyan-100 text-cyan-700',
+  'bg-indigo-100 text-indigo-700',
+]
+
 function providerLabel(type: ProviderType): string {
-  if (type === 'car_rental') return 'car'
-  return type
+  if (type === 'car_rental') return 'Car rental'
+  if (type === 'other') return 'Other'
+  return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+function hashProviderKey(value: string): number {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0
+  }
+  return hash
+}
+
+function fallbackColorClass(providerKey: string): string {
+  const hash = hashProviderKey(providerKey)
+  return FALLBACK_BG_CLASSES[hash % FALLBACK_BG_CLASSES.length]
+}
+
+function providerDomain(program: LoyaltyProgram): string | null {
+  const normalizedKey = program.provider_key.trim().toLowerCase()
+  if (normalizedKey.includes('.')) {
+    return normalizedKey
+  }
+
+  const normalizedName = program.provider_name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+
+  if (normalizedName.length === 0) {
+    return null
+  }
+
+  return `${normalizedName}.com`
+}
+
+function logoUrlForProgram(program: LoyaltyProgram): string | null {
+  if (program.provider_type === 'airline') {
+    const iata = AIRLINE_IATA_BY_PROVIDER_KEY[program.provider_key]
+    return iata ? `https://pics.avs.io/80/80/${iata}@2x.png` : null
+  }
+
+  const domain = providerDomain(program)
+  return domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : null
 }
 
 export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProviders }: LoyaltyVaultProps) {
@@ -77,14 +140,15 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
   const [editingProgram, setEditingProgram] = useState<LoyaltyProgram | null>(null)
   const [form, setForm] = useState<LoyaltyFormState>(EMPTY_FORM)
   const [providerKeyTouched, setProviderKeyTouched] = useState(false)
+  const [activeTraveler, setActiveTraveler] = useState<string>('all')
 
   const freeLimitReached = !isPro && programs.length >= 3
+  const userFullName = fullName?.trim().toLowerCase() ?? ''
 
   const providerSuggestions = useMemo(
     () => providers.filter((provider) => provider.provider_type === form.provider_type),
     [providers, form.provider_type]
   )
-  const userFullName = fullName?.trim().toLowerCase() ?? ''
 
   const sortedPrograms = useMemo(
     () =>
@@ -119,7 +183,29 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       })
   }, [sortedPrograms, userFullName])
 
-  const hasMultipleTravelers = groupedPrograms.length > 1
+  const travelerCount = groupedPrograms.length
+  const hasMultipleTravelers = travelerCount > 1
+
+  const travelerTabs = useMemo(
+    () => [
+      { id: 'all', label: 'All' },
+      ...groupedPrograms.map((group) => ({ id: group.travelerName, label: group.travelerName })),
+    ],
+    [groupedPrograms]
+  )
+
+  const visibleGroups = useMemo(() => {
+    if (activeTraveler === 'all') return groupedPrograms
+    return groupedPrograms.filter((group) => group.travelerName === activeTraveler)
+  }, [activeTraveler, groupedPrograms])
+
+  useEffect(() => {
+    if (activeTraveler === 'all') return
+    const travelerStillExists = groupedPrograms.some((group) => group.travelerName === activeTraveler)
+    if (!travelerStillExists) {
+      setActiveTraveler('all')
+    }
+  }, [activeTraveler, groupedPrograms])
 
   function nextProviderKey(providerType: ProviderType, providerName: string): string {
     const catalogMatch = providers.find(
@@ -203,7 +289,8 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       return
     }
 
-    setPrograms((prev) => [...prev, payload.data!])
+    const createdProgram = payload.data
+    setPrograms((prev) => [...prev, createdProgram])
     setSaving(false)
     setAddOpen(false)
   }
@@ -233,10 +320,11 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       return
     }
 
+    const updatedProgram = payload.data
     setPrograms((prev) =>
       prev.map((entry) =>
         entry.id === editingProgram.id
-          ? { ...entry, ...payload.data! }
+          ? { ...entry, ...updatedProgram }
           : entry
       )
     )
@@ -245,90 +333,129 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
   }
 
   function renderProgramCard(program: LoyaltyProgram) {
-    const logoUrl = !brokenLogoIds[program.id]
-      ? getProviderLogoUrl(program.provider_key, program.provider_type)
-      : null
+    const logoUrl = !brokenLogoIds[program.id] ? logoUrlForProgram(program) : null
     const fallbackLetter = program.provider_name.trim().charAt(0).toUpperCase() || '?'
 
     return (
-      <Card key={program.id}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-md bg-slate-100 text-xs font-semibold text-slate-600">
-                  {logoUrl ? (
-                    <img
-                      src={logoUrl}
-                      alt={`${program.provider_name} logo`}
-                      className="h-6 w-6 rounded-md object-cover"
-                      onError={() =>
-                        setBrokenLogoIds((prev) => ({
-                          ...prev,
-                          [program.id]: true,
-                        }))
-                      }
-                    />
-                  ) : (
-                    fallbackLetter
-                  )}
-                </div>
-                <p className="font-semibold text-gray-900">{program.provider_name}</p>
-                <span className="text-gray-300">|</span>
-                <p className="text-gray-700">{program.traveler_name}</p>
-                <Badge variant="outline" className="capitalize">
-                  {providerLabel(program.provider_type)}
-                </Badge>
-                {program.status_tier && <Badge>{program.status_tier}</Badge>}
-                {program.preferred && program.alliance_group && program.alliance_group !== 'none' && (
-                  <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
-                    <Star className="mr-1 h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-                    Preferred
-                  </Badge>
-                )}
-              </div>
-              <p className="font-mono text-sm text-gray-700">
-                {revealedIds[program.id] ? program.program_number : program.program_number_masked}
-              </p>
+      <article
+        key={program.id}
+        className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div
+              className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg text-sm font-semibold ${fallbackColorClass(program.provider_key)}`}
+            >
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`${program.provider_name} logo`}
+                  className="h-10 w-10 rounded-lg object-cover"
+                  onError={() =>
+                    setBrokenLogoIds((prev) => ({
+                      ...prev,
+                      [program.id]: true,
+                    }))
+                  }
+                />
+              ) : (
+                fallbackLetter
+              )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleCopy(program)}>
-                <Copy className="mr-1 h-3.5 w-3.5" />
-                Copy
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setRevealedIds((prev) => ({ ...prev, [program.id]: !prev[program.id] }))}
-              >
-                {revealedIds[program.id] ? <EyeOff className="mr-1 h-3.5 w-3.5" /> : <Eye className="mr-1 h-3.5 w-3.5" />}
-                {revealedIds[program.id] ? 'Hide' : 'Reveal'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => openEdit(program)}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => handleDelete(program)}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            <div className="min-w-0">
+              <p className="truncate text-lg font-semibold text-gray-900">{program.provider_name}</p>
+              <p className="truncate text-sm text-gray-500">{program.traveler_name}</p>
+              {program.status_tier && (
+                <p className="mt-1 text-xs text-gray-500">{program.status_tier}</p>
+              )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="flex shrink-0 items-center gap-1">
+            {program.preferred && (
+              <Star className="h-4 w-4 fill-amber-500 text-amber-500" aria-label="Preferred program" />
+            )}
+            {program.alliance_group && program.alliance_group !== 'none' && (
+              <Badge variant="outline" className="h-6 border-amber-200 bg-amber-50 text-amber-700">
+                {program.alliance_group}
+              </Badge>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+              onClick={() => openEdit(program)}
+              aria-label={`Edit ${program.provider_name}`}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+              onClick={() => handleDelete(program)}
+              aria-label={`Delete ${program.provider_name}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-8 flex items-end justify-between gap-4">
+          <p className="font-mono text-base text-gray-700">
+            {revealedIds[program.id] ? program.program_number : program.program_number_masked}
+          </p>
+
+          <div className="flex items-end gap-2">
+            <Badge variant="outline" className="border-0 bg-gray-50 text-xs text-gray-400">
+              {providerLabel(program.provider_type)}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs"
+              onClick={() => handleCopy(program)}
+            >
+              <Copy className="mr-1.5 h-3.5 w-3.5" />
+              Copy
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 px-2.5 text-xs"
+              onClick={() => setRevealedIds((prev) => ({ ...prev, [program.id]: !prev[program.id] }))}
+            >
+              {revealedIds[program.id] ? (
+                <EyeOff className="mr-1.5 h-3.5 w-3.5" />
+              ) : (
+                <Eye className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              {revealedIds[program.id] ? 'Hide' : 'Reveal'}
+            </Button>
+          </div>
+        </div>
+      </article>
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {copyMessage && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{copyMessage}</div>}
 
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500">Saved programs: {programs.length}</div>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Loyalty Programs</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            {programs.length} {programs.length === 1 ? 'program' : 'programs'} · {travelerCount}{' '}
+            {travelerCount === 1 ? 'traveler' : 'travelers'}
+          </p>
+        </div>
         <Button onClick={openAdd} disabled={freeLimitReached}>
           <Plus className="mr-2 h-4 w-4" />
-          Add loyalty program
+          Add program
         </Button>
-      </div>
+      </header>
 
       {freeLimitReached && (
         <p className="text-sm text-amber-700">
@@ -337,38 +464,65 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       )}
 
       {programs.length === 0 && (
-        <div className="rounded-lg border border-dashed border-[#cbd5e1] bg-[#f8fafc] p-5 text-sm text-gray-600">
-          Add your frequent flyer numbers, hotel loyalty IDs, and rental car memberships — we&apos;ll check that they&apos;re applied to your bookings.
+        <div className="flex flex-col items-center rounded-xl border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center">
+          <Award className="mb-3 h-8 w-8 text-gray-400" />
+          <p className="text-base font-medium text-gray-900">No loyalty programs yet.</p>
+          <p className="mt-2 max-w-md text-sm text-gray-500">
+            Add your frequent flyer and hotel membership numbers so we can check your bookings automatically.
+          </p>
+          <Button className="mt-5" onClick={openAdd} disabled={freeLimitReached}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add your first program
+          </Button>
         </div>
       )}
 
-      <div className="space-y-4">
-        {hasMultipleTravelers
-          ? groupedPrograms.map((group) => {
-              const isCurrentUser =
-                userFullName && group.travelerName.trim().toLowerCase() === userFullName
-              return (
-                <section key={group.travelerName} className="space-y-3">
-                  <div className="px-1">
-                    <h3 className="text-sm font-semibold text-gray-900">
-                      {isCurrentUser ? 'Your Programs' : group.travelerName}
-                    </h3>
-                    {isCurrentUser && (
-                      <p className="text-xs text-gray-500">{group.travelerName}</p>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    {group.entries.map((program) => renderProgramCard(program))}
-                  </div>
-                </section>
-              )
-            })
-          : (
-            <div className="space-y-3">
-              {sortedPrograms.map((program) => renderProgramCard(program))}
+      {hasMultipleTravelers && programs.length > 0 && (
+        <div className="sticky top-16 z-20 -mx-1 border-b border-gray-100 bg-white/95 px-1 py-3 backdrop-blur">
+          <div className="overflow-x-auto">
+            <div className="flex w-max min-w-full gap-2 pb-1">
+              {travelerTabs.map((tab) => {
+                const active = activeTraveler === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTraveler(tab.id)}
+                    className={`whitespace-nowrap rounded-full border px-4 py-1.5 text-sm transition-colors ${
+                      active
+                        ? 'border-gray-900 bg-gray-900 text-white'
+                        : 'border-gray-200 bg-white text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                )
+              })}
             </div>
-          )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {programs.length > 0 && (
+        <div className="space-y-5">
+          {visibleGroups.map((group, index) => (
+            <section key={group.travelerName} className="space-y-3">
+              {activeTraveler === 'all' && hasMultipleTravelers && (
+                <div className="flex items-center gap-3">
+                  {index > 0 && <div className="h-px flex-1 bg-gray-100" />}
+                  <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                    {group.travelerName}
+                  </p>
+                  <div className="h-px flex-1 bg-gray-100" />
+                </div>
+              )}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {group.entries.map((program) => renderProgramCard(program))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
@@ -383,19 +537,19 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
               onChange={(event) => setForm((prev) => ({ ...prev, traveler_name: event.target.value }))}
               required
             />
-              <Select
-                value={form.provider_type}
-                onChange={(event) => {
-                  setProviderKeyTouched(false)
-                  const nextType = event.target.value as ProviderType
-                  setForm((prev) => ({
-                    ...prev,
-                    provider_type: nextType,
-                    provider_name: '',
-                    provider_key: nextProviderKey(nextType, ''),
-                  }))
-                }}
-              >
+            <Select
+              value={form.provider_type}
+              onChange={(event) => {
+                setProviderKeyTouched(false)
+                const nextType = event.target.value as ProviderType
+                setForm((prev) => ({
+                  ...prev,
+                  provider_type: nextType,
+                  provider_name: '',
+                  provider_key: nextProviderKey(nextType, ''),
+                }))
+              }}
+            >
               <option value="airline">Airline</option>
               <option value="hotel">Hotel</option>
               <option value="car_rental">Car rental</option>

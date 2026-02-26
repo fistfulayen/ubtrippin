@@ -1,8 +1,6 @@
 import { headers } from 'next/headers'
-import { Award } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { LoyaltyVault } from '@/components/loyalty/loyalty-vault'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 type ProviderType = 'airline' | 'hotel' | 'car_rental' | 'other'
 
@@ -83,31 +81,13 @@ export default async function LoyaltyProgramsPage() {
   const isPro = plan?.subscription_tier === 'pro'
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Loyalty Programs</h1>
-        <p className="text-gray-600">Store membership numbers and let UBT check bookings for missing loyalty numbers.</p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Award className="h-5 w-5" />
-            Loyalty Programs
-          </CardTitle>
-          <CardDescription>
-            Add frequent flyer, hotel, and rental memberships for your travelers.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <LoyaltyVault
-            isPro={isPro}
-            fullName={plan?.full_name ?? null}
-            initialPrograms={loyaltyData.programs}
-            initialProviders={loyaltyData.providers}
-          />
-        </CardContent>
-      </Card>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <LoyaltyVault
+        isPro={isPro}
+        fullName={plan?.full_name ?? null}
+        initialPrograms={loyaltyData.programs}
+        initialProviders={loyaltyData.providers}
+      />
     </div>
   )
 }
