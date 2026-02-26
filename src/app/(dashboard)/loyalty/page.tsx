@@ -75,12 +75,12 @@ export default async function LoyaltyProgramsPage() {
 
   const { data: planData } = await supabase
     .from('profiles')
-    .select('tier, subscription_tier')
+    .select('subscription_tier')
     .eq('id', user.id)
     .maybeSingle()
 
-  const plan = planData as { tier?: string | null; subscription_tier?: string | null } | null
-  const isPro = plan?.tier === 'pro' || plan?.subscription_tier === 'pro'
+  const plan = planData as { subscription_tier?: string | null } | null
+  const isPro = plan?.subscription_tier === 'pro'
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
