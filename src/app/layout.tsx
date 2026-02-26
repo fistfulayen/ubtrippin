@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 
@@ -44,6 +45,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
         {children}
+        <Analytics />
         <ServiceWorkerRegistration />
       </body>
     </html>

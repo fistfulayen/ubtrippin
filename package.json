@@ -15,6 +15,7 @@
     "@react-pdf/renderer": "^4.3.2",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.97.0",
+    "@vercel/analytics": "^1.6.1",
     "ai": "^6.0.62",
     "canvas-confetti": "^1.9.4",
     "clsx": "^2.1.1",
