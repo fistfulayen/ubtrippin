@@ -23,7 +23,7 @@ function resolveOrigin(request: NextRequest): string {
     return `${protocol}://${host}`
   }
 
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://ubtrippin.xyz'
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 }
 
 export async function POST(request: NextRequest) {

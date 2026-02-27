@@ -46,6 +46,14 @@ function normalizeEmail(value: string | null | undefined): string | null {
   return trimmed || null
 }
 
+
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  // Stripe v20 moved subscription to invoice.parent.subscription_details
+  const sub = invoice.parent?.subscription_details?.subscription
+  if (!sub) return null
+  return typeof sub === 'string' ? sub : sub.id
+}
+
 function toStripeId(value: unknown): string | null {
   if (typeof value === 'string') {
     return value
@@ -489,7 +497,7 @@ async function handleInvoicePaid(
   invoice: Stripe.Invoice
 ) {
   const customerId = toStripeId(invoice.customer)
-  const subscriptionId = typeof ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription) === "string" ? ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription) : ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription)?.id ?? null
+  const subscriptionId = getInvoiceSubscriptionId(invoice)
   const profile = await resolveProfile(supabase, customerId, subscriptionId)
 
   if (!profile) {
@@ -525,7 +533,7 @@ async function handleInvoicePaymentFailed(
   eventCreated: number
 ) {
   const customerId = toStripeId(invoice.customer)
-  const subscriptionId = typeof ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription) === "string" ? ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription) : ((invoice as any).subscription ?? invoice.parent?.subscription_details?.subscription)?.id ?? null
+  const subscriptionId = getInvoiceSubscriptionId(invoice)
   const profile = await resolveProfile(supabase, customerId, subscriptionId)
 
   if (!profile) {

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { stripe } from '@/lib/stripe'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
 import { createClient } from '@/lib/supabase/server'
 
@@ -27,17 +28,29 @@ export async function GET() {
     )
   }
 
+  // Fetch live price data from Stripe
+  const [monthly, annual, earlyAdopter] = await Promise.all([
+    stripe.prices.retrieve(monthlyPriceId, { expand: ['product'] }),
+    stripe.prices.retrieve(annualPriceId, { expand: ['product'] }),
+    stripe.prices.retrieve(earlyAdopterPriceId, { expand: ['product'] }),
+  ])
+
   const spotsRemaining = getEarlyAdopterSpotsRemaining(proSubscriberCount)
+
+  const formatPrice = (price: typeof monthly) => ({
+    id: price.id,
+    name: typeof price.product === 'object' && 'name' in price.product ? price.product.name : price.id,
+    amount: price.unit_amount,
+    currency: price.currency,
+    interval: price.recurring?.interval ?? null,
+  })
 
   return NextResponse.json({
     prices: [
-      { id: monthlyPriceId, name: 'Monthly', amount: 299, interval: 'month' },
-      { id: annualPriceId, name: 'Annual', amount: 2499, interval: 'year' },
+      formatPrice(monthly),
+      formatPrice(annual),
       {
-        id: earlyAdopterPriceId,
-        name: 'Early Adopter',
-        amount: 1000,
-        interval: 'year',
+        ...formatPrice(earlyAdopter),
         available: spotsRemaining > 0,
         spotsRemaining,
       },
