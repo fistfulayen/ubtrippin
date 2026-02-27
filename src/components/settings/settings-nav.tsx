@@ -8,6 +8,7 @@ const items = [
   { href: '/settings', label: 'General' },
   { href: '/settings/profile', label: 'Traveler Profile' },
   { href: '/settings/family', label: 'Family' },
+  { href: '/settings/billing', label: 'Billing' },
   { href: '/settings/webhooks', label: 'Webhooks' },
 ]
 

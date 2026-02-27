@@ -1,6 +1,7 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import Link from 'next/link'
 import { Check, ChevronDown, ChevronRight, Copy, FlaskConical, Plus, RefreshCw, Trash2, WandSparkles } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -400,7 +401,13 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
     <div className="space-y-6">
       {subscriptionTier === 'free' && reachedLimit && (
         <div className="rounded-lg border border-[#cbd5e1] bg-[#ffffff] p-3 text-sm text-[#1e293b]">
-          Free tier supports 1 webhook. Upgrade to Pro for up to 10.
+          <p>Free tier supports 1 webhook. Upgrade to Pro for up to 10.</p>
+          <Link
+            href="/settings/billing"
+            className="mt-2 inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-3 py-1.5 text-sm font-medium text-[#1e293b] hover:bg-gray-50"
+          >
+            Upgrade to Pro
+          </Link>
         </div>
       )}
 
