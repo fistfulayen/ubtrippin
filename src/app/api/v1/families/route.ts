@@ -72,7 +72,7 @@ export async function GET() {
 
   const data = rows
     .map((row) => {
-      const family = Array.isArray(row.family) ? row.family[0] : null
+      const family = Array.isArray(row.family) ? row.family[0] : row.family
       if (!family) return null
       return {
         id: family.id,
