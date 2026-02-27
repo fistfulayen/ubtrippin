@@ -1,5 +1,9 @@
 export const EARLY_ADOPTER_LIMIT = 100
 
+/** Displayed prices — change here to update all UI copy. */
+export const PRICE_EARLY_ADOPTER = '$10/year'
+export const PRICE_PRO_MONTHLY = '$2.99/month'
+
 export type BillingSubscriptionTier = 'free' | 'pro' | 'grace' | 'paused'
 
 type RpcResult = {

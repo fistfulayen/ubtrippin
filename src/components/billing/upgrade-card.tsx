@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
-import { EARLY_ADOPTER_LIMIT } from '@/lib/billing'
+import { EARLY_ADOPTER_LIMIT, PRICE_EARLY_ADOPTER } from '@/lib/billing'
+import { useEarlyAdopterSpots } from '@/hooks/use-early-adopter-spots'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,10 +15,6 @@ interface UpgradeCardProps {
   variant?: 'inline' | 'card' | 'banner'
   showEarlyAdopter?: boolean
   className?: string
-}
-
-interface BillingSubscriptionPayload {
-  earlyAdopterSpotsRemaining?: number
 }
 
 function EarlyAdopterBadge({ spotsRemaining }: { spotsRemaining: number }) {
@@ -37,7 +34,7 @@ function EarlyAdopterBadge({ spotsRemaining }: { spotsRemaining: number }) {
   return (
     <div className="space-y-1.5">
       <p className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-        🎉 Early adopter: $10/year ({spotsRemaining} spots left)
+        🎉 Early adopter: {PRICE_EARLY_ADOPTER} ({spotsRemaining} spots left)
       </p>
       <div className="h-1.5 overflow-hidden rounded-full bg-indigo-100">
         <div
@@ -56,40 +53,7 @@ export function UpgradeCard({
   showEarlyAdopter = false,
   className,
 }: UpgradeCardProps) {
-  const [spotsRemaining, setSpotsRemaining] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!showEarlyAdopter) {
-      return
-    }
-
-    let active = true
-
-    async function loadSpots() {
-      try {
-        const response = await fetch('/api/v1/billing/subscription', {
-          cache: 'no-store',
-        })
-
-        if (!response.ok) {
-          return
-        }
-
-        const payload = (await response.json()) as BillingSubscriptionPayload
-        const nextSpots = payload.earlyAdopterSpotsRemaining
-        if (active && typeof nextSpots === 'number') {
-          setSpotsRemaining(nextSpots)
-        }
-      } catch {
-        // Silently fail; upsell copy still renders without the badge.
-      }
-    }
-
-    loadSpots()
-    return () => {
-      active = false
-    }
-  }, [showEarlyAdopter])
+  const spotsRemaining = useEarlyAdopterSpots(showEarlyAdopter)
 
   const badge = showEarlyAdopter && spotsRemaining !== null
     ? <EarlyAdopterBadge spotsRemaining={spotsRemaining} />

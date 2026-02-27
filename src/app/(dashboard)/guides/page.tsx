@@ -26,8 +26,7 @@ export default async function GuidesPage() {
 
   const allGuides = (guides ?? []) as CityGuide[]
   const hasGuides = allGuides.length > 0
-  const plan = planData as { subscription_tier?: string | null } | null
-  const isPro = plan?.subscription_tier === 'pro'
+  const isPro = planData?.subscription_tier === 'pro'
 
   return (
     <div className="space-y-8">

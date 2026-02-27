@@ -24,9 +24,7 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single()
 
-  const subscriptionTier = (
-    profile as { subscription_tier?: string | null } | null
-  )?.subscription_tier
+  const subscriptionTier = profile?.subscription_tier
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#ffffff]/50 to-[#f1f5f9]/30">

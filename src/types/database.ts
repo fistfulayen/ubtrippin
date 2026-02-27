@@ -22,6 +22,12 @@ export interface Database {
           calendar_token: string | null
           created_at: string
           updated_at: string
+          // Billing columns (added in 20260228000001_stripe_billing)
+          subscription_tier: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_current_period_end: string | null
+          subscription_grace_until: string | null
         }
         Insert: {
           id: string
@@ -31,6 +37,11 @@ export interface Database {
           calendar_token?: string | null
           created_at?: string
           updated_at?: string
+          subscription_tier?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_grace_until?: string | null
         }
         Update: {
           id?: string
@@ -40,6 +51,11 @@ export interface Database {
           calendar_token?: string | null
           created_at?: string
           updated_at?: string
+          subscription_tier?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_current_period_end?: string | null
+          subscription_grace_until?: string | null
         }
       }
       allowed_senders: {

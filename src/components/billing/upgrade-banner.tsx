@@ -4,6 +4,8 @@ import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { UpgradeCard } from '@/components/billing/upgrade-card'
+import { useEarlyAdopterSpots } from '@/hooks/use-early-adopter-spots'
+import { PRICE_EARLY_ADOPTER, PRICE_PRO_MONTHLY } from '@/lib/billing'
 
 const DISMISS_KEY = 'upgrade-banner-dismissed'
 const REAPPEAR_MS = 7 * 24 * 60 * 60 * 1000
@@ -12,16 +14,12 @@ interface UpgradeBannerProps {
   subscriptionTier?: string | null
 }
 
-interface BillingSubscriptionPayload {
-  earlyAdopterSpotsRemaining?: number
-}
-
 export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
   const [ready, setReady] = useState(false)
   const [dismissed, setDismissed] = useState(false)
-  const [spotsRemaining, setSpotsRemaining] = useState<number | null>(null)
 
   const isFree = useMemo(() => (subscriptionTier ?? 'free') === 'free', [subscriptionTier])
+  const spotsRemaining = useEarlyAdopterSpots(isFree && !dismissed)
 
   useEffect(() => {
     if (!isFree) {
@@ -51,46 +49,14 @@ export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
     }
   }, [isFree])
 
-  useEffect(() => {
-    if (!isFree || dismissed) {
-      return
-    }
-
-    let active = true
-
-    async function loadSpots() {
-      try {
-        const response = await fetch('/api/v1/billing/subscription', {
-          cache: 'no-store',
-        })
-        if (!response.ok) {
-          return
-        }
-
-        const payload = (await response.json()) as BillingSubscriptionPayload
-        const nextSpots = payload.earlyAdopterSpotsRemaining
-        if (active && typeof nextSpots === 'number') {
-          setSpotsRemaining(nextSpots)
-        }
-      } catch {
-        // Ignore fetch failures; fallback copy still renders.
-      }
-    }
-
-    loadSpots()
-    return () => {
-      active = false
-    }
-  }, [dismissed, isFree])
-
   if (!ready || !isFree || dismissed) {
     return null
   }
 
   const earlyAdopterAvailable = spotsRemaining === null || spotsRemaining > 0
   const title = earlyAdopterAvailable
-    ? '🎉 Early adopter pricing: $10/year for unlimited everything.'
-    : 'Upgrade to Pro - $2.99/month'
+    ? `🎉 Early adopter pricing: ${PRICE_EARLY_ADOPTER} for unlimited everything.`
+    : `Upgrade to Pro — ${PRICE_PRO_MONTHLY}`
   const description = earlyAdopterAvailable
     ? `Only ${spotsRemaining ?? '...'} spots left.`
     : ''
