@@ -1,11 +1,11 @@
 name: Agent Code Review
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [labeled]
 
 jobs:
   claude-review:
-    if: contains(github.event.pull_request.labels.*.name, 'agent-built')
+    if: github.event.label.name == 'agent-built'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -24,7 +24,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # Skip if diff is empty or too large (>5000 lines)
           LINES=$(wc -l < /tmp/diff.txt)
           if [ "$LINES" -eq 0 ]; then
             echo "Empty diff, skipping review"
@@ -37,7 +36,6 @@ jobs:
             exit 0
           fi
 
-          # Call Claude API directly (no CLI needed)
           DIFF=$(cat /tmp/diff.txt)
           REVIEW=$(curl -s https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
@@ -54,7 +52,6 @@ jobs:
                 }]
               }')" | jq -r '.content[0].text')
 
-          # Post as PR comment
           echo "🤖 **Claude Review**" > /tmp/review.md
           echo "" >> /tmp/review.md
           echo "$REVIEW" >> /tmp/review.md
