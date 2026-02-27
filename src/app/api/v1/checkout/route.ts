@@ -15,14 +15,7 @@ interface ProfileRow {
   stripe_customer_id: string | null
 }
 
-function resolveOrigin(request: NextRequest): string {
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
-  const protocol = request.headers.get('x-forwarded-proto') ?? 'https'
-
-  if (host) {
-    return `${protocol}://${host}`
-  }
-
+function resolveOrigin(): string {
   return process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 }
 
@@ -128,13 +121,22 @@ export async function POST(request: NextRequest) {
   let customerId = profile.stripe_customer_id
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: profile.email ?? user.email ?? undefined,
-      name: profile.full_name ?? undefined,
-      metadata: {
-        user_id: user.id,
-      },
-    })
+    let customer
+    try {
+      customer = await stripe.customers.create({
+        email: profile.email ?? user.email ?? undefined,
+        name: profile.full_name ?? undefined,
+        metadata: {
+          user_id: user.id,
+        },
+      })
+    } catch (error) {
+      console.error('[v1/checkout] Stripe customer creation failed:', error)
+      return NextResponse.json(
+        { error: { code: 'stripe_error', message: 'Failed to create Stripe customer.' } },
+        { status: 502 }
+      )
+    }
 
     customerId = customer.id
 
@@ -152,8 +154,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const origin = resolveOrigin(request)
-  const session = await stripe.checkout.sessions.create({
+  const origin = resolveOrigin()
+
+  let session
+  try {
+    session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
     client_reference_id: user.id,
@@ -161,7 +166,14 @@ export async function POST(request: NextRequest) {
     success_url: `${origin}/settings/billing?upgraded=true`,
     cancel_url: `${origin}/settings/billing`,
     allow_promotion_codes: true,
-  })
+    })
+  } catch (error) {
+    console.error('[v1/checkout] Stripe checkout session creation failed:', error)
+    return NextResponse.json(
+      { error: { code: 'stripe_error', message: 'Failed to create checkout session.' } },
+      { status: 502 }
+    )
+  }
 
   if (!session.url) {
     return NextResponse.json(

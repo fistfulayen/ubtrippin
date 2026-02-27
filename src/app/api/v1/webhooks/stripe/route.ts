@@ -402,7 +402,9 @@ async function handleSubscriptionUpdated(
       stripe_customer_id: customerId ?? undefined,
       stripe_subscription_id: subscription.id,
       subscription_current_period_end: unixSecondsToIso(subscription.items.data[0]?.current_period_end),
-      subscription_grace_until: nextTier === 'grace' ? undefined : null,
+      subscription_grace_until: nextTier === 'grace'
+        ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3-day grace period
+        : null,
     },
     'customer.subscription.updated'
   )

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createClient } from '@/lib/supabase/server'
 
@@ -6,18 +6,11 @@ interface ProfileRow {
   stripe_customer_id: string | null
 }
 
-function resolveOrigin(request: NextRequest): string {
-  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
-  const protocol = request.headers.get('x-forwarded-proto') ?? 'https'
-
-  if (host) {
-    return `${protocol}://${host}`
-  }
-
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://ubtrippin.xyz'
+function resolveOrigin(): string {
+  return process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -53,11 +46,19 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const origin = resolveOrigin(request)
-  const session = await stripe.billingPortal.sessions.create({
-    customer: profile.stripe_customer_id,
-    return_url: `${origin}/settings/billing`,
-  })
+  const origin = resolveOrigin()
 
-  return NextResponse.json({ url: session.url })
+  try {
+    const session = await stripe.billingPortal.sessions.create({
+      customer: profile.stripe_customer_id,
+      return_url: `${origin}/settings/billing`,
+    })
+    return NextResponse.json({ url: session.url })
+  } catch (error) {
+    console.error('[v1/billing/portal] Stripe API error:', error)
+    return NextResponse.json(
+      { error: { code: 'stripe_error', message: 'Failed to create portal session.' } },
+      { status: 502 }
+    )
+  }
 }
