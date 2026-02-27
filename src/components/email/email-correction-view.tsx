@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Mail, FileText, Shield } from 'lucide-react'
@@ -162,7 +163,12 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
           <CardContent>
             {email.parse_error && (
               <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-                {email.parse_error}
+                <p>{email.parse_error}</p>
+                {email.parse_error.includes('Upgrade to Pro') && (
+                  <Link href="/settings/billing" className="mt-2 inline-block font-medium underline underline-offset-2">
+                    Upgrade in Billing
+                  </Link>
+                )}
               </div>
             )}
 

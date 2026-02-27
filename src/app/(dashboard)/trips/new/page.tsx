@@ -54,9 +54,8 @@ export default async function NewTripPage() {
             >
               Back to trips
             </Link>
-            {/* Upgrade link placeholder — wire up Stripe when billing is ready */}
             <Link
-              href="/settings"
+              href="/settings/billing"
               className="inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-medium text-[#1e293b] hover:bg-[#ffffff]"
             >
               Upgrade to Pro

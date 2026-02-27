@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { Star, Pencil, Trash2, Copy, Eye, EyeOff, Plus, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -458,9 +459,12 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       </header>
 
       {freeLimitReached && (
-        <p className="text-sm text-amber-700">
-          Free tier supports 3 loyalty programs. Upgrade to Pro for unlimited.
-        </p>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p>Free tier supports 3 loyalty programs. Upgrade to Pro for unlimited.</p>
+          <Link href="/settings/billing" className="font-medium underline underline-offset-2">
+            Upgrade to Pro
+          </Link>
+        </div>
       )}
 
       {programs.length === 0 && (

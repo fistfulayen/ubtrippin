@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { User, Users, UserPlus, Trash2, Loader2, AlertTriangle } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -343,7 +344,13 @@ export function FamilySettings({ currentUserId, subscriptionTier }: FamilySettin
               </form>
             ) : (
               <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#1e293b]">
-                Family sharing is a Pro feature. Upgrade to Pro to create a family and invite members.
+                <p>Family sharing is a Pro feature. Upgrade to Pro to create a family and invite members.</p>
+                <Link
+                  href="/settings/billing"
+                  className="mt-3 inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#1e293b] hover:bg-gray-50"
+                >
+                  Upgrade to Pro
+                </Link>
               </div>
             )}
 
