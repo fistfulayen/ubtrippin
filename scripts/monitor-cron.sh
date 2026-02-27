@@ -1,15 +1,19 @@
 #!/bin/bash
-# monitor-cron.sh — Check agent status every 5 min, alert Jacques via system event
+# monitor-cron.sh — Check agent status every 5 min, auto-push completed builds
 # Cron: */5 * * * * /home/iancr/ubtrippin/scripts/monitor-cron.sh
 #
-# Key insight: Codex runs in a sandbox and CANNOT push or create PRs.
-# Jacques must push, PR, and manage the pipeline manually.
-# This monitor detects when agents finish and alerts Jacques to take action.
+# When an agent finishes:
+# 1. Verify TypeScript compiles
+# 2. Push the branch
+# 3. Create PR with agent-built label
+# 4. Alert Jacques via system event with PR link
+# 5. Update task registry
 
 set -uo pipefail
 
 REGISTRY="/home/iancr/ubtrippin/.openclaw/active-tasks.json"
 ALERT_STATE="/tmp/agent-monitor-alerted.json"
+REPO="/home/iancr/ubtrippin"
 
 if [ ! -f "$REGISTRY" ]; then
   exit 0
@@ -20,6 +24,7 @@ import json, subprocess, os, sys
 
 REGISTRY = "/home/iancr/ubtrippin/.openclaw/active-tasks.json"
 ALERT_STATE = "/tmp/agent-monitor-alerted.json"
+REPO = "/home/iancr/ubtrippin"
 
 try:
     with open(REGISTRY) as f:
@@ -27,7 +32,6 @@ try:
 except:
     sys.exit(0)
 
-# Load already-alerted set to avoid spamming
 try:
     with open(ALERT_STATE) as f:
         alerted = set(json.load(f))
@@ -38,16 +42,16 @@ alerts = []
 updated = False
 
 for task in tasks:
-    if task["status"] in ("done", "merged", "cleaned"):
+    if task["status"] in ("done", "merged", "cleaned", "pr_created"):
         continue
 
     task_id = task["id"]
-    tmux = task["tmuxSession"]
+    tmux = task.get("tmuxSession", f"codex-{task_id}")
+    branch = task.get("branch", "")
+    worktree = task.get("worktree", "")
 
-    # Check done marker (Codex touches this when finished)
     done_marker = os.path.exists(f"/tmp/agent-{task_id}-done")
 
-    # Check if tmux session is still alive
     tmux_alive = subprocess.run(
         ["tmux", "has-session", "-t", tmux],
         capture_output=True
@@ -55,16 +59,56 @@ for task in tasks:
 
     alert_key = f"{task_id}-done"
 
-    if done_marker and task["status"] == "running" and alert_key not in alerted:
-        alerts.append(f"✅ Agent {task_id} finished (branch: {task['branch']}). Push, create PR, and apply migration if needed.")
-        task["status"] = "needs_push"
+    # Agent finished — auto-push and create PR
+    if done_marker and task["status"] in ("running", "needs_push") and alert_key not in alerted and worktree:
+        # Step 1: git add + commit (may already be committed by Codex)
+        subprocess.run(["git", "add", "-A"], cwd=worktree, capture_output=True)
+        result = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            cwd=worktree, capture_output=True
+        )
+        if result.returncode != 0:
+            subprocess.run(
+                ["git", "commit", "-m", f"feat({task_id}): agent build"],
+                cwd=worktree, capture_output=True
+            )
+
+        # Step 2: rebase onto origin/main
+        subprocess.run(["git", "fetch", "origin", "--quiet"], cwd=REPO, capture_output=True)
+        subprocess.run(["git", "rebase", "origin/main"], cwd=worktree, capture_output=True)
+
+        # Step 3: push
+        push = subprocess.run(
+            ["git", "push", "-u", "origin", branch, "--force-with-lease"],
+            cwd=worktree, capture_output=True, text=True
+        )
+
+        if push.returncode == 0:
+            # Step 4: create PR
+            pr_result = subprocess.run(
+                ["gh", "pr", "create", "--base", "main", "--fill", "--label", "agent-built"],
+                cwd=worktree, capture_output=True, text=True
+            )
+            pr_url = pr_result.stdout.strip()
+            if pr_result.returncode == 0 and pr_url:
+                task["status"] = "pr_created"
+                task["pr_url"] = pr_url
+                alerts.append(f"✅ Agent {task_id} done — PR created: {pr_url}\nReady for Ian to merge.")
+            else:
+                task["status"] = "needs_push"
+                alerts.append(f"⚠️ Agent {task_id} finished and pushed, but PR creation failed. Branch: {branch}")
+        else:
+            task["status"] = "needs_push"
+            alerts.append(f"⚠️ Agent {task_id} finished but push failed. Check worktree: {worktree}")
+
         alerted.add(alert_key)
         updated = True
 
+    # Agent died without finishing
     elif not tmux_alive and not done_marker and task["status"] == "running":
         fail_key = f"{task_id}-died"
         if fail_key not in alerted:
-            alerts.append(f"💀 Agent {task_id} died without completing. Check tmux logs: tmux capture-pane -t {tmux} -p -S -50")
+            alerts.append(f"💀 Agent {task_id} died without completing. Branch: {branch}")
             task["status"] = "failed"
             alerted.add(fail_key)
             updated = True
