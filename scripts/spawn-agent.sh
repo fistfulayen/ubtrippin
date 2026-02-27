@@ -50,9 +50,8 @@ tmux new-session -d -s "$TMUX_SESSION" -c "$WORKTREE_DIR" \
 When completely finished:
 1. Run: npx tsc --noEmit
 2. If clean, commit all changes with a descriptive message
-3. Run: git push -u origin $BRANCH
-4. Run: gh pr create --base main --fill --label agent-built
-5. Touch /tmp/agent-${TASK_ID}-done
+3. Touch /tmp/agent-${TASK_ID}-done
+NOTE: Do NOT attempt git push or gh pr create — you are in a sandbox without network access. Jacques will handle push and PR after you finish.
 '; echo 'Agent exited. Press enter to close.'; read"
 
 # Register task
