@@ -7,7 +7,7 @@ import Image from 'next/image'
 
 function LoginContent() {
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/trips'
+  const redirectTo = searchParams.get('redirectTo') || searchParams.get('redirect') || '/trips'
 
   const handleGoogleLogin = async () => {
     const supabase = createClient()

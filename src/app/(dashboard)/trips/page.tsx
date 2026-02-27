@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
 import { sendWelcomeEmail } from './actions'
 import { Button } from '@/components/ui/button'
-import { Plus, Mail, MapPin } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function TripsPage() {
@@ -38,20 +39,21 @@ export default async function TripsPage() {
     .select('*, trip_items(id, kind, needs_review, provider, details_json)')
     .order('start_date', { ascending: true })
 
-  // Fetch shared trips (trips where user is a collaborator, not owner)
-  const { data: sharedCollabs } = user
-    ? await supabase
-        .from('trip_collaborators')
-        .select('trip_id, role, inviter:profiles!invited_by (full_name, email)')
-        .eq('user_id', user.id)
-        .not('accepted_at', 'is', null)
-    : { data: null }
+  const ownerIds = Array.from(
+    new Set((trips ?? []).map((trip) => trip.user_id).filter((ownerId) => ownerId && ownerId !== user?.id))
+  )
 
-  // Build a map of trip_id → inviter name for "Shared by" labels
-  const sharedTripMap = new Map<string, string>()
-  for (const collab of sharedCollabs ?? []) {
-    const inv = collab.inviter as { full_name?: string; email?: string } | null
-    sharedTripMap.set(collab.trip_id, inv?.full_name || inv?.email || 'someone')
+  const ownerNameMap = new Map<string, string>()
+  if (ownerIds.length > 0) {
+    const secret = createSecretClient()
+    const { data: ownerProfiles } = await secret
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', ownerIds)
+
+    for (const owner of (ownerProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
+      ownerNameMap.set(owner.id, owner.full_name || owner.email || 'Shared')
+    }
   }
 
   // All owned trip IDs (to distinguish shared)
@@ -129,8 +131,7 @@ export default async function TripsPage() {
                       needsReview={
                         !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
                       }
-                      isShared={shared}
-                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                      ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
                     />
                   )
                 })}
@@ -155,8 +156,7 @@ export default async function TripsPage() {
                       needsReview={
                         !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
                       }
-                      isShared={shared}
-                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                      ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
                     />
                   )
                 })}
@@ -180,8 +180,7 @@ export default async function TripsPage() {
                       itemCount={trip.trip_items?.length ?? 0}
                       needsReview={false}
                       isPast
-                      isShared={shared}
-                      sharedByName={shared ? sharedTripMap.get(trip.id) : undefined}
+                      ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
                     />
                   )
                 })}
