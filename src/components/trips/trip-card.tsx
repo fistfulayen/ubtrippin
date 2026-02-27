@@ -39,12 +39,12 @@ function getAirlineLogos(items?: TripItem[]): string[] {
     const details = item.details_json as Record<string, unknown> | null
     const flightNumber = details?.flight_number as string | undefined
 
-    const logoUrl = airline ? getProviderLogoUrl(airline, 'flight') : null
-    // Try flight number as provider name, then extract IATA code from it
-    const logoFromFlight = !logoUrl && flightNumber ? getProviderLogoUrl(flightNumber, 'flight') : null
-    const iataCode = !logoUrl && !logoFromFlight && flightNumber ? extractAirlineCode(flightNumber) : null
-    const logoFromIata = iataCode ? getProviderLogoUrl(iataCode, 'flight') : null
-    const url = logoUrl || logoFromFlight || logoFromIata
+    // Best strategy: extract IATA from flight number (e.g. "AF1234" → "AF")
+    const iataCode = flightNumber ? extractAirlineCode(flightNumber) : null
+    const logoFromIata = iataCode ? `https://pics.avs.io/80/80/${iataCode}@2x.png` : null
+    // Fallback: try provider name lookup
+    const logoFromProvider = !logoFromIata && airline ? getProviderLogoUrl(airline, 'flight') : null
+    const url = logoFromIata || logoFromProvider
 
     if (url && !seen.has(url)) {
       seen.add(url)

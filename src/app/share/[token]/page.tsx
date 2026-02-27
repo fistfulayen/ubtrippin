@@ -17,6 +17,7 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
+import { extractAirlineCode } from '@/lib/images/airline-logo'
 import { AirlineLogoIcon } from './airline-logo-icon'
 import type { TripItem, TripItemKind } from '@/types/database'
 
@@ -73,13 +74,13 @@ function TripItemRow({ item }: { item: TripItem }) {
     item.start_location && item.end_location
       ? `${item.start_location} → ${item.end_location}`
       : item.start_location || item.end_location || null
-  const airlineLogoUrl = item.kind === 'flight' && item.provider
-    ? getProviderLogoUrl(item.provider, item.kind)
-    : null
-
   // Extract flight details from details_json
   const details = item.details_json as Record<string, unknown> | null
   const flightNumber = details?.flight_number as string | undefined
+  const iataCode = flightNumber ? extractAirlineCode(flightNumber) : null
+  const airlineLogoUrl = item.kind === 'flight'
+    ? (iataCode ? `https://pics.avs.io/80/80/${iataCode}@2x.png` : (item.provider ? getProviderLogoUrl(item.provider, item.kind) : null))
+    : null
   const departureTime = details?.departure_local_time as string | undefined
   const arrivalTime = details?.arrival_local_time as string | undefined
   const departureStation = details?.departure_station as string | undefined || details?.departure_airport as string | undefined
