@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createSecretClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -23,6 +24,11 @@ import { DeleteGuideButton } from './delete-guide-button'
 interface GuidePageProps {
   params: Promise<{ id: string }>
   searchParams: Promise<{ filter?: string }>
+}
+
+type GuideEntryWithAuthor = GuideEntry & {
+  author_id?: string | null
+  author_name?: string | null
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -63,7 +69,48 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
     .eq('guide_id', id)
     .order('created_at', { ascending: false })
 
-  const entries = (allEntries ?? []) as GuideEntry[]
+  const rawEntries = (allEntries ?? []) as GuideEntryWithAuthor[]
+  const authorIds = Array.from(
+    new Set(
+      rawEntries
+        .map((entry) =>
+          typeof entry.author_id === 'string' && entry.author_id
+            ? entry.author_id
+            : entry.user_id
+        )
+        .filter((authorId): authorId is string => typeof authorId === 'string' && authorId.length > 0)
+    )
+  )
+
+  const authorNameById = new Map<string, string | null>()
+  if (authorIds.length > 0) {
+    const secret = createSecretClient()
+    const { data: authorProfiles } = await secret
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', authorIds)
+
+    for (const profile of (authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
+      authorNameById.set(profile.id, profile.full_name || profile.email || null)
+    }
+  }
+
+  const entries = rawEntries.map((entry) => {
+    const authorId =
+      typeof entry.author_id === 'string' && entry.author_id
+        ? entry.author_id
+        : entry.user_id
+    const explicitAuthorName =
+      typeof entry.author_name === 'string' && entry.author_name.trim()
+        ? entry.author_name
+        : null
+
+    return {
+      ...entry,
+      author_id: authorId,
+      author_name: explicitAuthorName || authorNameById.get(authorId) || null,
+    }
+  })
 
   // Split visited vs to_try
   const showToTry = filter === 'to-try'
@@ -80,6 +127,8 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
 
   const toTryCount = entries.filter((e) => e.status === 'to_try').length
   const visitedCount = entries.filter((e) => e.status === 'visited').length
+  const hasMultipleAuthors =
+    new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
 
   const flag = g.country_code
     ? String.fromCodePoint(
@@ -203,7 +252,12 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
               </h2>
               <div className="space-y-3">
                 {catEntries.map((entry) => (
-                  <EntryCard key={entry.id} entry={entry} guideId={id} />
+                  <EntryCard
+                    key={entry.id}
+                    entry={entry}
+                    guideId={id}
+                    showAuthorAttribution={hasMultipleAuthors}
+                  />
                 ))}
               </div>
             </section>
@@ -235,7 +289,15 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   )
 }
 
-function EntryCard({ entry, guideId }: { entry: GuideEntry; guideId: string }) {
+function EntryCard({
+  entry,
+  guideId,
+  showAuthorAttribution,
+}: {
+  entry: GuideEntryWithAuthor
+  guideId: string
+  showAuthorAttribution: boolean
+}) {
   return (
     <div
       className={`rounded-xl border bg-white p-4 ${
@@ -268,6 +330,9 @@ function EntryCard({ entry, guideId }: { entry: GuideEntry; guideId: string }) {
           )}
 
           <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-400">
+            {showAuthorAttribution && (
+              <span className="text-gray-500">Added by {entry.author_name || 'Traveler'}</span>
+            )}
             {entry.address && (
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />

@@ -8,6 +8,11 @@ interface Props {
   params: Promise<{ token: string }>
 }
 
+type GuideEntryWithAuthor = GuideEntry & {
+  author_id?: string | null
+  author_name?: string | null
+}
+
 const CATEGORY_ICONS: Record<string, string> = {
   Coffee: '☕',
   Restaurants: '🍽️',
@@ -46,7 +51,49 @@ export default async function PublicGuidePage({ params }: Props) {
     .eq('guide_id', g.id)
     .order('created_at', { ascending: false })
 
-  const entries = (allEntries ?? []) as GuideEntry[]
+  const rawEntries = (allEntries ?? []) as GuideEntryWithAuthor[]
+  const authorIds = Array.from(
+    new Set(
+      rawEntries
+        .map((entry) =>
+          typeof entry.author_id === 'string' && entry.author_id
+            ? entry.author_id
+            : entry.user_id
+        )
+        .filter((authorId): authorId is string => typeof authorId === 'string' && authorId.length > 0)
+    )
+  )
+
+  const authorNameById = new Map<string, string | null>()
+  if (authorIds.length > 0) {
+    const { data: authorProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, email')
+      .in('id', authorIds)
+
+    for (const profile of (authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
+      authorNameById.set(profile.id, profile.full_name || profile.email || null)
+    }
+  }
+
+  const entries = rawEntries.map((entry) => {
+    const authorId =
+      typeof entry.author_id === 'string' && entry.author_id
+        ? entry.author_id
+        : entry.user_id
+    const explicitAuthorName =
+      typeof entry.author_name === 'string' && entry.author_name.trim()
+        ? entry.author_name
+        : null
+
+    return {
+      ...entry,
+      author_id: authorId,
+      author_name: explicitAuthorName || authorNameById.get(authorId) || null,
+    }
+  })
+  const hasMultipleAuthors =
+    new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
 
   // Group visited entries by category; separate to_try section
   const visited = entries.filter((e) => e.status === 'visited')
@@ -116,7 +163,7 @@ export default async function PublicGuidePage({ params }: Props) {
             </h2>
             <div className="space-y-4">
               {catEntries.map((entry) => (
-                <PublicEntryCard key={entry.id} entry={entry} />
+                <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
               ))}
             </div>
           </section>
@@ -131,7 +178,7 @@ export default async function PublicGuidePage({ params }: Props) {
             </h2>
             <div className="space-y-4">
               {toTry.map((entry) => (
-                <PublicEntryCard key={entry.id} entry={entry} />
+                <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
               ))}
             </div>
           </section>
@@ -156,7 +203,13 @@ export default async function PublicGuidePage({ params }: Props) {
   )
 }
 
-function PublicEntryCard({ entry }: { entry: GuideEntry }) {
+function PublicEntryCard({
+  entry,
+  showAuthorAttribution,
+}: {
+  entry: GuideEntryWithAuthor
+  showAuthorAttribution: boolean
+}) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
@@ -177,6 +230,9 @@ function PublicEntryCard({ entry }: { entry: GuideEntry }) {
           )}
 
           <div className="mt-3 flex flex-wrap gap-3 text-sm text-gray-400">
+            {showAuthorAttribution && (
+              <span className="text-gray-500">Added by {entry.author_name || 'Traveler'}</span>
+            )}
             {entry.address && (
               <span className="flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5" />

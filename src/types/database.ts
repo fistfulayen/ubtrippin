@@ -588,6 +588,8 @@ export interface GuideEntry {
   rating: number | null
   recommended_by: string | null
   recommended_by_user_id: string | null
+  author_id: string | null
+  author_name: string | null
   tags: string[]
   source: GuideEntrySource
   source_url: string | null

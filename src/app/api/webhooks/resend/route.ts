@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
 import { getResendClient } from '@/lib/resend/client'
-import { extractTravelData } from '@/lib/ai/extract-travel-data'
+import { extractTravelData, type ExtractedItem } from '@/lib/ai/extract-travel-data'
 import { extractTextFromPdf } from '@/lib/pdf/parse-attachment'
 import {
   assignToTrip,
@@ -24,6 +24,16 @@ import { resolveProviderKey } from '@/lib/loyalty-matching'
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
+
+interface TripCandidate {
+  id: string
+  user_id: string
+  title: string
+  start_date: string | null
+  end_date: string | null
+  primary_location: string | null
+  travelers: string[]
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -297,11 +307,18 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      // Get user's existing trips for assignment
+      // Get sender's existing trips for assignment
       const { data: existingTrips } = await supabase
         .from('trips')
-        .select('id, title, start_date, end_date, primary_location')
+        .select('id, user_id, title, start_date, end_date, primary_location, travelers')
         .eq('user_id', userId)
+
+      // Also load family member trips for cross-family routing fallback.
+      const familyTrips = await getFamilyTripCandidates(supabase, userId)
+
+      const ownedTrips = (existingTrips ?? []) as TripCandidate[]
+      const allTripCandidates = [...ownedTrips, ...familyTrips]
+      const tripById = new Map(allTripCandidates.map((trip) => [trip.id, trip]))
 
       // Process extracted items - all items from same email go to same trip
       const createdItems: { tripId: string; itemId: string }[] = []
@@ -309,14 +326,29 @@ export async function POST(request: NextRequest) {
 
       // Determine trip assignment using the first item, then use same trip for all
       let emailTripId: string | null = null
+      let emailTripOwnerId: string | null = null
+      let familyTripMatch: TripCandidate | null | undefined = undefined
 
       for (const item of extractionResult.items) {
         let tripId: string | null = emailTripId
+        let tripOwnerId: string | null = emailTripOwnerId
 
         // Only determine assignment for first item - all others go to same trip
         if (!tripId) {
-          const assignment = assignToTrip(item, existingTrips || [])
+          const assignment = assignToTrip(item, ownedTrips)
           tripId = assignment.tripId
+          tripOwnerId = tripId ? userId : null
+
+          // No own-trip match: try matching family-member trips before creating a new trip.
+          if (!tripId) {
+            if (familyTripMatch === undefined) {
+              familyTripMatch = await findMatchingFamilyTrip(extractionResult.items, familyTrips)
+            }
+            if (familyTripMatch) {
+              tripId = familyTripMatch.id
+              tripOwnerId = familyTripMatch.user_id
+            }
+          }
 
           // Create new trip if needed
           if (!tripId) {
@@ -350,6 +382,7 @@ export async function POST(request: NextRequest) {
             }
 
             tripId = newTrip.id
+            tripOwnerId = userId
 
             // Track activation milestone (idempotent)
             trackTripCreated(userId).catch((err) =>
@@ -380,22 +413,28 @@ export async function POST(request: NextRequest) {
             }
 
             // Add to existing trips for future emails
-            existingTrips?.push({
+            const insertedTrip: TripCandidate = {
               id: newTrip.id,
+              user_id: userId,
               title: newTrip.title,
               start_date: newTrip.start_date,
               end_date: newTrip.end_date,
               primary_location: newTrip.primary_location,
-            })
+              travelers: newTrip.travelers || [],
+            }
+            ownedTrips.push(insertedTrip)
+            tripById.set(newTrip.id, insertedTrip)
           }
 
           // Remember this trip for all subsequent items from this email
           emailTripId = tripId
+          emailTripOwnerId = tripOwnerId
         }
 
         // Track items per trip for date updates
         // tripId is guaranteed non-null here (created above if it was null)
         const confirmedTripId = tripId!
+        const confirmedTripOwnerId = tripOwnerId || userId
         if (!tripsToUpdate.has(confirmedTripId)) {
           tripsToUpdate.set(confirmedTripId, { items: [] })
         }
@@ -405,7 +444,7 @@ export async function POST(request: NextRequest) {
         const { data: tripItem, error: itemError } = await supabase
           .from('trip_items')
           .insert({
-            user_id: userId,
+            user_id: confirmedTripOwnerId,
             trip_id: confirmedTripId,
             kind: item.kind,
             provider: item.provider,
@@ -433,7 +472,7 @@ export async function POST(request: NextRequest) {
         }
 
         await applyEmailLoyaltyFlag({
-          userId,
+          userId: confirmedTripOwnerId,
           tripItemId: tripItem.id,
           providerName: item.provider,
           rawEmailText: `${fullEmail.subject || ''}\n${fullEmail.text || ''}\n${attachmentText || ''}`,
@@ -444,7 +483,7 @@ export async function POST(request: NextRequest) {
 
       // Update trip dates and info for affected trips
       for (const [tripId, { items }] of tripsToUpdate) {
-        const trip = existingTrips?.find((t) => t.id === tripId)
+        const trip = tripById.get(tripId)
         if (!trip) continue
 
         const newDates = items.reduce(
@@ -539,6 +578,170 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+const FAMILY_TRIP_GAP_TOLERANCE_DAYS = 1
+
+function toDateStartUtcMs(date: string): number {
+  return Date.parse(`${date}T00:00:00Z`)
+}
+
+function rangesOverlapWithTolerance(
+  startA: string | null,
+  endA: string | null,
+  startB: string | null,
+  endB: string | null
+): boolean {
+  if (!startA || !startB) return false
+
+  const toleranceMs = FAMILY_TRIP_GAP_TOLERANCE_DAYS * ONE_DAY_MS
+  const aStart = toDateStartUtcMs(startA) - toleranceMs
+  const aEnd = toDateStartUtcMs(endA || startA) + toleranceMs
+  const bStart = toDateStartUtcMs(startB) - toleranceMs
+  const bEnd = toDateStartUtcMs(endB || startB) + toleranceMs
+
+  return aStart <= bEnd && aEnd >= bStart
+}
+
+function normalizeLocationForMatch(raw: string | null | undefined): string | null {
+  if (!raw) return null
+
+  const normalized = raw
+    .toLowerCase()
+    .replace(/\([a-z]{3}\)/g, ' ')
+    .replace(/^[a-z]{3}\s*[-–]\s*/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalized || null
+}
+
+function normalizeTravelerName(raw: string): string {
+  return raw.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+function countSharedTravelers(emailTravelers: Set<string>, tripTravelers: string[]): number {
+  let shared = 0
+  for (const traveler of tripTravelers) {
+    const normalized = normalizeTravelerName(traveler)
+    if (normalized && emailTravelers.has(normalized)) {
+      shared += 1
+    }
+  }
+  return shared
+}
+
+async function findMatchingFamilyTrip(
+  items: ExtractedItem[],
+  familyTrips: TripCandidate[]
+): Promise<TripCandidate | null> {
+  if (items.length === 0 || familyTrips.length === 0) return null
+
+  const emailTravelers = new Set(
+    collectTravelerNames(items)
+      .map((name) => normalizeTravelerName(name))
+      .filter((name) => !!name)
+  )
+  if (emailTravelers.size === 0) return null
+
+  const emailStartDate = items
+    .map((item) => item.start_date)
+    .sort()[0] || null
+  const emailEndDate = items
+    .map((item) => item.end_date || item.start_date)
+    .sort()
+    .slice(-1)[0] || emailStartDate
+
+  const destinationTokens = new Set<string>()
+  for (const item of items) {
+    const rawLocation = item.end_location || item.start_location
+    if (!rawLocation) continue
+
+    const normalizedCity = await locationToCityAsync(rawLocation)
+    const token = normalizeLocationForMatch(normalizedCity || rawLocation)
+    if (token) destinationTokens.add(token)
+  }
+  if (destinationTokens.size === 0) return null
+
+  let best: { trip: TripCandidate; shared: number; startDistance: number } | null = null
+
+  for (const trip of familyTrips) {
+    if (!rangesOverlapWithTolerance(emailStartDate, emailEndDate, trip.start_date, trip.end_date)) {
+      continue
+    }
+
+    const tripLocationToken = normalizeLocationForMatch(trip.primary_location)
+    if (!tripLocationToken || !destinationTokens.has(tripLocationToken)) {
+      continue
+    }
+
+    const sharedTravelers = countSharedTravelers(emailTravelers, trip.travelers || [])
+    if (sharedTravelers <= 0) continue
+
+    const startDistance =
+      emailStartDate && trip.start_date
+        ? Math.abs(toDateStartUtcMs(emailStartDate) - toDateStartUtcMs(trip.start_date))
+        : Number.MAX_SAFE_INTEGER
+
+    if (
+      !best ||
+      sharedTravelers > best.shared ||
+      (sharedTravelers === best.shared && startDistance < best.startDistance)
+    ) {
+      best = {
+        trip,
+        shared: sharedTravelers,
+        startDistance,
+      }
+    }
+  }
+
+  return best?.trip ?? null
+}
+
+async function getFamilyTripCandidates(
+  supabase: ReturnType<typeof createSecretClient>,
+  userId: string
+): Promise<TripCandidate[]> {
+  const { data: userMembershipRows } = await supabase
+    .from('family_members')
+    .select('family_id')
+    .eq('user_id', userId)
+    .not('accepted_at', 'is', null)
+
+  const familyIds = Array.from(
+    new Set(
+      (userMembershipRows ?? [])
+        .map((row) => (row as { family_id?: string }).family_id)
+        .filter((familyId): familyId is string => typeof familyId === 'string' && familyId.length > 0)
+    )
+  )
+  if (familyIds.length === 0) return []
+
+  const { data: relatedMemberRows } = await supabase
+    .from('family_members')
+    .select('user_id')
+    .in('family_id', familyIds)
+    .not('accepted_at', 'is', null)
+    .neq('user_id', userId)
+
+  const relatedUserIds = Array.from(
+    new Set(
+      (relatedMemberRows ?? [])
+        .map((row) => (row as { user_id?: string | null }).user_id)
+        .filter((memberId): memberId is string => typeof memberId === 'string' && memberId.length > 0)
+    )
+  )
+  if (relatedUserIds.length === 0) return []
+
+  const { data: familyTripRows } = await supabase
+    .from('trips')
+    .select('id, user_id, title, start_date, end_date, primary_location, travelers')
+    .in('user_id', relatedUserIds)
+
+  return (familyTripRows ?? []) as TripCandidate[]
 }
 
 interface LoyaltySignupMatch {
