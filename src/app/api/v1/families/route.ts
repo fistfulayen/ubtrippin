@@ -164,7 +164,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { error: memberError } = await supabase
+  // Use service client for bootstrap member — RLS requires being an admin of the
+  // family to insert, but no members exist yet (chicken-and-egg).
+  const secret = createSecretClient()
+  const { error: memberError } = await secret
     .from('family_members')
     .insert({
       family_id: family.id,
