@@ -1,41 +1,15 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 const EARLY_ADOPTER_LIMIT = 100
 
-interface BillingSubscriptionResponse {
-  earlyAdopterSpotsRemaining?: number
+interface EarlyAdopterCounterProps {
+  /** Spots remaining, sourced from the parent's already-fetched subscription data. */
+  spotsRemaining: number | null
 }
 
-export function EarlyAdopterCounter() {
-  const [spotsRemaining, setSpotsRemaining] = useState<number | null>(null)
-
-  useEffect(() => {
-    let active = true
-
-    async function load() {
-      try {
-        const response = await fetch('/api/v1/billing/subscription', { cache: 'no-store' })
-        if (!response.ok) return
-        const payload = (await response.json()) as BillingSubscriptionResponse
-        if (!active) return
-
-        const remaining = Number(payload.earlyAdopterSpotsRemaining ?? 0)
-        if (Number.isFinite(remaining)) {
-          setSpotsRemaining(Math.max(0, Math.min(EARLY_ADOPTER_LIMIT, remaining)))
-        }
-      } catch {
-        // Keep hidden on failure.
-      }
-    }
-
-    load()
-    return () => {
-      active = false
-    }
-  }, [])
-
+export function EarlyAdopterCounter({ spotsRemaining }: EarlyAdopterCounterProps) {
   const taken = useMemo(() => {
     if (spotsRemaining === null) return 0
     return EARLY_ADOPTER_LIMIT - spotsRemaining

@@ -71,7 +71,7 @@ function formatMoney(amount: number | null, currency: string): string {
 }
 
 function formatPlanSuffix(price: SubscriptionPrice | null): string {
-  if (!price) return '$24.99/year'
+  if (!price) return '…'
   const base = formatMoney(price.amount, price.currency)
   if (!price.interval) return base
   return `${base}/${price.interval}`
@@ -119,8 +119,11 @@ export function BillingPanel({ initialSubscription }: BillingPanelProps) {
             setPrices(pricesPayload.prices ?? [])
           }
         }
-      } catch {
-        // Keep initial server-rendered state on fetch failures.
+      } catch (err) {
+        console.error('[BillingPanel] Failed to refresh subscription/prices:', err)
+        if (active) {
+          setError('Failed to load the latest billing data. Showing cached information.')
+        }
       }
     }
 
@@ -335,7 +338,7 @@ export function BillingPanel({ initialSubscription }: BillingPanelProps) {
               </div>
             </div>
 
-            <EarlyAdopterCounter />
+            <EarlyAdopterCounter spotsRemaining={subscription.earlyAdopterSpotsRemaining} />
           </CardContent>
         </Card>
       )}
