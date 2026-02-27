@@ -118,9 +118,20 @@ export async function createEntry(guideId: string, formData: FormData) {
 
   if (!guide) return
 
+  const { data: authorProfile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const author = authorProfile as { full_name?: string | null; email?: string | null } | null
+  const authorName = author?.full_name || author?.email || null
+
   const { error } = await supabase.from('guide_entries').insert({
     guide_id: guideId,
     user_id: user.id,
+    author_id: user.id,
+    author_name: authorName,
     name,
     category,
     status,

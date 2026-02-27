@@ -69,12 +69,22 @@ export async function POST(
     : 'agent'
 
   const rating = body.rating ? Number(body.rating) : null
+  const { data: authorProfile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', auth.userId)
+    .maybeSingle()
+
+  const author = authorProfile as { full_name?: string | null; email?: string | null } | null
+  const authorName = author?.full_name || author?.email || null
 
   const { data: entry, error } = await supabase
     .from('guide_entries')
     .insert({
       guide_id: guideId,
       user_id: auth.userId,
+      author_id: auth.userId,
+      author_name: authorName,
       name,
       category: (body.category as string) ?? 'Hidden Gems',
       status,

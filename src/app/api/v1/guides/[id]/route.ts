@@ -60,10 +60,52 @@ export async function GET(
     )
   }
 
+  const rawEntries = (entries ?? []) as Array<Record<string, unknown> & GuideEntry>
+  const authorIds = Array.from(
+    new Set(
+      rawEntries
+        .map((entry) =>
+          typeof entry.author_id === 'string' && entry.author_id
+            ? entry.author_id
+            : entry.user_id
+        )
+        .filter((authorId): authorId is string => typeof authorId === 'string' && authorId.length > 0)
+    )
+  )
+
+  const { data: authorProfiles } = authorIds.length
+    ? await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', authorIds)
+    : { data: [] }
+
+  const authorNameById = new Map<string, string | null>(
+    ((authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>)
+      .map((profile) => [profile.id, profile.full_name || profile.email || null])
+  )
+
+  const entriesWithAuthor = rawEntries.map((entry) => {
+    const authorId =
+      typeof entry.author_id === 'string' && entry.author_id
+        ? entry.author_id
+        : entry.user_id
+    const explicitAuthorName =
+      typeof entry.author_name === 'string' && entry.author_name.trim()
+        ? entry.author_name
+        : null
+
+    return {
+      ...entry,
+      author_id: authorId,
+      author_name: explicitAuthorName || authorNameById.get(authorId) || null,
+    }
+  })
+
   const format = new URL(request.url).searchParams.get('format') ?? 'json'
 
   if (format === 'md') {
-    const markdown = guideToMarkdown(guide as CityGuide, (entries ?? []) as GuideEntry[])
+    const markdown = guideToMarkdown(guide as CityGuide, entriesWithAuthor as GuideEntry[])
     return new NextResponse(markdown, {
       headers: {
         'Content-Type': 'text/markdown; charset=utf-8',
@@ -74,8 +116,8 @@ export async function GET(
 
   // Default: JSON
   return NextResponse.json({
-    data: { ...(guide as CityGuide), entries: entries ?? [] },
-    meta: { entry_count: (entries ?? []).length },
+    data: { ...(guide as CityGuide), entries: entriesWithAuthor },
+    meta: { entry_count: entriesWithAuthor.length },
   })
 }
 
