@@ -77,6 +77,28 @@ function TripItemRow({ item }: { item: TripItem }) {
     ? getProviderLogoUrl(item.provider, item.kind)
     : null
 
+  // Extract flight details from details_json
+  const details = item.details_json as Record<string, unknown> | null
+  const flightNumber = details?.flight_number as string | undefined
+  const departureTime = details?.departure_local_time as string | undefined
+  const arrivalTime = details?.arrival_local_time as string | undefined
+  const departureStation = details?.departure_station as string | undefined || details?.departure_airport as string | undefined
+  const arrivalStation = details?.arrival_station as string | undefined || details?.arrival_airport as string | undefined
+
+  // Build a display title: "Delta DL349" or "SNCF TGV 1234"
+  const displayTitle = flightNumber
+    ? `${item.provider ?? capitalise(item.kind)} ${flightNumber}`
+    : item.provider ?? capitalise(item.kind)
+
+  // Build time display: "14:55 → 19:43"
+  const timeDisplay = departureTime && arrivalTime
+    ? `${departureTime} → ${arrivalTime}`
+    : departureTime
+      ? `Departs ${departureTime}`
+      : arrivalTime
+        ? `Arrives ${arrivalTime}`
+        : null
+
   return (
     <div className="flex items-start gap-3 py-4 border-b border-[#f1f5f9] last:border-0">
       {/* Icon — airline logo for flights, generic icon for others */}
@@ -95,7 +117,7 @@ function TripItemRow({ item }: { item: TripItem }) {
       <div className="flex-1 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-gray-900">
-            {item.provider ?? capitalise(item.kind)}
+            {displayTitle}
           </span>
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${kindColors[item.kind]}`}
@@ -104,7 +126,12 @@ function TripItemRow({ item }: { item: TripItem }) {
           </span>
         </div>
 
-        {item.summary && (
+        {/* Flight times — prominent display */}
+        {timeDisplay && (
+          <p className="mt-1 text-sm font-medium text-gray-800">{timeDisplay}</p>
+        )}
+
+        {item.summary && !timeDisplay && (
           <p className="mt-0.5 text-sm text-gray-600 leading-snug">{item.summary}</p>
         )}
 
