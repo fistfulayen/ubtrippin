@@ -3,7 +3,7 @@ import Image from 'next/image'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
-import { MapPin, Calendar, AlertCircle, Users } from 'lucide-react'
+import { MapPin, Calendar, AlertCircle, User } from 'lucide-react'
 import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -22,8 +22,7 @@ interface TripCardProps {
   itemCount: number
   needsReview?: boolean
   isPast?: boolean
-  isShared?: boolean
-  sharedByName?: string
+  ownerName?: string
 }
 
 function getAirlineLogos(items?: TripItem[]): string[] {
@@ -55,7 +54,13 @@ function getAirlineLogos(items?: TripItem[]): string[] {
   return logos.slice(0, 3) // Max 3 airline logos
 }
 
-export function TripCard({ trip, itemCount, needsReview, isPast, isShared, sharedByName }: TripCardProps) {
+function ownerTripLabel(ownerName: string): string {
+  const trimmed = ownerName.trim()
+  if (!trimmed) return 'Shared trip'
+  return trimmed.endsWith('s') ? `${trimmed}' trip` : `${trimmed}'s trip`
+}
+
+export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {
   const airlineLogos = getAirlineLogos(trip.trip_items)
 
   return (
@@ -102,9 +107,17 @@ export function TripCard({ trip, itemCount, needsReview, isPast, isShared, share
         <CardContent className="p-4">
           {/* Header with title and review badge */}
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-semibold text-gray-900 group-hover:text-[#4338ca] transition-colors line-clamp-1">
-              {trip.title}
-            </h3>
+            <div className="min-w-0">
+              <h3 className="font-semibold text-gray-900 group-hover:text-[#4338ca] transition-colors line-clamp-1">
+                {trip.title}
+              </h3>
+              {ownerName && (
+                <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                  <User className="h-3.5 w-3.5" />
+                  <span>{ownerTripLabel(ownerName)}</span>
+                </div>
+              )}
+            </div>
             {needsReview && (
               <Badge variant="warning" className="shrink-0">
                 <AlertCircle className="mr-1 h-3 w-3" />
@@ -134,12 +147,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, isShared, share
             <span className="text-gray-500">
               {itemCount} {itemCount === 1 ? 'item' : 'items'}
             </span>
-            {isShared && sharedByName ? (
-              <span className="flex items-center gap-1 text-indigo-600">
-                <Users className="h-3.5 w-3.5" />
-                {sharedByName}
-              </span>
-            ) : trip.travelers && trip.travelers.length > 0 ? (
+            {trip.travelers && trip.travelers.length > 0 ? (
               <span className="text-gray-500">
                 {trip.travelers.length} {trip.travelers.length === 1 ? 'traveler' : 'travelers'}
               </span>
