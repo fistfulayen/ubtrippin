@@ -1,19 +1,33 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Plus, BookOpen, Globe, Lock, MapPin } from 'lucide-react'
 import type { CityGuide } from '@/types/database'
 
 export default async function GuidesPage() {
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   const { data: guides } = await supabase
     .from('city_guides')
     .select('*')
     .order('updated_at', { ascending: false })
 
+  const { data: planData } = user
+    ? await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .maybeSingle()
+    : { data: null }
+
   const allGuides = (guides ?? []) as CityGuide[]
   const hasGuides = allGuides.length > 0
+  const plan = planData as { subscription_tier?: string | null } | null
+  const isPro = plan?.subscription_tier === 'pro'
 
   return (
     <div className="space-y-8">
@@ -32,6 +46,15 @@ export default async function GuidesPage() {
           </Button>
         </Link>
       </div>
+
+      {!isPro && (
+        <UpgradeCard
+          title="Pro features: PDF export, sharing."
+          description="Upgrade to export polished guide PDFs and share guides with family or collaborators."
+          variant="inline"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+        />
+      )}
 
       {!hasGuides ? (
         <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">

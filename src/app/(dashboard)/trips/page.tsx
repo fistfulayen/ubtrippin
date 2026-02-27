@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { TripCard } from '@/components/trips/trip-card'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
 import { sendWelcomeEmail } from './actions'
 import { Button } from '@/components/ui/button'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Plus } from 'lucide-react'
 import Link from 'next/link'
 
@@ -20,7 +20,7 @@ export default async function TripsPage() {
   const { data: profile } = user
     ? await supabase
         .from('profiles')
-        .select('welcome_email_sent, onboarding_completed, full_name, email')
+        .select('welcome_email_sent, onboarding_completed, full_name, email, subscription_tier')
         .eq('id', user.id)
         .single()
     : { data: null }
@@ -45,8 +45,7 @@ export default async function TripsPage() {
 
   const ownerNameMap = new Map<string, string>()
   if (ownerIds.length > 0) {
-    const secret = createSecretClient()
-    const { data: ownerProfiles } = await secret
+    const { data: ownerProfiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', ownerIds)
@@ -63,6 +62,7 @@ export default async function TripsPage() {
 
   // Three trip states: current (started, not ended), upcoming (not started), past (ended)
   const today = new Date().toISOString().split('T')[0]
+  const isPro = profile?.subscription_tier === 'pro'
   const currentTrips = trips?.filter(
     (trip) => trip.start_date && trip.start_date <= today && (trip.end_date || trip.start_date) >= today
   ) || []
@@ -79,6 +79,12 @@ export default async function TripsPage() {
   }) || []
 
   const hasTrips = (trips?.length ?? 0) > 0
+  const ownedActiveTripCount = (trips ?? []).filter(
+    (trip) =>
+      trip.user_id === user?.id &&
+      (!trip.start_date || (trip.end_date || trip.start_date) >= today)
+  ).length
+  const showFreeTripLimitCard = !isPro && ownedActiveTripCount >= 3
 
   // Show first-trip celebration banner once, until dismissed
   const showFirstTripBanner = hasTrips && profile && !profile.onboarding_completed
@@ -104,6 +110,15 @@ export default async function TripsPage() {
           </Button>
         </Link>
       </div>
+
+      {showFreeTripLimitCard && (
+        <UpgradeCard
+          title="You've reached the free trip limit"
+          description="Upgrade to Pro for unlimited trips, live flight status, and more."
+          variant="card"
+          showEarlyAdopter
+        />
+      )}
 
       {/* First trip celebration banner */}
       {showFirstTripBanner && firstTrip && (

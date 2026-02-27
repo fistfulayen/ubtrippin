@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { Star, Pencil, Trash2, Copy, Eye, EyeOff, Plus, Award } from 'lucide-react'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -459,12 +459,12 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       </header>
 
       {freeLimitReached && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          <p>Free tier supports 3 loyalty programs. Upgrade to Pro for unlimited.</p>
-          <Link href="/settings/billing" className="font-medium underline underline-offset-2">
-            Upgrade to Pro
-          </Link>
-        </div>
+        <UpgradeCard
+          title="Unlock unlimited loyalty programs"
+          description="Free tier supports 3 programs. Upgrade to Pro for unlimited loyalty tracking across all travelers."
+          variant="card"
+          showEarlyAdopter
+        />
       )}
 
       {programs.length === 0 && (
