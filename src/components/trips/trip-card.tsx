@@ -8,6 +8,7 @@ import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { extractAirlineCode } from '@/lib/images/airline-logo'
+import { TripStatusSummary } from './trip-status-summary'
 
 interface TripItem {
   id: string
@@ -15,6 +16,8 @@ interface TripItem {
   needs_review: boolean
   provider: string | null
   details_json: Json
+  start_date: string
+  start_ts: string | null
 }
 
 interface TripCardProps {
@@ -61,8 +64,29 @@ function ownerTripLabel(ownerName: string): string {
   return trimmed.endsWith('s') ? `${trimmed}' trip` : `${trimmed}'s trip`
 }
 
+function hasFlightWithin48Hours(items?: TripItem[]): boolean {
+  if (!items || items.length === 0) return false
+
+  const nowMs = Date.now()
+  const maxMs = nowMs + 48 * 60 * 60 * 1000
+
+  for (const item of items) {
+    if (item.kind !== 'flight') continue
+
+    const when = item.start_ts ? new Date(item.start_ts) : new Date(`${item.start_date}T00:00:00Z`)
+    const time = when.getTime()
+    if (Number.isNaN(time)) continue
+    if (time >= nowMs && time <= maxMs) {
+      return true
+    }
+  }
+
+  return false
+}
+
 export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {
   const airlineLogos = getProviderLogos(trip.trip_items)
+  const showStatusSummary = hasFlightWithin48Hours(trip.trip_items)
 
   return (
     <Link href={`/trips/${trip.id}`}>
@@ -118,6 +142,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
                   <span>{ownerTripLabel(ownerName)}</span>
                 </div>
               )}
+              <TripStatusSummary tripId={trip.id} enabled={showStatusSummary} />
             </div>
             {needsReview && (
               <Badge variant="warning" className="shrink-0">

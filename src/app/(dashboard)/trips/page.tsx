@@ -36,7 +36,7 @@ export default async function TripsPage() {
 
   const { data: trips } = await supabase
     .from('trips')
-    .select('*, trip_items(id, kind, needs_review, provider, details_json)')
+    .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
     .order('start_date', { ascending: true })
 
   const ownerIds = Array.from(

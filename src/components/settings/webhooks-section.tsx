@@ -55,6 +55,7 @@ const ALL_EVENTS = [
   { name: 'item.created', description: 'A new item is added to a trip' },
   { name: 'item.updated', description: 'An item is modified' },
   { name: 'item.deleted', description: 'An item is removed' },
+  { name: 'item.status_changed', description: 'A live item status changes (flight status updates)' },
   { name: 'items.batch_created', description: 'Multiple items added at once' },
   { name: 'collaborator.invited', description: 'A collaborator is invited' },
   { name: 'collaborator.accepted', description: 'A collaborator accepts' },

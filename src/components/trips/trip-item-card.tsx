@@ -44,6 +44,7 @@ import {
   CarDetailsView,
   GenericDetailsView,
 } from './item-details'
+import { ItemStatusBadge } from './item-status-badge'
 
 interface TripItemCardProps {
   item: TripItem
@@ -249,6 +250,10 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
                   </span>
                 )}
               </div>
+
+              {item.kind === 'flight' && (
+                <ItemStatusBadge itemId={item.id} />
+              )}
             </div>
 
             {/* Actions */}

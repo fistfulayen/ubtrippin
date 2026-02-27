@@ -9,6 +9,7 @@ export const WEBHOOK_EVENTS = [
   'item.created',
   'item.updated',
   'item.deleted',
+  'item.status_changed',
   'items.batch_created',
   'collaborator.invited',
   'collaborator.accepted',
