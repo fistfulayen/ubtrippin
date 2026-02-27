@@ -13,7 +13,7 @@ export function adminClient(): SupabaseClient {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY
   if (!url || !key) {
     throw new Error(
-      'Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — set them in .env.test or CI secrets.'
+      'Missing SUPABASE_URL / SUPABASE_SECRET_KEY — set them in .env.test or CI secrets.'
     )
   }
   _client = createClient(url, key, {
