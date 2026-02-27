@@ -1,9 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import Link from 'next/link'
 import { Check, ChevronDown, ChevronRight, Copy, FlaskConical, Plus, RefreshCw, Trash2, WandSparkles } from 'lucide-react'
 
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -400,15 +400,12 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
   return (
     <div className="space-y-6">
       {subscriptionTier === 'free' && reachedLimit && (
-        <div className="rounded-lg border border-[#cbd5e1] bg-[#ffffff] p-3 text-sm text-[#1e293b]">
-          <p>Free tier supports 1 webhook. Upgrade to Pro for up to 10.</p>
-          <Link
-            href="/settings/billing"
-            className="mt-2 inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-3 py-1.5 text-sm font-medium text-[#1e293b] hover:bg-gray-50"
-          >
-            Upgrade to Pro
-          </Link>
-        </div>
+        <UpgradeCard
+          title="Webhooks are a Pro feature"
+          description="Let your AI agents react to trip updates in real-time."
+          variant="card"
+          showEarlyAdopter
+        />
       )}
 
       <div className="flex items-center justify-between gap-3">

@@ -1,9 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { User, Users, UserPlus, Trash2, Loader2, AlertTriangle } from 'lucide-react'
 
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -343,15 +343,12 @@ export function FamilySettings({ currentUserId, subscriptionTier }: FamilySettin
                 </Button>
               </form>
             ) : (
-              <div className="rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4 text-sm text-[#1e293b]">
-                <p>Family sharing is a Pro feature. Upgrade to Pro to create a family and invite members.</p>
-                <Link
-                  href="/settings/billing"
-                  className="mt-3 inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-3 py-2 text-sm font-medium text-[#1e293b] hover:bg-gray-50"
-                >
-                  Upgrade to Pro
-                </Link>
-              </div>
+              <UpgradeCard
+                title="Family sharing is a Pro feature"
+                description="Share trips, loyalty programs, and city guides with your family."
+                variant="card"
+                showEarlyAdopter
+              />
             )}
 
             {createError && <p className="text-sm text-red-600">{createError}</p>}
