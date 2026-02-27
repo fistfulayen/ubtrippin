@@ -31,6 +31,8 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
 fi
 
 API="${SUPABASE_URL}/rest/v1"
+API_V1="${UBT_API_URL:-https://www.ubtrippin.xyz/api/v1}"
+API_V1="${API_V1%/}"
 APP_URL="${UBT_APP_URL:-https://www.ubtrippin.xyz}"
 
 # UBT_API_KEY enables v1 REST API calls (required for merge, move, etc.)
@@ -231,7 +233,7 @@ cmd_trips_merge() {
   local target_id="${1:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
   local source_id="${2:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
   echo "Merging source trip ${source_id:0:8} → target ${target_id:0:8}..."
-  _api -X POST "${APP_URL}/api/v1/trips/${target_id}/merge" \
+  _api -X POST "${API_V1}/trips/${target_id}/merge" \
     -d "{\"source_trip_id\": \"${source_id}\"}" | _json
 }
 
@@ -239,12 +241,12 @@ cmd_items_move() {
   local item_id="${1:?Usage: ubt items move <item_id> <target_trip_id>}"
   local trip_id="${2:?Usage: ubt items move <item_id> <target_trip_id>}"
   echo "Moving item ${item_id:0:8} → trip ${trip_id:0:8}..."
-  _api -X PATCH "${APP_URL}/api/v1/items/${item_id}" \
+  _api -X PATCH "${API_V1}/items/${item_id}" \
     -d "{\"trip_id\": \"${trip_id}\"}" | _json
 }
 
 cmd_calendar_get() {
-  _api "${APP_URL}/api/v1/calendar/token" | python3 -c "
+  _api "${API_V1}/calendar/token" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 d = data.get('data', {})
@@ -261,7 +263,7 @@ print('Token: ' + d.get('token', 'N/A')[:8] + '...')
 
 cmd_calendar_regen() {
   echo "Regenerating calendar token (this will invalidate the old URL)..."
-  _api -X POST "${APP_URL}/api/v1/calendar/token" | python3 -c "
+  _api -X POST "${API_V1}/calendar/token" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 d = data.get('data', {})
@@ -271,7 +273,7 @@ print(f\"  {d.get('feed_url', 'N/A')}\")
 }
 
 cmd_senders_list() {
-  _api "${APP_URL}/api/v1/settings/senders" | python3 -c "
+  _api "${API_V1}/settings/senders" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 senders = data.get('data', [])
@@ -296,7 +298,7 @@ cmd_senders_add() {
   else
     body="{\"email\": \"${email}\"}"
   fi
-  _api -X POST "${APP_URL}/api/v1/settings/senders" -d "$body" | python3 -c "
+  _api -X POST "${API_V1}/settings/senders" -d "$body" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -312,7 +314,7 @@ cmd_senders_remove() {
   echo "Removing sender ${sender_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X DELETE "${APP_URL}/api/v1/settings/senders/${sender_id}" \
+    -X DELETE "${API_V1}/settings/senders/${sender_id}" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
   if [ "$status" = "204" ]; then
@@ -325,7 +327,7 @@ cmd_senders_remove() {
 
 cmd_webhooks_list() {
   local result
-  result=$(_api "${APP_URL}/api/v1/webhooks")
+  result=$(_api "${API_V1}/webhooks")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -402,7 +404,7 @@ print(json.dumps(payload))
 " "$url" "$events" "$secret" "$description")
 
   local result
-  result=$(_api -X POST "${APP_URL}/api/v1/webhooks" -d "$body")
+  result=$(_api -X POST "${API_V1}/webhooks" -d "$body")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -426,7 +428,7 @@ print(f\"  secret_masked: {w.get('secret_masked')}\")
 cmd_webhooks_show() {
   local webhook_id="${1:?Usage: ubt webhooks show <id>}"
   local result
-  result=$(_api "${APP_URL}/api/v1/webhooks/${webhook_id}")
+  result=$(_api "${API_V1}/webhooks/${webhook_id}")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -458,7 +460,7 @@ cmd_webhooks_delete() {
   echo "Deleting webhook ${webhook_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X DELETE "${APP_URL}/api/v1/webhooks/${webhook_id}" \
+    -X DELETE "${API_V1}/webhooks/${webhook_id}" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
   if [ "$status" = "204" ]; then
@@ -472,7 +474,7 @@ cmd_webhooks_delete() {
 cmd_webhooks_test() {
   local webhook_id="${1:?Usage: ubt webhooks test <id>}"
   local result
-  result=$(_api -X POST "${APP_URL}/api/v1/webhooks/${webhook_id}/test")
+  result=$(_api -X POST "${API_V1}/webhooks/${webhook_id}/test")
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
     return
@@ -490,7 +492,7 @@ print('Test ping queued.')
 cmd_webhooks_deliveries() {
   local webhook_id="${1:?Usage: ubt webhooks deliveries <id>}"
   local result
-  result=$(_api "${APP_URL}/api/v1/webhooks/${webhook_id}/deliveries")
+  result=$(_api "${API_V1}/webhooks/${webhook_id}/deliveries")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -518,7 +520,7 @@ for d in deliveries:
 
 cmd_image_search() {
   local query="${1:?Usage: ubt image search <query>}"
-  _api "${APP_URL}/api/v1/images/search?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('$query'))")" | python3 -c "
+  _api "${API_V1}/images/search?q=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote('$query'))")" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 images = data.get('data', [])
@@ -544,7 +546,7 @@ cmd_rls_check() {
 
 cmd_collab_list() {
   local trip_id="${1:?Usage: ubt collab list <trip_id>}"
-  _api "${APP_URL}/api/v1/trips/${trip_id}/collaborators" | python3 -c "
+  _api "${API_V1}/trips/${trip_id}/collaborators" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -570,7 +572,7 @@ cmd_collab_invite() {
   local email="${2:?Usage: ubt collab invite <trip_id> <email> [role]}"
   local role="${3:-editor}"
   echo "Inviting ${email} to trip ${trip_id:0:8} as ${role}..."
-  _api -X POST "${APP_URL}/api/v1/trips/${trip_id}/collaborators" \
+  _api -X POST "${API_V1}/trips/${trip_id}/collaborators" \
     -d "{\"email\": \"${email}\", \"role\": \"${role}\"}" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
@@ -589,7 +591,7 @@ cmd_collab_remove() {
   echo "Removing collaborator ${collab_id:0:8} from trip ${trip_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X DELETE "${APP_URL}/api/v1/trips/${trip_id}/collaborators/${collab_id}" \
+    -X DELETE "${API_V1}/trips/${trip_id}/collaborators/${collab_id}" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
   if [ "$status" = "204" ] || [ "$status" = "200" ]; then
@@ -606,7 +608,7 @@ cmd_notifications_list() {
   if [ "$unread_flag" = "--unread" ]; then
     qs="?unread=true"
   fi
-  _api "${APP_URL}/api/v1/notifications${qs}" | python3 -c "
+  _api "${API_V1}/notifications${qs}" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -633,7 +635,7 @@ for n in notifications:
 
 cmd_notifications_read() {
   local notification_id="${1:?Usage: ubt notifications read <notification_id>}"
-  _api -X PATCH "${APP_URL}/api/v1/notifications/${notification_id}" -d '{}' | python3 -c "
+  _api -X PATCH "${API_V1}/notifications/${notification_id}" -d '{}' | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -646,8 +648,8 @@ print(f'Marked read: {d.get(\"id\",\"?\")[:8]} (read_at: {d.get(\"read_at\",\"?\
 
 cmd_profile_show() {
   local profile_json loyalty_json
-  profile_json=$(_api "${APP_URL}/api/v1/me/profile")
-  loyalty_json=$(_api "${APP_URL}/api/v1/me/loyalty")
+  profile_json=$(_api "${API_V1}/me/profile")
+  loyalty_json=$(_api "${API_V1}/me/loyalty")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     python3 -c "
@@ -725,7 +727,7 @@ cmd_profile_set() {
   local body
   body=$(python3 -c "import json,sys; print(json.dumps({sys.argv[1]: sys.argv[2]}))" "$api_field" "$value")
   local result
-  result=$(_api -X PUT "${APP_URL}/api/v1/me/profile" -d "$body")
+  result=$(_api -X PUT "${API_V1}/me/profile" -d "$body")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -744,7 +746,7 @@ print('Updated traveler profile.')
 
 cmd_profile_loyalty_list() {
   local result
-  result=$(_api "${APP_URL}/api/v1/me/loyalty")
+  result=$(_api "${API_V1}/me/loyalty")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -793,7 +795,7 @@ print(json.dumps(payload))
 " "$traveler_name" "$provider_type" "$provider_name" "$provider_key" "$program_number" "$status_tier")
 
   local result
-  result=$(_api -X POST "${APP_URL}/api/v1/me/loyalty" -d "$body")
+  result=$(_api -X POST "${API_V1}/me/loyalty" -d "$body")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -814,7 +816,7 @@ print(f\"Added loyalty program: {d.get('provider_name', '?')} ({d.get('id', '')[
 cmd_profile_loyalty_edit() {
   local program_id="${1:?Usage: ubt profile loyalty edit <id>}"
   local list_result current
-  list_result=$(_api "${APP_URL}/api/v1/me/loyalty")
+  list_result=$(_api "${API_V1}/me/loyalty")
   current=$(python3 -c "
 import json, sys
 payload = json.loads(sys.argv[1])
@@ -881,7 +883,7 @@ print(json.dumps(payload))
   fi
 
   local result
-  result=$(_api -X PATCH "${APP_URL}/api/v1/me/loyalty/${program_id}" -d "$body")
+  result=$(_api -X PATCH "${API_V1}/me/loyalty/${program_id}" -d "$body")
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
     return
@@ -907,7 +909,7 @@ cmd_profile_loyalty_delete() {
 
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X DELETE "${APP_URL}/api/v1/me/loyalty/${program_id}" \
+    -X DELETE "${API_V1}/me/loyalty/${program_id}" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
 
@@ -922,7 +924,7 @@ cmd_profile_loyalty_delete() {
 cmd_profile_loyalty_lookup() {
   local provider_key="${1:?Usage: ubt profile loyalty lookup <provider_key>}"
   local result
-  result=$(_api "${APP_URL}/api/v1/me/loyalty/lookup?provider=${provider_key}")
+  result=$(_api "${API_V1}/me/loyalty/lookup?provider=${provider_key}")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
@@ -959,7 +961,388 @@ print('No loyalty match found.')
 }
 
 cmd_profile_loyalty_export() {
-  _api "${APP_URL}/api/v1/me/loyalty/export"
+  _api "${API_V1}/me/loyalty/export"
+}
+
+cmd_family_list() {
+  local result
+  result=$(_api "${API_V1}/families")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+families = payload.get('data', [])
+if not families:
+    print('No families found.')
+    sys.exit(0)
+print(f'Families ({len(families)}):')
+for f in families:
+    print(f\"  {f.get('id','')[:8]}  {f.get('name','(unnamed)'):<32} role:{f.get('role','?'):<6} members:{f.get('member_count', 0)}\")
+"
+}
+
+cmd_family_create() {
+  local name="$*"
+  if [ -z "$name" ]; then
+    echo "Usage: ubt family create <family_name>" >&2
+    exit 1
+  fi
+
+  local body
+  body=$(python3 -c "import json,sys; print(json.dumps({'name': sys.argv[1]}))" "$name")
+
+  local result
+  result=$(_api -X POST "${API_V1}/families" -d "$body")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+family = payload.get('data', {})
+print('Family created:')
+print(f\"  id:   {family.get('id')}\")
+print(f\"  name: {family.get('name')}\")
+"
+}
+
+cmd_family_show() {
+  local family_id="${1:?Usage: ubt family show <family_id>}"
+  local result
+  result=$(_api "${API_V1}/families/${family_id}")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+family = payload.get('data', {})
+print('Family:')
+print(f\"  id:          {family.get('id')}\")
+print(f\"  name:        {family.get('name')}\")
+print(f\"  viewer_role: {family.get('viewer_role')}\")
+print(f\"  created_at:  {family.get('created_at')}\")
+members = family.get('members', [])
+print()
+print(f'Members ({len(members)}):')
+if not members:
+    sys.exit(0)
+for member in members:
+    role = member.get('role', '?')
+    status = 'pending' if member.get('pending') else 'accepted'
+    name = member.get('name') or member.get('email') or member.get('invited_email') or '-'
+    email = member.get('email') or member.get('invited_email') or '-'
+    user_id = member.get('user_id') or '-'
+    print(f\"  {member.get('id','')[:8]}  {name:<28} {email:<32} role:{role:<6} {status}\")
+    print(f\"           user_id: {user_id}\")
+"
+}
+
+cmd_family_invite() {
+  local family_id="${1:?Usage: ubt family invite <family_id> <email>}"
+  local email="${2:?Usage: ubt family invite <family_id> <email>}"
+  local body
+  body=$(python3 -c "import json,sys; print(json.dumps({'email': sys.argv[1]}))" "$email")
+
+  local result
+  result=$(_api -X POST "${API_V1}/families/${family_id}/members" -d "$body")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+member = payload.get('data', {})
+print('Invite created:')
+print(f\"  member_id: {member.get('id')}\")
+print(f\"  email:     {member.get('invited_email')}\")
+print(f\"  role:      {member.get('role')}\")
+print('Invite email queued.')
+"
+}
+
+cmd_family_remove() {
+  local family_id="${1:?Usage: ubt family remove <family_id> <user_id>}"
+  local user_or_member_id="${2:?Usage: ubt family remove <family_id> <user_id>}"
+
+  local family_result
+  family_result=$(_api "${API_V1}/families/${family_id}")
+
+  local member_id
+  member_id=$(python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+target = sys.argv[1]
+if 'error' in payload:
+    print('__ERROR__:' + payload['error'].get('message', 'Failed to load family.'))
+    sys.exit(0)
+family = payload.get('data', {})
+members = family.get('members', [])
+for m in members:
+    if m.get('id') == target or m.get('user_id') == target:
+        print(m.get('id', ''))
+        sys.exit(0)
+print('')
+" "$user_or_member_id" <<<"$family_result")
+
+  if [[ "$member_id" == __ERROR__:* ]]; then
+    echo "Error: ${member_id#__ERROR__:}" >&2
+    exit 1
+  fi
+
+  if [ -z "$member_id" ]; then
+    echo "Error: Could not find member for '${user_or_member_id}' in this family." >&2
+    exit 1
+  fi
+
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${API_V1}/families/${family_id}/members/${member_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+
+  if [ "$status" = "204" ] || [ "$status" = "200" ]; then
+    echo "Removed member ${member_id:0:8} from family ${family_id:0:8}."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_family_leave() {
+  local family_id="${1:?Usage: ubt family leave <family_id>}"
+  local profile_json family_json
+  profile_json=$(_api "${API_V1}/me/profile")
+  family_json=$(_api "${API_V1}/families/${family_id}")
+
+  local member_id
+  member_id=$(python3 -c "
+import json, sys
+profile = json.loads(sys.argv[1])
+family = json.loads(sys.argv[2])
+if 'error' in profile:
+    print('__ERROR__:' + profile['error'].get('message', 'Failed to load profile.'))
+    sys.exit(0)
+if 'error' in family:
+    print('__ERROR__:' + family['error'].get('message', 'Failed to load family.'))
+    sys.exit(0)
+viewer_id = (profile.get('data') or {}).get('id')
+for m in (family.get('data') or {}).get('members', []):
+    if m.get('user_id') == viewer_id:
+        print(m.get('id', ''))
+        sys.exit(0)
+print('')
+" "$profile_json" "$family_json")
+
+  if [[ "$member_id" == __ERROR__:* ]]; then
+    echo "Error: ${member_id#__ERROR__:}" >&2
+    exit 1
+  fi
+
+  if [ -z "$member_id" ]; then
+    echo "Error: You do not have an accepted membership in this family." >&2
+    exit 1
+  fi
+
+  local status
+  status=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X DELETE "${API_V1}/families/${family_id}/members/${member_id}" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -H "Content-Type: application/json")
+
+  if [ "$status" = "204" ] || [ "$status" = "200" ]; then
+    echo "Left family ${family_id:0:8}."
+  else
+    echo "Failed (HTTP ${status})"
+    exit 1
+  fi
+}
+
+cmd_family_loyalty() {
+  local family_id="${1:?Usage: ubt family loyalty <family_id>}"
+  local result
+  result=$(_api "${API_V1}/families/${family_id}/loyalty")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+rows = payload.get('data', [])
+meta = payload.get('meta', {})
+print(f\"Family loyalty programs ({len(rows)}), members: {meta.get('family_member_count', '?')}\")
+if not rows:
+    sys.exit(0)
+for p in rows:
+    number = p.get('program_number_masked') or p.get('program_number') or 'N/A'
+    member = p.get('member_name') or p.get('traveler_name') or p.get('user_id', '')[:8]
+    preferred = ' *preferred' if p.get('preferred') else ''
+    print(f\"  {p.get('provider_name','?'):<26} {member:<24} {number}{preferred}\")
+"
+}
+
+cmd_family_loyalty_lookup() {
+  local family_id="${1:?Usage: ubt family loyalty lookup <family_id> <provider>}"
+  local provider="${2:?Usage: ubt family loyalty lookup <family_id> <provider>}"
+  local encoded_provider
+  encoded_provider=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$provider")
+  local result
+  result=$(_api "${API_V1}/families/${family_id}/loyalty/lookup?provider=${encoded_provider}")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+rows = payload.get('data', [])
+meta = payload.get('meta', {})
+provider_key = meta.get('provider_key', '?')
+alliance = meta.get('alliance')
+print(f\"Lookup: {provider_key}\")
+if alliance:
+    print(f\"Alliance fallback: {alliance}\")
+print(f\"Matched members: {meta.get('matched_count', 0)} / {meta.get('family_member_count', len(rows))}\")
+print()
+for row in rows:
+    member = row.get('member_name') or row.get('user_id', '')[:8]
+    program = row.get('program')
+    if not program:
+        print(f\"  {member:<24} no match\")
+        continue
+    match_type = 'exact' if row.get('exact_match') else 'alliance'
+    number = program.get('program_number_masked') or program.get('program_number') or 'N/A'
+    print(f\"  {member:<24} {program.get('provider_name','?'):<28} {number} ({match_type})\")
+"
+}
+
+cmd_family_profiles() {
+  local family_id="${1:?Usage: ubt family profiles <family_id>}"
+  local result
+  result=$(_api "${API_V1}/families/${family_id}/profiles")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+profiles = payload.get('data', [])
+print(f'Family profiles ({len(profiles)}):')
+if not profiles:
+    sys.exit(0)
+for p in profiles:
+    name = p.get('full_name') or p.get('email') or p.get('user_id', '')[:8]
+    seat = p.get('seat_preference') or 'no_preference'
+    meal = p.get('meal_preference') or 'no_preference'
+    home = p.get('home_airport') or '-'
+    print(f\"  {name:<30} seat:{seat:<14} meal:{meal:<14} home:{home}\")
+"
+}
+
+cmd_family_trips() {
+  local family_id="${1:?Usage: ubt family trips <family_id>}"
+  local scope="${2:-all}"
+  local result
+  result=$(_api "${API_V1}/families/${family_id}/trips?scope=${scope}")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+trips = payload.get('data', [])
+meta = payload.get('meta', {})
+print(f\"Family trips ({len(trips)}), scope: {meta.get('scope', 'all')}\")
+if not trips:
+    sys.exit(0)
+for t in trips:
+    owner = ((t.get('owner') or {}).get('full_name')) or t.get('owner_name') or (t.get('user_id','')[:8])
+    dates = t.get('start_date') or '-'
+    if t.get('end_date') and t.get('end_date') != t.get('start_date'):
+        dates += ' → ' + t.get('end_date')
+    print(f\"  {t.get('id','')[:8]}  {t.get('title','(unnamed)'):<28} {dates:<24} owner:{owner}\")
+"
+}
+
+cmd_family_guides() {
+  local family_id="${1:?Usage: ubt family guides <family_id>}"
+  local result
+  result=$(_api "${API_V1}/families/${family_id}/guides")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | python3 -c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+guides = payload.get('data', [])
+print(f'Family guides ({len(guides)}):')
+if not guides:
+    sys.exit(0)
+for g in guides:
+    owner = ((g.get('owner') or {}).get('full_name')) or g.get('owner_name') or (g.get('user_id','')[:8])
+    city = g.get('city', '?')
+    country = g.get('country') or g.get('country_code') or ''
+    entries = g.get('entry_count')
+    if entries is None:
+        entries = len(g.get('entries') or [])
+    place = city if not country else f\"{city}, {country}\"
+    print(f\"  {g.get('id','')[:8]}  {place:<30} entries:{entries:<4} owner:{owner}\")
+"
 }
 
 # Usage
@@ -990,6 +1373,17 @@ Commands:
   collab list <trip_id>                 List collaborators on a trip you own *
   collab invite <trip_id> <email> [role] Invite a collaborator (editor or viewer) *
   collab remove <trip_id> <collab_id>   Remove a collaborator *
+  family list                           List families *
+  family create <name>                  Create a family (Pro) *
+  family show <family_id>               Show family details + members *
+  family invite <family_id> <email>     Invite a family member (Pro) *
+  family remove <family_id> <user_id>   Remove family member by user_id/member_id *
+  family leave <family_id>              Leave a family *
+  family loyalty <family_id>            List family loyalty programs *
+  family loyalty lookup <family_id> <provider> Lookup provider across family members *
+  family profiles <family_id>           List family profiles *
+  family trips <family_id> [scope]      List family trips (scope: all/current/upcoming/past) *
+  family guides <family_id>             List family guides *
   notifications list [--unread]         List notifications *
   notifications read <id>               Mark a notification as read *
   profile show                          Show traveler profile + loyalty vault *
@@ -1008,6 +1402,7 @@ Commands marked * require UBT_API_KEY in ~/.ubt/config or env.
 
 Options:
   FORMAT=json ubt ...      Output raw JSON instead of formatted text
+  UBT_API_URL=...          Override API base URL (default: https://www.ubtrippin.xyz/api/v1)
 
 Examples:
   ubt trips list
@@ -1023,6 +1418,11 @@ Examples:
   ubt collab list <trip_id>
   ubt collab invite <trip_id> friend@example.com editor
   ubt collab remove <trip_id> <collab_id>
+  ubt family list
+  ubt family create "Rogers Family"
+  ubt family show <family_id>
+  ubt family invite <family_id> parent@example.com
+  ubt family loyalty lookup <family_id> united
   ubt notifications list --unread
   ubt notifications read <notification_id>
   ubt profile show
@@ -1086,6 +1486,29 @@ case "${1:-}" in
       invite) cmd_collab_invite "${3:-}" "${4:-}" "${5:-}" ;;
       remove) cmd_collab_remove "${3:-}" "${4:-}" ;;
       *)      usage ;;
+    esac
+    ;;
+  family)
+    case "${2:-}" in
+      list)    cmd_family_list ;;
+      create)  shift 2; cmd_family_create "$@" ;;
+      show)    cmd_family_show "${3:?Usage: ubt family show <family_id>}" ;;
+      invite)  cmd_family_invite "${3:-}" "${4:-}" ;;
+      remove)  cmd_family_remove "${3:-}" "${4:-}" ;;
+      leave)   cmd_family_leave "${3:-}" ;;
+      loyalty)
+        if [ "${3:-}" = "lookup" ]; then
+          cmd_family_loyalty_lookup "${4:-}" "${5:-}"
+        elif [ -n "${3:-}" ] && [ "${3:-}" != "list" ]; then
+          cmd_family_loyalty "${3:-}"
+        else
+          cmd_family_loyalty "${4:-}"
+        fi
+        ;;
+      profiles) cmd_family_profiles "${3:-}" ;;
+      trips)    cmd_family_trips "${3:-}" "${4:-}" ;;
+      guides)   cmd_family_guides "${3:-}" ;;
+      *)        usage ;;
     esac
     ;;
   notifications)

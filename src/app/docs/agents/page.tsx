@@ -55,10 +55,11 @@ export default function AgentDocsPage() {
       <div className="max-w-3xl mx-auto px-6 pb-24 space-y-10">
 
         {/* ─── Quick-pick ─── */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
           {[
             { name: 'OpenClaw', anchor: '#openclaw', emoji: '🦞' },
             { name: 'Claude / Cursor', anchor: '#mcp', emoji: '⚡' },
+            { name: 'Family', anchor: '#family', emoji: '👨‍👩‍👧‍👦' },
             { name: 'ChatGPT', anchor: '#chatgpt', emoji: '🤖' },
             { name: 'REST API', anchor: '#rest', emoji: '🔌' },
           ].map((item) => (
@@ -102,7 +103,7 @@ export default function AgentDocsPage() {
         </Section>
 
         {/* ─── MCP (Claude Desktop / Cursor / Windsurf) ─── */}
-        <Section id="mcp" title="MCP Server — Claude Desktop, Cursor, Windsurf" badge="MCP v1.5">
+        <Section id="mcp" title="MCP Server — Claude Desktop, Cursor, Windsurf" badge="MCP v1.8">
           <p className="text-sm mb-4" style={{ color: '#475569' }}>
             The <code className="px-1 py-0.5 rounded text-xs" style={{ background: '#f1f5f9' }}>ubtrippin-mcp</code> package exposes all UBTRIPPIN tools via the{' '}
             <a href="https://modelcontextprotocol.io" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>Model Context Protocol</a>.
@@ -140,6 +141,7 @@ export default function AgentDocsPage() {
 
           <CapabilityList items={[
             '30+ tools — trips, items, guides, collaborators, notifications',
+            'Family sharing tools — families, shared loyalty, profiles, trips, guides',
             'Calendar feed URL retrieval',
             'Activation status check',
             'Cover image search',
@@ -149,6 +151,33 @@ export default function AgentDocsPage() {
           <p className="text-sm mt-4" style={{ color: '#64748b' }}>
             npm: <a href="https://www.npmjs.com/package/ubtrippin-mcp" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>npmjs.com/package/ubtrippin-mcp</a>{' '}
             · Docs: <a href="https://github.com/ubtrippin/ubtrippin/blob/main/mcp/README.md" target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>mcp/README.md</a>
+          </p>
+        </Section>
+
+        {/* ─── Family Sharing ─── */}
+        <Section id="family" title="Family Sharing for Agents" badge="PRD 015">
+          <p className="text-sm mb-4" style={{ color: '#475569' }}>
+            Family Sharing is all-or-nothing context sharing. Once members accept an invite, agents can query shared loyalty, profiles, trips, and guides across the family.
+          </p>
+
+          <h3 className="text-sm font-semibold mb-2" style={{ color: '#1a1a2e' }}>MCP tools</h3>
+          <CodeBlock>{`list_families
+get_family { family_id }
+get_family_loyalty { family_id }
+lookup_family_loyalty { family_id, provider }
+get_family_profiles { family_id }
+get_family_trips { family_id, scope? }
+get_family_guides { family_id }`}</CodeBlock>
+
+          <h3 className="text-sm font-semibold mb-2 mt-5" style={{ color: '#1a1a2e' }}>CLI</h3>
+          <CodeBlock>{`ubt family list
+ubt family create "Rogers Family"
+ubt family invite <family_id> parent@example.com
+ubt family loyalty lookup <family_id> united
+ubt family trips <family_id> upcoming`}</CodeBlock>
+
+          <p className="text-xs mt-3" style={{ color: '#64748b' }}>
+            Pro is required to create families and send invites. Accepted members can be on free or Pro plans.
           </p>
         </Section>
 

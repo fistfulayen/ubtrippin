@@ -842,6 +842,260 @@ Returns `204 No Content`.
 
 ---
 
+### Family Sharing
+
+Family Sharing is **all-or-nothing** context sharing across accepted family members.
+
+Pro requirements:
+- `POST /api/v1/families` (create family): **Pro required**
+- `POST /api/v1/families/:id/members` (invite member): **Pro required**
+- Membership and accepted-member read access: available on free + Pro accounts
+
+#### `GET /api/v1/families`
+
+List families where the authenticated user is an accepted member.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/families \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "<family_uuid>",
+      "name": "Rogers Family",
+      "created_by": "<user_uuid>",
+      "created_at": "2026-02-27T18:40:00Z",
+      "updated_at": "2026-02-27T18:40:00Z",
+      "role": "admin",
+      "member_count": 3
+    }
+  ]
+}
+```
+
+#### `POST /api/v1/families`
+
+Create a family. Creator becomes `admin`.
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/families \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Rogers Family" }'
+```
+
+`201 Created`
+
+```json
+{
+  "data": {
+    "id": "<family_uuid>",
+    "name": "Rogers Family",
+    "created_by": "<user_uuid>",
+    "created_at": "2026-02-27T18:40:00Z",
+    "updated_at": "2026-02-27T18:40:00Z"
+  }
+}
+```
+
+#### `GET /api/v1/families/:id`
+
+Get family details plus full member list.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": {
+    "id": "<family_uuid>",
+    "name": "Rogers Family",
+    "created_by": "<user_uuid>",
+    "created_at": "2026-02-27T18:40:00Z",
+    "updated_at": "2026-02-27T18:41:00Z",
+    "viewer_role": "admin",
+    "members": [
+      {
+        "id": "<member_uuid>",
+        "user_id": "<user_uuid>",
+        "role": "admin",
+        "name": "Ian Rogers",
+        "email": "ian@example.com",
+        "invited_email": "ian@example.com",
+        "avatar_url": null,
+        "accepted_at": "2026-02-27T18:40:00Z",
+        "pending": false,
+        "invited_by_name": "Ian Rogers",
+        "created_at": "2026-02-27T18:40:00Z",
+        "invite_token": null
+      }
+    ]
+  }
+}
+```
+
+#### `PATCH /api/v1/families/:id`
+
+Rename a family. Admin only.
+
+```bash
+curl -X PATCH https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "name": "Rogers + Smith Family" }'
+```
+
+#### `DELETE /api/v1/families/:id`
+
+Delete a family. Admin only.
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Returns `204 No Content`.
+
+#### `POST /api/v1/families/:id/members`
+
+Invite a member by email. Admin only. **Requires Pro**.
+
+```bash
+curl -X POST https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/members \
+  -H "Authorization: Bearer $UBT_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "parent@example.com" }'
+```
+
+`201 Created`
+
+```json
+{
+  "data": {
+    "id": "<member_uuid>",
+    "family_id": "<family_uuid>",
+    "user_id": null,
+    "role": "member",
+    "invited_email": "parent@example.com",
+    "accepted_at": null,
+    "created_at": "2026-02-27T18:45:00Z"
+  }
+}
+```
+
+#### `DELETE /api/v1/families/:id/members/:uid`
+
+Remove a member from a family.
+- Admins can remove any member
+- Members can remove themselves (leave family)
+
+```bash
+curl -X DELETE https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/members/$MEMBER_ID \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+Returns `204 No Content`.
+
+#### `GET /api/v1/families/:id/loyalty`
+
+List loyalty programs across accepted family members.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/loyalty \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "<program_uuid>",
+      "user_id": "<user_uuid>",
+      "traveler_name": "Ian Rogers",
+      "provider_name": "United MileagePlus",
+      "provider_key": "united",
+      "program_number": "MP123452847",
+      "program_number_masked": "MP•••••2847",
+      "preferred": true,
+      "updated_at": "2026-02-27T18:10:00Z",
+      "created_at": "2026-02-25T18:10:00Z",
+      "member_name": "Ian Rogers"
+    }
+  ],
+  "meta": {
+    "count": 1,
+    "family_member_count": 3
+  }
+}
+```
+
+#### `GET /api/v1/families/:id/loyalty/lookup?provider=:provider`
+
+Lookup a provider across all family members (with alliance fallback).
+
+```bash
+curl "https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/loyalty/lookup?provider=airfrance" \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+```json
+{
+  "data": [
+    {
+      "user_id": "<user_uuid>",
+      "member_name": "Ian Rogers",
+      "exact_match": false,
+      "program": {
+        "provider_name": "Delta SkyMiles",
+        "provider_key": "delta",
+        "program_number_masked": "DL•••••8901",
+        "program_number": "DL123458901"
+      }
+    }
+  ],
+  "meta": {
+    "provider_key": "airfrance",
+    "alliance": "skyteam",
+    "family_member_count": 3,
+    "matched_count": 1
+  }
+}
+```
+
+#### `GET /api/v1/families/:id/profiles`
+
+List profile/preferences for accepted family members.
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/profiles \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### `GET /api/v1/families/:id/trips`
+
+List family trips (owner + members). Optional `scope` query: `all`, `current`, `upcoming`, `past`.
+
+```bash
+curl "https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/trips?scope=upcoming" \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+#### `GET /api/v1/families/:id/guides`
+
+List city guides across family members (includes entries + owner info).
+
+```bash
+curl https://www.ubtrippin.xyz/api/v1/families/$FAMILY_ID/guides \
+  -H "Authorization: Bearer $UBT_API_KEY"
+```
+
+---
+
 ### Notifications
 
 Notifications are fired when collaborators accept invites or add items to your trips.

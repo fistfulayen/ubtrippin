@@ -7,12 +7,13 @@
  *
  * Configuration:
  *   UBT_API_KEY   — Your UBTRIPPIN API key (from ubtrippin.xyz/settings)
- *   UBT_BASE_URL  — Optional: override base URL (default: https://ubtrippin.xyz)
+ *   UBT_BASE_URL  — Optional: override base URL (default: https://www.ubtrippin.xyz)
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
+import { registerFamilyTools } from './tools/family.js'
 
 const API_KEY = process.env.UBT_API_KEY
 const BASE_URL = (process.env.UBT_BASE_URL || 'https://www.ubtrippin.xyz').replace(/\/$/, '')
@@ -241,7 +242,7 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.7.0' },
+  { name: 'ubtrippin', version: '1.8.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
@@ -255,6 +256,7 @@ City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_gu
 Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
 Notifications: get_notifications, mark_notification_read
 Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, lookup_loyalty_program
+Family Sharing: list_families, get_family, get_family_loyalty, lookup_family_loyalty, get_family_profiles, get_family_trips, get_family_guides
 Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender, list_webhooks, register_webhook, delete_webhook, test_webhook, list_deliveries
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
@@ -1464,6 +1466,12 @@ server.registerTool(
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )
+
+// ---------------------------------------------------------------------------
+// Family Sharing Tools (PRD 015)
+// ---------------------------------------------------------------------------
+
+registerFamilyTools(server, apiFetch)
 
 // ---------------------------------------------------------------------------
 // Resources
