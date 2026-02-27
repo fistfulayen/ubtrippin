@@ -1,0 +1,63 @@
+name: Agent Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  claude-review:
+    if: contains(github.event.pull_request.labels.*.name, 'agent-built')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get diff
+        run: |
+          git diff origin/main...HEAD > /tmp/diff.txt
+          echo "Diff size: $(wc -l < /tmp/diff.txt) lines"
+
+      - name: Claude Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Skip if diff is empty or too large (>5000 lines)
+          LINES=$(wc -l < /tmp/diff.txt)
+          if [ "$LINES" -eq 0 ]; then
+            echo "Empty diff, skipping review"
+            exit 0
+          fi
+          if [ "$LINES" -gt 5000 ]; then
+            echo "Diff too large ($LINES lines), skipping automated review"
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --body "⚠️ Diff is $LINES lines — too large for automated review. Manual review recommended."
+            exit 0
+          fi
+
+          # Call Claude API directly (no CLI needed)
+          DIFF=$(cat /tmp/diff.txt)
+          REVIEW=$(curl -s https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -n \
+              --arg diff "$DIFF" \
+              '{
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 2000,
+                messages: [{
+                  role: "user",
+                  content: ("Review this code diff. Only flag real problems — bugs, security issues, logic errors, missing error handling. Do NOT flag style preferences, naming opinions, or suggest refactors. Be concise. If everything looks good, say so.\n\n```diff\n" + $diff + "\n```")
+                }]
+              }')" | jq -r '.content[0].text')
+
+          # Post as PR comment
+          echo "🤖 **Claude Review**" > /tmp/review.md
+          echo "" >> /tmp/review.md
+          echo "$REVIEW" >> /tmp/review.md
+          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
+        env:
+          GH_TOKEN: ${{ github.token }}

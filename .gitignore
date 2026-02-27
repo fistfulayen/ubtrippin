@@ -49,3 +49,6 @@ e2e/auth-state.json
 .env.test
 playwright-report/
 test-results/
+
+# Agent swarm
+.openclaw/active-tasks.json
