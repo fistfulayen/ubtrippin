@@ -135,15 +135,13 @@ export function ItemStatusBadge({ itemId }: ItemStatusBadgeProps) {
     return () => clearInterval(timer)
   }, [loadStatus])
 
-  const effective = status ?? {
-    status: 'unknown' as LiveStatus,
-    delay_minutes: null,
-    gate: null,
-    terminal: null,
-    estimated_departure: null,
-    previous_status: null,
-    last_checked_at: null,
+  // Don't show badge until we have actual status data from FlightAware
+  // (FlightAware only allows queries within 48h of departure)
+  if (!status || status.status === 'unknown') {
+    return null
   }
+
+  const effective = status
 
   const heading = useMemo(() => {
     const base = STATUS_META[effective.status].label
