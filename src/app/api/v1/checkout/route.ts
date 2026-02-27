@@ -98,6 +98,10 @@ export async function POST(request: NextRequest) {
 
   const spotsRemaining = getEarlyAdopterSpotsRemaining(proSubscriberCount)
   const earlyAdopterAvailable = spotsRemaining > 0
+  // Note: This check is best-effort. Under concurrent load, multiple users could start
+  // checkout sessions that exceed the 100-seat early adopter cap. At our current scale
+  // this is acceptable. If we approach 90+ subscribers, add a DB advisory lock or
+  // Stripe coupon-based enforcement.
 
   const validPrices = new Set<string>([monthlyPriceId, annualPriceId])
   if (earlyAdopterAvailable) {
