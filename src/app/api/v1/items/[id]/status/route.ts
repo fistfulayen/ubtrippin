@@ -66,7 +66,7 @@ export async function GET(
 
   const { data: statusRow, error: statusError } = await supabase
     .from('trip_item_status')
-    .select('*')
+    .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
     .eq('item_id', itemId)
     .maybeSingle()
 

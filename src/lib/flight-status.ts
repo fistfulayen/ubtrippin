@@ -124,10 +124,6 @@ function mapFlightStatus(
   if (!sourceStatus) return 'unknown'
 
   switch (sourceStatus.toLowerCase()) {
-    case 'cancelled':
-      return 'cancelled'
-    case 'diverted':
-      return 'diverted'
     case 'en route':
       return 'en_route'
     case 'landed':

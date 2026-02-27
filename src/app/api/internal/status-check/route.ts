@@ -120,7 +120,10 @@ function isStaleForSchedule(
 
 function hasValidCronAuth(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return true
+  if (!secret) {
+    console.error('[internal/status-check] CRON_SECRET is not configured. Denying access for security.')
+    return false
+  }
   return request.headers.get('authorization') === `Bearer ${secret}`
 }
 

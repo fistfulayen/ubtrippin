@@ -76,7 +76,7 @@ export async function GET(
   const { data: statusRows, error: statusError } = itemIds.length
     ? await supabase
         .from('trip_item_status')
-        .select('*')
+        .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
         .in('item_id', itemIds)
     : { data: [], error: null }
 

@@ -167,7 +167,7 @@ export async function POST(
   const { data: savedStatus, error: saveError } = await supabase
     .from('trip_item_status')
     .upsert(upsert.values, { onConflict: 'item_id' })
-    .select('*')
+    .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
     .single()
 
   if (saveError || !savedStatus) {
