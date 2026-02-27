@@ -1,7 +1,7 @@
 #!/bin/bash
 # check-agents.sh — Deterministic agent monitoring. Zero LLM tokens.
-# Checks tmux sessions, PRs, CI status. Outputs JSON.
-# Exit 0 with alerts = action needed. Exit 0 no alerts = all quiet.
+# Checks tmux sessions, done markers, PRs, CI status, reviews.
+# Exit 0 with JSON output. Alerts = action needed.
 
 set -uo pipefail
 
@@ -30,12 +30,16 @@ alerts = []
 updated = False
 
 for task in tasks:
-    if task["status"] not in ("running", "review", "respawning"):
+    if task.get("status") in ("done", "merged", "cleaned"):
         continue
 
     task_id = task["id"]
-    tmux = task["tmuxSession"]
-    branch = task["branch"]
+    tmux = task.get("tmuxSession", f"codex-{task_id}")
+    branch = task.get("branch", "")
+    worktree = task.get("worktree", "")
+
+    if "checks" not in task:
+        task["checks"] = {}
 
     # Check tmux alive
     tmux_alive = subprocess.run(
@@ -46,26 +50,71 @@ for task in tasks:
     # Check done marker
     done_marker = os.path.exists(f"/tmp/agent-{task_id}-done")
 
-    # Check for PR if we don't have one yet
-    if not task.get("pr"):
-        result = subprocess.run(
-            ["gh", "pr", "list", "--head", branch, "--json", "number,state", "--limit", "1"],
-            capture_output=True, text=True, cwd=REPO
-        )
-        try:
-            prs = json.loads(result.stdout)
-            if prs:
-                task["pr"] = prs[0]["number"]
-                task["status"] = "review"
-                updated = True
-        except:
-            pass
+    # --- PHASE 1: Agent finished, needs push + PR ---
+    if done_marker and task.get("status") == "running" and worktree:
+        # Auto-commit if uncommitted changes
+        subprocess.run(["git", "add", "-A"], cwd=worktree, capture_output=True)
+        has_changes = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"], cwd=worktree, capture_output=True
+        ).returncode != 0
+        if has_changes:
+            subprocess.run(
+                ["git", "commit", "-m", f"feat({task_id}): agent build"],
+                cwd=worktree, capture_output=True
+            )
 
-    # If we have a PR, check CI and reviews
-    if task.get("pr"):
+        # Rebase + push
+        subprocess.run(["git", "fetch", "origin", "--quiet"], cwd=REPO, capture_output=True)
+        subprocess.run(["git", "rebase", "origin/main"], cwd=worktree, capture_output=True)
+        push = subprocess.run(
+            ["git", "push", "-u", "origin", branch, "--force-with-lease"],
+            cwd=worktree, capture_output=True, text=True
+        )
+
+        if push.returncode == 0:
+            # Create PR if none exists
+            if not task.get("pr"):
+                pr_result = subprocess.run(
+                    ["gh", "pr", "create", "--base", "main", "--fill", "--label", "agent-built"],
+                    cwd=worktree, capture_output=True, text=True
+                )
+                if pr_result.returncode == 0:
+                    pr_url = pr_result.stdout.strip()
+                    # Extract PR number
+                    try:
+                        pr_num = int(pr_url.split("/")[-1])
+                        task["pr"] = pr_num
+                        task["pr_url"] = pr_url
+                    except:
+                        pass
+
+            task["status"] = "review"
+            alerts.append(f"📦 Agent {task_id} pushed — PR #{task.get('pr', '?')} ready for review pipeline")
+        else:
+            task["status"] = "needs_push"
+            alerts.append(f"⚠️ Agent {task_id} finished but push failed. Branch: {branch}")
+        updated = True
+        continue
+
+    # Agent died without done marker
+    if not tmux_alive and not done_marker and task.get("status") == "running":
+        attempts = task.get("attempts", 1)
+        max_attempts = task.get("maxAttempts", 3)
+        if attempts < max_attempts:
+            task["status"] = "needs_respawn"
+            task["attempts"] = attempts + 1
+            alerts.append(f"🔄 Agent {task_id} died (attempt {attempts}/{max_attempts}) — needs respawn")
+        else:
+            task["status"] = "failed"
+            alerts.append(f"💀 Agent {task_id} died after {max_attempts} attempts")
+        updated = True
+        continue
+
+    # --- PHASE 2: PR exists, check CI + reviews ---
+    if task.get("pr") and task.get("status") in ("review", "ready", "ci_failed"):
         pr_num = task["pr"]
 
-        # CI status via gh pr checks
+        # CI status
         result = subprocess.run(
             ["gh", "pr", "checks", str(pr_num), "--json", "name,state,conclusion"],
             capture_output=True, text=True, cwd=REPO
@@ -73,21 +122,18 @@ for task in tasks:
         try:
             checks_data = json.loads(result.stdout)
             if checks_data:
-                ci_passed = all(
+                all_complete = all(c.get("state") in ("COMPLETED", "completed") for c in checks_data)
+                ci_passed = all_complete and all(
                     c.get("conclusion") in ("SUCCESS", "success")
-                    for c in checks_data
-                    if c.get("state") in ("COMPLETED", "completed")
-                )
-                ci_pending = any(
-                    c.get("state") not in ("COMPLETED", "completed")
                     for c in checks_data
                 )
                 ci_failed = any(
                     c.get("conclusion") in ("FAILURE", "failure")
                     for c in checks_data
+                    if c.get("state") in ("COMPLETED", "completed")
                 )
 
-                if ci_pending:
+                if not all_complete:
                     task["checks"]["ci"] = "pending"
                 elif ci_failed:
                     task["checks"]["ci"] = "failed"
@@ -98,49 +144,43 @@ for task in tasks:
         except:
             task["checks"]["ci"] = "unknown"
 
-        # Review count
+        # Review comments count (Gemini + Claude)
         result = subprocess.run(
-            ["gh", "pr", "view", str(pr_num), "--json", "reviews"],
+            ["gh", "api", f"repos/fistfulayen/ubtrippin/pulls/{pr_num}/comments",
+             "--jq", "length"],
             capture_output=True, text=True, cwd=REPO
         )
         try:
-            reviews = json.loads(result.stdout).get("reviews", [])
-            task["checks"]["reviews"] = len(reviews)
-            approved = [r for r in reviews if r.get("state") == "APPROVED"]
-            task["checks"]["approved"] = len(approved)
+            task["checks"]["reviewComments"] = int(result.stdout.strip())
         except:
             pass
 
-        updated = True
+        # Review bodies (approvals, etc)
+        result = subprocess.run(
+            ["gh", "api", f"repos/fistfulayen/ubtrippin/pulls/{pr_num}/reviews",
+             "--jq", '[.[] | .body] | length'],
+            capture_output=True, text=True, cwd=REPO
+        )
+        try:
+            task["checks"]["reviews"] = int(result.stdout.strip())
+        except:
+            pass
 
-        # PR ready: CI passed
-        if task["checks"].get("ci") == "passed" and task["status"] != "ready":
+        # Determine overall readiness
+        ci = task["checks"].get("ci")
+        reviews = task["checks"].get("reviews", 0)
+
+        if ci == "passed" and reviews >= 2 and task["status"] != "ready":
             task["status"] = "ready"
-            alerts.append(f"✅ PR #{pr_num} ({task_id}) ready for review — CI passed, {task['checks'].get('reviews', 0)} reviews")
-
-        # CI failed
-        if task["checks"].get("ci") == "failed" and task["status"] != "failed":
+            alerts.append(f"✅ PR #{pr_num} ({task_id}) — CI passed, {reviews} reviews. Ready for merge.")
+            updated = True
+        elif ci == "failed" and task["status"] != "ci_failed":
             task["status"] = "ci_failed"
-            alerts.append(f"❌ PR #{pr_num} ({task_id}) CI failed — needs intervention")
-
-    # Agent died without PR
-    if not tmux_alive and not task.get("pr") and task["status"] == "running":
-        if done_marker:
-            alerts.append(f"⚠️ Agent {task_id} finished but no PR found — check branch {branch}")
-            task["status"] = "needs_attention"
-        else:
-            if task.get("attempts", 1) < task.get("maxAttempts", 3):
-                alerts.append(f"🔄 Agent {task_id} died — attempt {task['attempts']}/{task['maxAttempts']}")
-                task["status"] = "respawning"
-            else:
-                alerts.append(f"💀 Agent {task_id} died after {task['maxAttempts']} attempts — needs manual help")
-                task["status"] = "failed"
-        updated = True
-
-    # Agent finished and PR exists — clean state
-    if not tmux_alive and task.get("pr") and done_marker and task["status"] == "running":
-        task["status"] = "review"
-        updated = True
+            alerts.append(f"❌ PR #{pr_num} ({task_id}) — CI failed. Needs fix.")
+            updated = True
+        elif ci == "passed" and reviews < 2:
+            # CI passed but waiting for reviews
+            updated = True
 
 if updated:
     with open(REGISTRY, "w") as f:
@@ -150,14 +190,13 @@ if updated:
 active = [
     {
         "id": t["id"],
-        "status": t["status"],
-        "branch": t["branch"],
+        "status": t.get("status"),
+        "branch": t.get("branch"),
         "pr": t.get("pr"),
         "checks": t.get("checks", {}),
-        "tmux": t["tmuxSession"]
     }
     for t in tasks
-    if t["status"] not in ("done", "cleaned", "merged")
+    if t.get("status") not in ("done", "merged", "cleaned")
 ]
 
 output = {"tasks": active, "alerts": alerts}
