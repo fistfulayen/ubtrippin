@@ -127,6 +127,20 @@ curl https://ubtrippin.xyz/api/v1/trips \
 
 ---
 
+## Features
+
+- **AI email ingestion** — forward confirmations to `trips@ubtrippin.xyz`, get structured itinerary data back.
+- **Family Sharing** — sharing is caring: accepted family members share trips, loyalty vaults, profiles, and guides.
+- **Traveler Profile & Loyalty Vault** — persistent traveler preferences + loyalty numbers for booking-time personalization.
+- **Trip collaboration** — invite editors/viewers to collaborate on a trip.
+- **Agent interfaces** — access via web app, REST API, CLI, and MCP server.
+
+### Family Sharing
+
+Family Sharing is all-or-nothing by design. Create a family, invite members, and shared travel context becomes queryable by agents across the whole family.
+
+---
+
 ## Traveler Profile & Loyalty Vault
 
 UBTRIPPIN stores persistent traveler preferences (seat, meal, alliance, home airport, currency) plus loyalty programs in a vault your agent can read at booking time.
