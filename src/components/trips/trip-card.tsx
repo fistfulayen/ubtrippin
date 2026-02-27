@@ -25,25 +25,26 @@ interface TripCardProps {
   ownerName?: string
 }
 
-function getAirlineLogos(items?: TripItem[]): string[] {
+function getProviderLogos(items?: TripItem[]): string[] {
   if (!items) return []
   const seen = new Set<string>()
   const logos: string[] = []
 
   for (const item of items) {
-    if (item.kind !== 'flight') continue
-
-    // Try provider field first, then flight_number from details_json
-    const airline = item.provider
+    const provider = item.provider
     const details = item.details_json as Record<string, unknown> | null
-    const flightNumber = details?.flight_number as string | undefined
 
-    // Best strategy: extract IATA from flight number (e.g. "AF1234" → "AF")
-    const iataCode = flightNumber ? extractAirlineCode(flightNumber) : null
-    const logoFromIata = iataCode ? `https://pics.avs.io/80/80/${iataCode}@2x.png` : null
-    // Fallback: try provider name lookup
-    const logoFromProvider = !logoFromIata && airline ? getProviderLogoUrl(airline, 'flight') : null
-    const url = logoFromIata || logoFromProvider
+    let url: string | null = null
+
+    if (item.kind === 'flight') {
+      const flightNumber = details?.flight_number as string | undefined
+      const iataCode = flightNumber ? extractAirlineCode(flightNumber) : null
+      const logoFromIata = iataCode ? `https://pics.avs.io/80/80/${iataCode}@2x.png` : null
+      const logoFromProvider = !logoFromIata && provider ? getProviderLogoUrl(provider, 'flight') : null
+      url = logoFromIata || logoFromProvider
+    } else if (provider) {
+      url = getProviderLogoUrl(provider, item.kind || 'other')
+    }
 
     if (url && !seen.has(url)) {
       seen.add(url)
@@ -51,7 +52,7 @@ function getAirlineLogos(items?: TripItem[]): string[] {
     }
   }
 
-  return logos.slice(0, 3) // Max 3 airline logos
+  return logos.slice(0, 4) // Max 4 provider logos
 }
 
 function ownerTripLabel(ownerName: string): string {
@@ -61,7 +62,7 @@ function ownerTripLabel(ownerName: string): string {
 }
 
 export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {
-  const airlineLogos = getAirlineLogos(trip.trip_items)
+  const airlineLogos = getProviderLogos(trip.trip_items)
 
   return (
     <Link href={`/trips/${trip.id}`}>
@@ -82,7 +83,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           )}
-          {/* Airline logos */}
+          {/* Provider logos */}
           {airlineLogos.length > 0 && (
             <div className="absolute bottom-2 right-2 flex -space-x-2">
               {airlineLogos.map((url, i) => (
@@ -93,7 +94,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
                 >
                   <Image
                     src={url}
-                    alt="Airline"
+                    alt="Provider"
                     width={28}
                     height={28}
                     className="object-contain"
