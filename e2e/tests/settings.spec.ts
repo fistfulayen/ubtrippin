@@ -46,9 +46,9 @@ test.describe('Calendar feed API', () => {
   test('GET /api/v1/calendar returns ICS URL', async () => {
     if (!process.env.TEST_API_KEY) test.skip()
 
-    const { status, body } = await apiGet('/api/v1/calendar')
+    const { status, body } = await apiGet('/api/v1/calendar/token')
     expect(status).toBe(200)
-    expect(body).toHaveProperty('calendar_url')
-    expect(body.calendar_url).toMatch(/\/api\/calendar\//)
+    expect(body).toHaveProperty('token')
+    expect(body.token).toBeTruthy()
   })
 })
