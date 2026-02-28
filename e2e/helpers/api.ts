@@ -13,9 +13,17 @@ function authHeaders(): HeadersInit {
   }
 }
 
+async function parseBody(res: Response) {
+  const ct = res.headers.get('content-type') ?? ''
+  if (ct.includes('application/json')) {
+    try { return await res.json() } catch { return null }
+  }
+  return null
+}
+
 export async function apiGet(path: string) {
   const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders() })
-  return { status: res.status, body: await res.json() }
+  return { status: res.status, body: await parseBody(res) }
 }
 
 export async function apiPost(path: string, data: unknown) {
@@ -24,7 +32,7 @@ export async function apiPost(path: string, data: unknown) {
     headers: authHeaders(),
     body: JSON.stringify(data),
   })
-  return { status: res.status, body: await res.json() }
+  return { status: res.status, body: await parseBody(res) }
 }
 
 export async function apiPatch(path: string, data: unknown) {
@@ -33,7 +41,7 @@ export async function apiPatch(path: string, data: unknown) {
     headers: authHeaders(),
     body: JSON.stringify(data),
   })
-  return { status: res.status, body: await res.json() }
+  return { status: res.status, body: await parseBody(res) }
 }
 
 export async function apiDelete(path: string) {
@@ -41,5 +49,5 @@ export async function apiDelete(path: string) {
     method: 'DELETE',
     headers: authHeaders(),
   })
-  return { status: res.status, body: res.status === 204 ? null : await res.json() }
+  return { status: res.status, body: res.status === 204 ? null : await parseBody(res) }
 }
