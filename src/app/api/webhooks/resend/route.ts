@@ -115,6 +115,10 @@ export async function POST(request: NextRequest) {
 
     // Extract sender email (removing display name if present)
     const fromEmail = fullEmail.from.match(/<(.+)>/)?.[1] || fullEmail.from
+    const senderName =
+      fullEmail.from.match(/^"?([^"<]+)"?\s*</)?.[1]?.trim() ||
+      fromEmail.split('@')[0] ||
+      null
 
     // Look up user by sender email in allowed_senders
     const { data: allowedSender } = await supabase
@@ -292,6 +296,38 @@ export async function POST(request: NextRequest) {
             message: 'Loyalty signup email processed',
             email_id: sourceEmail.id,
             items_created: 0,
+          })
+        }
+
+        const recommendationImport = await importRecommendationEmail({
+          supabase,
+          userId,
+          fromEmail,
+          senderName,
+          subject: fullEmail.subject || '',
+          bodyText: `${fullEmail.text || ''}\n${attachmentText || ''}`,
+        })
+
+        if (recommendationImport.importedCount > 0) {
+          await supabase
+            .from('source_emails')
+            .update({
+              parse_status: 'completed',
+              parse_error: null,
+              extracted_json: {
+                doc_type: 'guide_recommendations',
+                items: [],
+                recommendations_imported: recommendationImport.importedCount,
+                city: recommendationImport.city,
+              },
+            })
+            .eq('id', sourceEmail.id)
+
+          return NextResponse.json({
+            message: 'Recommendation email imported into guide entries',
+            email_id: sourceEmail.id,
+            items_created: 0,
+            guide_entries_created: recommendationImport.importedCount,
           })
         }
 
@@ -884,6 +920,194 @@ async function upsertLoyaltyFromSignup(params: {
       program_number_masked: maskLoyaltyNumber(normalizedNumber),
       preferred: false,
     })
+}
+
+interface RecommendationImportResult {
+  importedCount: number
+  city: string | null
+}
+
+function normalizeText(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
+  const haystack = normalizeText(`${subject}\n${bodyText}`)
+  const bookingSignals = [
+    'booking confirmation',
+    'reservation confirmed',
+    'itinerary',
+    'ticket number',
+    'check-in',
+    'boarding pass',
+    'flight',
+    'hotel',
+    'confirmation code',
+    'pnr',
+  ]
+  return bookingSignals.some((signal) => haystack.includes(signal))
+}
+
+function looksLikeRecommendationEmail(subject: string, bodyText: string): boolean {
+  const haystack = normalizeText(`${subject}\n${bodyText}`)
+  const recommendationSignals = [
+    'recommend',
+    'recommendation',
+    'places to eat',
+    'places to visit',
+    'you should try',
+    'you should go',
+    'my list',
+    'favorites in',
+    'must-try',
+    'must visit',
+  ]
+  const hasRecommendationSignal = recommendationSignals.some((signal) => haystack.includes(signal))
+  return hasRecommendationSignal && !looksLikeBookingEmail(subject, bodyText)
+}
+
+function cleanRecommendationLine(line: string): string {
+  return line
+    .replace(/^[\-\*\u2022]+\s*/, '')
+    .replace(/^\d+[\.\)]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function inferCategoryFromLine(line: string): string {
+  const lower = normalizeText(line)
+  if (/(coffee|cafe|espresso|roaster)/u.test(lower)) return 'Coffee'
+  if (/(bar|wine|cocktail|brewery|pub)/u.test(lower)) return 'Bars & Wine'
+  if (/(museum|gallery|exhibit|exhibition)/u.test(lower)) return 'Museums & Galleries'
+  if (/(park|garden|hike|trail|nature)/u.test(lower)) return 'Parks & Nature'
+  if (/(restaurant|dinner|lunch|brunch|food|eat)/u.test(lower)) return 'Restaurants'
+  return 'Hidden Gems'
+}
+
+function extractRecommendationCandidates(bodyText: string): Array<{ name: string; description: string | null; category: string }> {
+  const lines = bodyText
+    .split('\n')
+    .map((line) => cleanRecommendationLine(line))
+    .filter((line) => line.length >= 3 && line.length <= 180)
+
+  const seen = new Set<string>()
+  const results: Array<{ name: string; description: string | null; category: string }> = []
+
+  for (const line of lines) {
+    const bulletLike = /^([\p{Lu}0-9][\p{L}0-9 '&().,-]{2,80})(\s*[-\u2013:]\s*(.+))?$/u.exec(line)
+    if (!bulletLike) continue
+
+    const name = bulletLike[1].trim()
+    if (name.split(' ').length > 8) continue
+    const normalized = normalizeText(name)
+    if (seen.has(normalized)) continue
+    seen.add(normalized)
+
+    const description = bulletLike[3]?.trim() || null
+    const category = inferCategoryFromLine(line)
+    results.push({ name, description, category })
+
+    if (results.length >= 10) break
+  }
+
+  return results
+}
+
+function inferRecommendationCity(subject: string, bodyText: string): string | null {
+  const normalizedSubject = normalizeText(subject)
+  const normalizedBody = normalizeText(bodyText)
+
+  const subjectMatch = normalizedSubject.match(/\b(?:in|for|around)\s+([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\b/)
+  if (subjectMatch?.[1]) return subjectMatch[1].trim()
+
+  const bodyMatch = normalizedBody.match(/\b(?:in|for|around)\s+([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\b/)
+  if (bodyMatch?.[1]) return bodyMatch[1].trim()
+
+  const cityListMatch = normalizedSubject.match(/^([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\s+(?:recommendations|recs|favorites)\b/)
+  if (cityListMatch?.[1]) return cityListMatch[1].trim()
+
+  return null
+}
+
+async function importRecommendationEmail(params: {
+  supabase: ReturnType<typeof createSecretClient>
+  userId: string
+  fromEmail: string
+  senderName: string | null
+  subject: string
+  bodyText: string
+}): Promise<RecommendationImportResult> {
+  if (!looksLikeRecommendationEmail(params.subject, params.bodyText)) {
+    return { importedCount: 0, city: null }
+  }
+
+  const candidates = extractRecommendationCandidates(params.bodyText)
+  if (candidates.length === 0) {
+    return { importedCount: 0, city: null }
+  }
+
+  let city = inferRecommendationCity(params.subject, params.bodyText)
+  if (!city) {
+    const { data: guides } = await params.supabase
+      .from('city_guides')
+      .select('city')
+      .eq('user_id', params.userId)
+      .limit(2)
+
+    if (guides && guides.length === 1) {
+      city = (guides[0] as { city: string }).city
+    }
+  }
+
+  if (!city) return { importedCount: 0, city: null }
+
+  const { data: existingGuide } = await params.supabase
+    .from('city_guides')
+    .select('id')
+    .eq('user_id', params.userId)
+    .ilike('city', city)
+    .maybeSingle()
+
+  let guideId = existingGuide?.id ?? null
+  if (!guideId) {
+    const { data: newGuide } = await params.supabase
+      .from('city_guides')
+      .insert({ user_id: params.userId, city })
+      .select('id')
+      .single()
+    guideId = newGuide?.id ?? null
+  }
+
+  if (!guideId) return { importedCount: 0, city }
+
+  const { data: authorProfile } = await params.supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', params.userId)
+    .maybeSingle()
+  const profile = authorProfile as { full_name?: string | null; email?: string | null } | null
+  const authorName = profile?.full_name || profile?.email || null
+
+  const inserts = candidates.map((candidate) => ({
+    guide_id: guideId,
+    user_id: params.userId,
+    author_id: params.userId,
+    author_name: authorName,
+    name: candidate.name,
+    category: candidate.category,
+    status: 'to_try' as const,
+    description: candidate.description,
+    recommended_by: params.senderName || params.fromEmail,
+    source: 'import' as const,
+  }))
+
+  const { error } = await params.supabase.from('guide_entries').insert(inserts)
+  if (error) {
+    console.error('[webhooks/resend] Failed to import recommendation entries:', error)
+    return { importedCount: 0, city }
+  }
+
+  return { importedCount: inserts.length, city }
 }
 
 async function sendUnclearEmailReply(params: {

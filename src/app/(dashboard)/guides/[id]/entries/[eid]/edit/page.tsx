@@ -45,12 +45,14 @@ export default async function EditEntryPage({ params }: Props) {
       <EntryForm
         action={action}
         cancelHref={`/guides/${id}`}
+        guideCity={g.city}
         defaultValues={{
           name: e.name,
           category: e.category,
           status: e.status,
           description: e.description ?? '',
           address: e.address ?? '',
+          google_place_id: e.google_place_id ?? '',
           website_url: e.website_url ?? '',
           rating: e.rating ? String(e.rating) : '',
           recommended_by: e.recommended_by ?? '',

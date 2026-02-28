@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { nanoid } from 'nanoid'
+import { getDestinationImageUrl } from '@/lib/images/unsplash'
 
 // ---------------------------------------------------------------------------
 // Guide CRUD
@@ -81,6 +82,34 @@ export async function toggleGuidePublic(guideId: string, isPublic: boolean) {
   return { ok: true }
 }
 
+export async function refreshGuideCoverImage(guideId: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: guide } = await supabase
+    .from('city_guides')
+    .select('id, city')
+    .eq('id', guideId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (!guide?.city) return
+
+  const coverImageUrl = await getDestinationImageUrl(guide.city)
+  if (!coverImageUrl) return
+
+  await supabase
+    .from('city_guides')
+    .update({ cover_image_url: coverImageUrl })
+    .eq('id', guideId)
+    .eq('user_id', user.id)
+
+  revalidatePath(`/guides/${guideId}`)
+}
+
 // ---------------------------------------------------------------------------
 // Entry CRUD
 // ---------------------------------------------------------------------------
@@ -105,6 +134,7 @@ export async function createEntry(guideId: string, formData: FormData) {
   const longitude = lng_raw ? parseFloat(lng_raw) : null
   const source_url = (formData.get('source_url') as string)?.trim() || null
   const source = (formData.get('source') as string) || 'manual'
+  const google_place_id = (formData.get('google_place_id') as string)?.trim() || null
 
   if (!name) return
 
@@ -142,6 +172,7 @@ export async function createEntry(guideId: string, formData: FormData) {
     recommended_by,
     latitude,
     longitude,
+    google_place_id,
     source: source as 'manual' | 'agent' | 'import' | 'share-to',
     source_url,
   })
@@ -170,6 +201,7 @@ export async function updateEntry(guideId: string, entryId: string, formData: Fo
   const lng_raw = formData.get('longitude') as string
   const latitude = lat_raw ? parseFloat(lat_raw) : null
   const longitude = lng_raw ? parseFloat(lng_raw) : null
+  const google_place_id = (formData.get('google_place_id') as string)?.trim() || null
 
   if (!name) return
 
@@ -186,6 +218,7 @@ export async function updateEntry(guideId: string, entryId: string, formData: Fo
       recommended_by,
       latitude,
       longitude,
+      google_place_id,
     })
     .eq('id', entryId)
     .eq('user_id', user.id)

@@ -53,6 +53,7 @@ export default async function AddEntryPage({ params, searchParams }: Props) {
       <EntryForm
         action={action}
         cancelHref={`/guides/${id}`}
+        guideCity={g.city}
         defaultValues={{
           name: name ?? '',
           source_url: url ?? '',
