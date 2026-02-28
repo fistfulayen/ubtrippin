@@ -8,13 +8,18 @@
  */
 
 import { createSecretClient } from '@/lib/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+type DbClient = SupabaseClient
 
 /**
  * Called when the email ingest webhook successfully processes an email for a user.
  * Sets first_forward_at if it hasn't been set yet (idempotent).
  */
-export async function trackFirstForward(userId: string): Promise<void> {
-  const supabase = createSecretClient()
+export async function trackFirstForward(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<void> {
 
   // Only set if not already set — idempotent upsert
   await supabase
@@ -30,8 +35,10 @@ export async function trackFirstForward(userId: string): Promise<void> {
  * - If activated_at already set: sets second_trip_at if not already set
  * Both operations are idempotent.
  */
-export async function trackTripCreated(userId: string): Promise<void> {
-  const supabase = createSecretClient()
+export async function trackTripCreated(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<void> {
 
   // Fetch current activation state
   const { data: profile } = await supabase

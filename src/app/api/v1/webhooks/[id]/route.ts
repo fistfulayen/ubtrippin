@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { authenticateWebhookRequest, isWebhookAuthError } from '@/lib/api/webhook-auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { encryptWebhookSecret, maskWebhookSecret } from '@/lib/webhook-crypto'
 import { validateWebhookUrl } from '@/lib/webhook-url'
 import { WEBHOOK_EVENTS } from '@/lib/webhooks'
@@ -37,7 +37,7 @@ function sanitizeWebhook(webhook: Record<string, unknown>): Record<string, unkno
 }
 
 async function getOwnedWebhookOr404(userId: string, webhookId: string) {
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(userId)
   const { data } = await supabase
     .from('webhooks')
     .select('id, user_id, url, description, secret_masked, events, enabled, created_at, updated_at')
@@ -215,7 +215,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data, error } = await supabase
     .from('webhooks')
     .update(updates)
@@ -260,7 +260,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   await supabase.from('webhook_delivery_queue').delete().eq('webhook_id', id)
 

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { nanoid } from 'nanoid'
 import type { CityGuide, GuideEntry } from '@/types/database'
@@ -30,7 +30,7 @@ export async function GET(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   const { data: guide, error: guideError } = await supabase
     .from('city_guides')
@@ -149,7 +149,7 @@ export async function PATCH(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // If making public, ensure share_token exists
   const updates: Record<string, unknown> = {}
@@ -208,7 +208,7 @@ export async function DELETE(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   const { error } = await supabase
     .from('city_guides')

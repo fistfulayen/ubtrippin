@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
@@ -127,7 +127,7 @@ export async function POST(
     cleanItems.push(result.data)
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 7. Verify trip ownership (once for the batch)
   const { data: trip } = await supabase

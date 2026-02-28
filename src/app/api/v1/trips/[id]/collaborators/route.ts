@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { sendCollaboratorInviteEmail } from '@/lib/email/collaborator-invite'
 import { customAlphabet } from 'nanoid'
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // Verify ownership
   const { data: trip } = await supabase
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // Verify ownership + get trip details for email
   const { data: trip } = await supabase

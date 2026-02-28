@@ -1,6 +1,8 @@
 import { createSecretClient } from '@/lib/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type SubscriptionTier = 'free' | 'pro'
+type DbClient = SupabaseClient
 
 const FREE_TRIP_LIMIT = 3
 const FREE_EXTRACTION_LIMIT = 10
@@ -12,8 +14,10 @@ export interface LimitResult {
   limit: number | null
 }
 
-export async function getUserTier(userId: string): Promise<SubscriptionTier> {
-  const supabase = createSecretClient()
+export async function getUserTier(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<SubscriptionTier> {
   const { data } = await supabase
     .from('profiles')
     .select('subscription_tier')
@@ -26,14 +30,16 @@ export async function getUserTier(userId: string): Promise<SubscriptionTier> {
 /**
  * Check whether the user is allowed to extract another email this month.
  */
-export async function checkExtractionLimit(userId: string): Promise<LimitResult> {
-  const tier = await getUserTier(userId)
+export async function checkExtractionLimit(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<LimitResult> {
+  const tier = await getUserTier(userId, supabase)
 
   if (tier === 'pro') {
     return { allowed: true, used: 0, limit: null }
   }
 
-  const supabase = createSecretClient()
   const month = new Date().toISOString().slice(0, 7) // YYYY-MM
 
   const { data } = await supabase
@@ -55,8 +61,10 @@ export async function checkExtractionLimit(userId: string): Promise<LimitResult>
 /**
  * Bump the monthly extraction counter for a user (upsert).
  */
-export async function incrementExtractionCount(userId: string): Promise<void> {
-  const supabase = createSecretClient()
+export async function incrementExtractionCount(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<void> {
   const month = new Date().toISOString().slice(0, 7) // YYYY-MM
 
   const { data: existing } = await supabase
@@ -82,14 +90,16 @@ export async function incrementExtractionCount(userId: string): Promise<void> {
 /**
  * Check whether the user is allowed to create another trip.
  */
-export async function checkTripLimit(userId: string): Promise<LimitResult> {
-  const tier = await getUserTier(userId)
+export async function checkTripLimit(
+  userId: string,
+  supabase: DbClient = createSecretClient()
+): Promise<LimitResult> {
+  const tier = await getUserTier(userId, supabase)
 
   if (tier === 'pro') {
     return { allowed: true, used: 0, limit: null }
   }
 
-  const supabase = createSecretClient()
   const today = new Date().toISOString().slice(0, 10)
   const { data } = await supabase
     .from('trips')

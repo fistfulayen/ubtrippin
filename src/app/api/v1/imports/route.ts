@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 4. Pro tier gate
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: profile } = await supabase
     .from('profiles')
     .select('tier')
@@ -132,7 +132,7 @@ export async function GET(request: NextRequest) {
   const limited = rateLimitResponse(auth.keyHash)
   if (limited) return limited
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: imports, error } = await supabase
     .from('imports')
     .select('id, source, status, trips_created, error, created_at, completed_at')

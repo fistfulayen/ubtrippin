@@ -3,7 +3,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 type Params = { params: Promise<{ token: string }> }
 
@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   const { data: invite, error } = await supabase
     .from('trip_collaborators')

@@ -1,4 +1,5 @@
 import { createSecretClient } from '@/lib/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface ExtractionExample {
   id: string
@@ -16,10 +17,9 @@ export interface ExtractionExample {
  * Prioritizes provider-specific examples, falls back to global high-quality ones.
  */
 export async function selectExamples(
-  senderDomain?: string
+  senderDomain?: string,
+  supabase: SupabaseClient = createSecretClient()
 ): Promise<ExtractionExample[]> {
-  const supabase = createSecretClient()
-
   // Build query - prioritize provider-specific matches, then global examples
   let query = supabase
     .from('extraction_examples')

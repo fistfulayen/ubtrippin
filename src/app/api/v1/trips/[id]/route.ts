@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeItem, sanitizeTripInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -33,7 +33,7 @@ export async function GET(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   const TRIP_FIELDS = `id,
        title,
@@ -180,7 +180,7 @@ export async function PATCH(
   }
 
   // 6. Update — verify ownership via .eq('user_id') + check rows affected
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // First check ownership
   const { data: existing } = await supabase
@@ -268,7 +268,7 @@ export async function DELETE(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 4. Verify ownership before deleting
   const { data: existing } = await supabase
