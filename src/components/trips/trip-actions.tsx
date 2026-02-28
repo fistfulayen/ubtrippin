@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -23,15 +24,17 @@ interface TripActionsProps {
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
   /** Whether the current user is the trip owner (default: true for backward compat) */
   isOwner?: boolean
+  isPro?: boolean
 }
 
-export function TripActions({ trip, allTrips, isOwner = true }: TripActionsProps) {
+export function TripActions({ trip, allTrips, isOwner = true, isPro = false }: TripActionsProps) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
   const [merging, setMerging] = useState(false)
   const [mergeTarget, setMergeTarget] = useState<string>('')
   const [mergeOpen, setMergeOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [showPdfUpsell, setShowPdfUpsell] = useState(false)
 
   const otherTrips = allTrips.filter((t) => t.id !== trip.id)
 
@@ -68,23 +71,30 @@ export function TripActions({ trip, allTrips, isOwner = true }: TripActionsProps
     router.refresh()
   }
 
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Link href={`/trips/${trip.id}/add-item`}>
-        <Button variant="outline" size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          Add Item
-        </Button>
-      </Link>
+  const handleExportPdf = () => {
+    if (!isPro) {
+      setShowPdfUpsell(true)
+      return
+    }
+    window.open(`/trips/${trip.id}/pdf`, '_blank', 'noopener,noreferrer')
+  }
 
-      <Link href={`/trips/${trip.id}/pdf`} target="_blank">
-        <Button variant="outline" size="sm">
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        <Link href={`/trips/${trip.id}/add-item`}>
+          <Button variant="outline" size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </Link>
+
+        <Button variant="outline" size="sm" onClick={handleExportPdf}>
           <FileDown className="mr-2 h-4 w-4" />
           Download PDF
         </Button>
-      </Link>
 
-      {isOwner && otherTrips.length > 0 && (
+        {isOwner && otherTrips.length > 0 && (
         <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
@@ -130,9 +140,9 @@ export function TripActions({ trip, allTrips, isOwner = true }: TripActionsProps
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      )}
+        )}
 
-      {isOwner && (
+        {isOwner && (
         <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
@@ -166,6 +176,16 @@ export function TripActions({ trip, allTrips, isOwner = true }: TripActionsProps
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
+      </div>
+
+      {showPdfUpsell && (
+        <UpgradeCard
+          title="PDF export is included with Pro"
+          description="Export polished itinerary PDFs for offline access, sharing, and printing."
+          variant="card"
+          showEarlyAdopter
+        />
       )}
     </div>
   )

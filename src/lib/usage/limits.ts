@@ -90,12 +90,18 @@ export async function checkTripLimit(userId: string): Promise<LimitResult> {
   }
 
   const supabase = createSecretClient()
-  const { count } = await supabase
+  const today = new Date().toISOString().slice(0, 10)
+  const { data } = await supabase
     .from('trips')
-    .select('id', { count: 'exact', head: true })
+    .select('id, start_date, end_date')
     .eq('user_id', userId)
 
-  const used = count ?? 0
+  const used = (data ?? []).filter((trip) => {
+    const start = trip.start_date as string | null
+    const end = trip.end_date as string | null
+    if (!start) return true
+    return (end ?? start) >= today
+  }).length
 
   return {
     allowed: used < FREE_TRIP_LIMIT,

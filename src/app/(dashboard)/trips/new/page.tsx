@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { createClient } from '@/lib/supabase/server'
 import { checkTripLimit } from '@/lib/usage/limits'
 import NewTripForm from './new-trip-form'
@@ -38,29 +39,22 @@ export default async function NewTripPage() {
       </div>
 
       {limitHit ? (
-        <div className="rounded-xl border border-[#cbd5e1] bg-[#ffffff] p-6 space-y-3">
-          <h2 className="text-lg font-semibold text-[#1e293b]">Trip limit reached</h2>
-          <p className="text-sm text-[#1e293b]">
-            You&apos;ve used {limitUsed} of {limitMax} trips on the free plan. Upgrade to{' '}
-            <strong>Pro</strong> for unlimited trips.
+        <div className="space-y-4">
+          <UpgradeCard
+            title="You hit the free trip limit"
+            description={`You already have ${limitUsed}/${limitMax} active trips. Upgrade to Pro to create trip #${limitMax + 1} now.`}
+            variant="card"
+            showEarlyAdopter
+          />
+          <p className="text-xs text-slate-600">
+            You can also archive or delete an existing trip to free up a slot.
           </p>
-          <p className="text-xs text-[#4338ca]">
-            Alternatively, delete an existing trip to free up a slot.
-          </p>
-          <div className="flex gap-3 pt-2">
-            <Link
-              href="/trips"
-              className="inline-flex items-center rounded-md bg-[#1e293b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
-            >
-              Back to trips
-            </Link>
-            <Link
-              href="/settings/billing"
-              className="inline-flex items-center rounded-md border border-[#cbd5e1] bg-white px-4 py-2 text-sm font-medium text-[#1e293b] hover:bg-[#ffffff]"
-            >
-              Upgrade to Pro
-            </Link>
-          </div>
+          <Link
+            href="/trips"
+            className="inline-flex items-center rounded-md bg-[#1e293b] px-4 py-2 text-sm font-medium text-white hover:bg-[#312e81]"
+          >
+            Back to trips
+          </Link>
         </div>
       ) : (
         <NewTripForm />

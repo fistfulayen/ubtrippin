@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('calendar_token')
+    .select('calendar_token, subscription_tier')
     .eq('id', user.id)
     .single()
 
@@ -40,6 +40,19 @@ export async function POST(_request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('subscription_tier')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.subscription_tier !== 'pro') {
+    return NextResponse.json(
+      { error: { code: 'pro_required', message: 'Calendar feed is available on Pro.' } },
+      { status: 403 }
+    )
   }
 
   const token = nanoid(32)

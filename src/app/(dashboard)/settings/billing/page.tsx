@@ -1,6 +1,7 @@
 import { CreditCard } from 'lucide-react'
 
 import { BillingPanel } from './billing-panel'
+import { UpgradeSuccess } from '@/components/billing/upgrade-success'
 import { SettingsNav } from '@/components/settings/settings-nav'
 import { createClient } from '@/lib/supabase/server'
 
@@ -13,7 +14,11 @@ function normalizeTier(value: string | null | undefined): SubscriptionTier {
   return 'free'
 }
 
-export default async function SettingsBillingPage() {
+interface SettingsBillingPageProps {
+  searchParams?: Promise<{ upgraded?: string }>
+}
+
+export default async function SettingsBillingPage({ searchParams }: SettingsBillingPageProps) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -41,6 +46,9 @@ export default async function SettingsBillingPage() {
     current_price: null,
   }
 
+  const query = await searchParams
+  const upgraded = query?.upgraded === 'true'
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
@@ -49,6 +57,8 @@ export default async function SettingsBillingPage() {
       </div>
 
       <SettingsNav />
+
+      <UpgradeSuccess active={upgraded} />
 
       <div className="rounded-lg border border-[#cbd5e1] bg-white p-4">
         <div className="mb-4 flex items-center gap-2 text-sm font-medium text-[#1e293b]">
