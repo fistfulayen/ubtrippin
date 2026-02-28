@@ -105,7 +105,6 @@ function GuideCard({ guide }: { guide: CityGuide }) {
       <div className="group rounded-xl border border-gray-200 bg-white p-5 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer">
         {/* Cover image or placeholder */}
         {guide.cover_image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={guide.cover_image_url}
             alt={guide.city}

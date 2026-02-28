@@ -193,7 +193,6 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                 onComplete={(c) => setCompletedCrop(c)}
                 aspect={16 / 9}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={previewSrc}
                   alt="Crop preview"

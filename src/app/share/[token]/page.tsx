@@ -1,5 +1,5 @@
 import { createSecretClient } from '@/lib/supabase/service'
-import { formatDateRange, formatDate, getKindIcon } from '@/lib/utils'
+import { formatDateRange, getKindIcon } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import Image from 'next/image'
@@ -19,7 +19,7 @@ import {
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { extractAirlineCode } from '@/lib/images/airline-logo'
 import { AirlineLogoIcon } from './airline-logo-icon'
-import type { TripItem, TripItemKind } from '@/types/database'
+import type { TripItemKind } from '@/types/database'
 
 interface SharePageProps {
   params: Promise<{ token: string }>
@@ -68,7 +68,7 @@ const kindColors: Record<TripItemKind, string> = {
   other: 'bg-gray-100 text-gray-800',
 }
 
-function TripItemRow({ item }: { item: TripItem }) {
+function TripItemRow({ item }: { item: ShareTripItem }) {
   const names = item.traveler_names.map(obfuscateName)
   const location =
     item.start_location && item.end_location
@@ -83,9 +83,6 @@ function TripItemRow({ item }: { item: TripItem }) {
     : null
   const departureTime = details?.departure_local_time as string | undefined
   const arrivalTime = details?.arrival_local_time as string | undefined
-  const departureStation = details?.departure_station as string | undefined || details?.departure_airport as string | undefined
-  const arrivalStation = details?.arrival_station as string | undefined || details?.arrival_airport as string | undefined
-
   // Build a display title: "Delta DL349" or "SNCF TGV 1234"
   const displayTitle = flightNumber
     ? `${item.provider ?? capitalise(item.kind)} ${flightNumber}`
@@ -231,7 +228,7 @@ export default async function SharePage({ params }: SharePageProps) {
     .order('start_ts', { ascending: true })
 
   // Strip sensitive fields from details_json before passing to the component
-  const items = rawItems?.map((item) => {
+  const items = rawItems?.map((item): ShareTripItem => {
     const { details_json, ...rest } = item
     let safeDetails: Record<string, unknown> | null = null
     if (details_json && typeof details_json === 'object') {
@@ -374,7 +371,7 @@ export default async function SharePage({ params }: SharePageProps) {
                 <div className="divide-y divide-[#f1f5f9]">
                   {items.map((item) => (
                     <div key={item.id} className="px-5">
-                      <TripItemRow item={item as any} />
+                      <TripItemRow item={item} />
                     </div>
                   ))}
                 </div>
@@ -424,4 +421,16 @@ export default async function SharePage({ params }: SharePageProps) {
       </footer>
     </div>
   )
+}
+interface ShareTripItem {
+  id: string
+  kind: TripItemKind
+  provider: string | null
+  traveler_names: string[]
+  start_date: string
+  end_date: string | null
+  start_location: string | null
+  end_location: string | null
+  summary: string | null
+  details_json: Record<string, unknown> | null
 }
