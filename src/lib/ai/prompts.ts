@@ -17,10 +17,13 @@ Rules:
 10. If data is ambiguous or confidence < 0.65, set needs_review to true
 11. Extract the status: "confirmed", "cancelled", "changed", "pending", or "unknown"
 12. Parse dates in ISO 8601 format (YYYY-MM-DD) and timestamps as ISO 8601 with timezone
+13. If a date in the source omits the year, infer the NEXT occurrence on or after today (never default to a past year). Example when today is 2026-02-28: "March 15" => 2026-03-15, "January 10" => 2027-01-10.
 
 Return ONLY valid JSON matching this schema. Do not include any other text or explanation.`
 
 export const TRAVEL_EXTRACTION_USER_PROMPT = `Extract travel reservations from this email content.
+
+Reference date (today): {{today}}
 
 Return JSON in this exact format:
 {
@@ -98,7 +101,10 @@ export function buildExtractionPrompt(
   body: string,
   attachmentText?: string
 ): string {
+  const today = new Date().toISOString().split('T')[0]
+
   let prompt = TRAVEL_EXTRACTION_USER_PROMPT
+    .replace('{{today}}', today)
     .replace('{{subject}}', subject || '(no subject)')
     .replace('{{body}}', body || '(no body)')
 
