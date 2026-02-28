@@ -16,13 +16,13 @@ test.describe('/trips list', () => {
   test('loads for authenticated user', async ({ page }) => {
     if (!process.env.TEST_USER_EMAIL) test.skip()
 
-    await page.goto('/trips')
+    const response = await page.goto('/trips')
     await expect(page).not.toHaveURL(/\/login/)
 
     // Page should load without error (no error boundary text)
     const body = await page.content()
     expect(body).not.toContain('Application error')
-    expect(body).not.toContain('500')
+    expect(response?.status()).not.toBe(500)
   })
 })
 

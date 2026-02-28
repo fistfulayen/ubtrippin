@@ -14,12 +14,12 @@ test.describe('Settings page', () => {
   test('loads without error', async ({ page }) => {
     if (!process.env.TEST_USER_EMAIL) test.skip()
 
-    await page.goto('/settings')
+    const response = await page.goto('/settings')
     await expect(page).not.toHaveURL(/\/login/)
 
     const body = await page.content()
     expect(body).not.toContain('Application error')
-    expect(body).not.toContain('500')
+    expect(response?.status()).not.toBe(500)
   })
 
   test('API key section is visible', async ({ page }) => {

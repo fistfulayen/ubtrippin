@@ -14,6 +14,7 @@ export interface SeedGuideOptions {
 
 export interface SeedEntryOptions {
   guideId: string
+  userId: string
   name?: string
   category?: string
   status?: 'visited' | 'to_try'
@@ -48,6 +49,7 @@ export async function seedGuideEntry(opts: SeedEntryOptions): Promise<string> {
   const { data, error } = await supabase
     .from('guide_entries')
     .insert({
+      user_id: opts.userId,
       guide_id: opts.guideId,
       name: opts.name ?? 'E2E Test Cafe',
       category: opts.category ?? 'coffee',
