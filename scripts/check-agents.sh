@@ -108,7 +108,7 @@ for task in tasks:
                         pr_num = int(pr_url.split("/")[-1])
                         task["pr"] = pr_num
                         task["pr_url"] = pr_url
-                    except:
+                    except (IndexError, TypeError, ValueError):
                         pass
 
             task["status"] = "review"
@@ -164,7 +164,7 @@ for task in tasks:
                     task["checks"]["ci"] = "passed"
             else:
                 task["checks"]["ci"] = "no-checks"
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             task["checks"]["ci"] = "unknown"
 
         # Review sources (Gemini + Claude)
