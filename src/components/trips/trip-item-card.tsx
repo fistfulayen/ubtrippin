@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,6 +35,7 @@ import {
   MapPin,
   Clock,
   Hash,
+  Pencil,
 } from 'lucide-react'
 import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -151,6 +153,9 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
 
   const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
   const otherTrips = safeAllTrips.filter((t) => t.id !== item.trip_id)
+  const sourceEmailId = typeof item.source_email_id === 'string' && item.source_email_id.length > 0
+    ? item.source_email_id
+    : null
 
   return (
     <>
@@ -266,7 +271,30 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
             </div>
 
             {/* Actions */}
-            <div className="relative">
+            <div className="relative flex items-center gap-1">
+              {sourceEmailId ? (
+                <Link href={`/inbox?highlight=${encodeURIComponent(sourceEmailId)}`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    title="Edit extraction in Inbox"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-gray-300"
+                  disabled
+                  title="No source email for this item"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"

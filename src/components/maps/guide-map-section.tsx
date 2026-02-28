@@ -20,5 +20,6 @@ const GuideMap = dynamic(
 )
 
 export function GuideMapSection({ entries }: GuideMapSectionProps) {
+  if (entries.length === 0) return null
   return <GuideMap entries={entries} />
 }

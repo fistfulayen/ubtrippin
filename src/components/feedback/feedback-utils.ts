@@ -7,6 +7,7 @@ export interface FeedbackBoardItem {
   type: FeedbackType
   title: string
   body: string
+  image_url: string | null
   status: FeedbackStatus
   votes: number
   created_at: string

@@ -7,6 +7,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   STATUS_BADGE_CLASS,
@@ -22,9 +23,16 @@ interface FeedbackDetailProps {
   comments: FeedbackCommentItem[]
   currentUserId: string
   currentUserName: string | null
+  canManageStatus: boolean
 }
 
-export function FeedbackDetail({ feedback, comments: initialComments, currentUserId, currentUserName }: FeedbackDetailProps) {
+export function FeedbackDetail({
+  feedback,
+  comments: initialComments,
+  currentUserId,
+  currentUserName,
+  canManageStatus,
+}: FeedbackDetailProps) {
   const supabase = createClient()
 
   const [item, setItem] = useState<FeedbackBoardItem>(feedback)
@@ -32,6 +40,7 @@ export function FeedbackDetail({ feedback, comments: initialComments, currentUse
   const [commentBody, setCommentBody] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
   const [voting, setVoting] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function toggleVote() {
@@ -106,6 +115,39 @@ export function FeedbackDetail({ feedback, comments: initialComments, currentUse
     setSubmittingComment(false)
   }
 
+  async function handleStatusChange(nextStatus: FeedbackBoardItem['status']) {
+    if (!canManageStatus || nextStatus === item.status || updatingStatus) return
+
+    setUpdatingStatus(true)
+    setError(null)
+
+    try {
+      const response = await fetch(`/api/feedback/${item.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      })
+
+      if (!response.ok) {
+        setError('Could not update status.')
+        setUpdatingStatus(false)
+        return
+      }
+
+      const payload = (await response.json()) as { data?: Partial<FeedbackBoardItem> }
+      if (payload.data) {
+        setItem((prev) => ({
+          ...prev,
+          ...payload.data,
+        }))
+      }
+    } catch {
+      setError('Could not update status.')
+    }
+
+    setUpdatingStatus(false)
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link href="/feedback" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
@@ -124,6 +166,25 @@ export function FeedbackDetail({ feedback, comments: initialComments, currentUse
               <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_BADGE_CLASS[item.status])}>
                 {STATUS_LABELS[item.status]}
               </span>
+              {canManageStatus && (
+                <div className="ml-2 flex items-center gap-2">
+                  <Select
+                    value={item.status}
+                    disabled={updatingStatus}
+                    onChange={(event) => {
+                      void handleStatusChange(event.target.value as FeedbackBoardItem['status'])
+                    }}
+                    className="h-8 rounded-md border-gray-300 px-2 py-1 text-xs"
+                  >
+                    <option value="new">New</option>
+                    <option value="under_review">Under Review</option>
+                    <option value="planned">Planned</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="shipped">Shipped</option>
+                    <option value="declined">Declined</option>
+                  </Select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -146,6 +207,16 @@ export function FeedbackDetail({ feedback, comments: initialComments, currentUse
         </div>
 
         <p className="whitespace-pre-wrap text-gray-700">{item.body}</p>
+
+        {item.image_url && (
+          <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="block">
+            <img
+              src={item.image_url}
+              alt="Feedback screenshot"
+              className="max-h-[420px] w-full rounded-lg border border-gray-200 object-contain"
+            />
+          </a>
+        )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
       </article>

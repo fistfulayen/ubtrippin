@@ -23,7 +23,7 @@ export default async function FeedbackDetailPage({ params }: FeedbackDetailPageP
 
   const { data: feedbackData } = await supabase
     .from('feedback')
-    .select('id, user_id, type, title, body, status, votes, created_at, updated_at')
+    .select('id, user_id, type, title, body, image_url, status, votes, created_at, updated_at')
     .eq('id', id)
     .maybeSingle()
 
@@ -81,6 +81,7 @@ export default async function FeedbackDetailPage({ params }: FeedbackDetailPageP
       comments={commentItems}
       currentUserId={user.id}
       currentUserName={nameByUserId.get(user.id) ?? null}
+      canManageStatus={user.id === feedback.user_id}
     />
   )
 }

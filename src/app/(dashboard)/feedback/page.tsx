@@ -17,7 +17,7 @@ export default async function FeedbackPage() {
 
   const { data: feedbackData } = await supabase
     .from('feedback')
-    .select('id, user_id, type, title, body, status, votes, created_at, updated_at')
+    .select('id, user_id, type, title, body, image_url, status, votes, created_at, updated_at')
     .order('votes', { ascending: false })
     .order('created_at', { ascending: false })
 

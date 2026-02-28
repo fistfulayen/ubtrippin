@@ -69,6 +69,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [type, setType] = useState<FeedbackType>('general')
+  const [imageFile, setImageFile] = useState<File | null>(null)
 
   const visibleItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -103,19 +104,47 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
     setSaving(true)
     setError(null)
 
-    const { data, error: insertError } = await supabase
-      .from('feedback')
-      .insert({
-        user_id: currentUserId,
-        type,
-        title: trimmedTitle,
-        body: trimmedBody,
-        page_url: typeof window !== 'undefined' ? window.location.pathname : null,
-      })
-      .select('id, user_id, type, title, body, status, votes, created_at, updated_at')
-      .single()
+    if (imageFile) {
+      const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+      if (!allowedTypes.has(imageFile.type)) {
+        setError('Image must be JPG, PNG, or WebP.')
+        setSaving(false)
+        return
+      }
+      if (imageFile.size > 5 * 1024 * 1024) {
+        setError('Image must be 5MB or smaller.')
+        setSaving(false)
+        return
+      }
+    }
 
-    if (insertError || !data) {
+    const formData = new FormData()
+    formData.append('title', trimmedTitle)
+    formData.append('body', trimmedBody)
+    formData.append('type', type)
+    formData.append('page_url', typeof window !== 'undefined' ? window.location.pathname : '')
+    if (imageFile) {
+      formData.append('image', imageFile)
+    }
+
+    let data: Omit<FeedbackBoardItem, 'author_name' | 'comment_count' | 'voted_by_me'> | null = null
+    try {
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const payload = (await response.json()) as {
+          data?: Omit<FeedbackBoardItem, 'author_name' | 'comment_count' | 'voted_by_me'>
+        }
+        data = payload.data ?? null
+      }
+    } catch {
+      data = null
+    }
+
+    if (!data) {
       setError('Unable to submit feedback right now.')
       setSaving(false)
       return
@@ -132,6 +161,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
     setTitle('')
     setBody('')
     setType('general')
+    setImageFile(null)
     setOpen(false)
     setSaving(false)
     showToast('Thanks! We read every piece of feedback.')
@@ -375,6 +405,22 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
                 placeholder="What happened? What would you like to see?"
                 className="min-h-28"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-gray-700" htmlFor="feedback-image">
+                Screenshot (optional)
+              </label>
+              <Input
+                id="feedback-image"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null
+                  setImageFile(file)
+                }}
+              />
+              <p className="text-xs text-gray-500">Max 1 image, 5MB, JPG/PNG/WebP.</p>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
