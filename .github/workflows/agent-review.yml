@@ -1,29 +1,38 @@
 name: Agent Code Review
 on:
   pull_request:
-    types: [labeled]
+    types: [opened, labeled]
 
 jobs:
   claude-review:
-    if: github.event.label.name == 'agent-built'
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'agent-built') ||
+      (github.event.action == 'opened' &&
+       (startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/')))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get diff
+      - name: Get PR diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          git diff origin/main...HEAD > /tmp/diff.txt
+          gh pr diff "$PR_NUMBER" --repo "${{ github.repository }}" > /tmp/diff.txt
           echo "Diff size: $(wc -l < /tmp/diff.txt) lines"
 
       - name: Claude Review
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "ANTHROPIC_API_KEY is missing; skipping Claude review"
+            exit 0
+          fi
+
           LINES=$(wc -l < /tmp/diff.txt)
           if [ "$LINES" -eq 0 ]; then
             echo "Empty diff, skipping review"
@@ -31,30 +40,51 @@ jobs:
           fi
           if [ "$LINES" -gt 5000 ]; then
             echo "Diff too large ($LINES lines), skipping automated review"
-            gh pr comment ${{ github.event.pull_request.number }} \
+            gh pr comment "$PR_NUMBER" \
               --body "⚠️ Diff is $LINES lines — too large for automated review. Manual review recommended."
             exit 0
           fi
 
           DIFF=$(cat /tmp/diff.txt)
-          REVIEW=$(curl -s https://api.anthropic.com/v1/messages \
+          RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "content-type: application/json" \
             -d "$(jq -n \
               --arg diff "$DIFF" \
               '{
-                model: "claude-sonnet-4-20250514",
+                model: "anthropic/claude-sonnet-4-6",
                 max_tokens: 2000,
                 messages: [{
                   role: "user",
-                  content: ("Review this code diff. Only flag real problems — bugs, security issues, logic errors, missing error handling. Do NOT flag style preferences, naming opinions, or suggest refactors. Be concise. If everything looks good, say so.\n\n```diff\n" + $diff + "\n```")
+                  content: ("Review this pull request diff with a strict security and correctness focus.\n\nChecklist (explicitly validate each item):\n1) No RLS bypasses on user-facing paths.\n2) No createSecretClient() usage on happy paths or normal request handling.\n3) No new TypeScript any types unless unavoidable and justified.\n4) No obvious auth, data-leak, injection, or privilege-escalation risks.\n5) No functional regressions in changed logic.\n\nRules:\n- Only report real issues with file path + exact risk.\n- Ignore style/naming/refactor preferences.\n- If no issues, say: LGTM (no material findings).\n\n```diff\n" + $diff + "\n```")
                 }]
-              }')" | jq -r '.content[0].text')
+              }')")
 
-          echo "🤖 **Claude Review**" > /tmp/review.md
-          echo "" >> /tmp/review.md
-          echo "$REVIEW" >> /tmp/review.md
-          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
-        env:
-          GH_TOKEN: ${{ github.token }}
+          REVIEW=$(echo "$RESPONSE" | jq -r '.content[0].text // empty')
+          if [ -z "$REVIEW" ] || [ "$REVIEW" = "null" ]; then
+            ERROR_MSG=$(echo "$RESPONSE" | jq -r '.error.message // .error.type // "Unknown API error"')
+            echo "Claude API error: $ERROR_MSG"
+            REVIEW="Claude review failed: $ERROR_MSG"
+          fi
+
+          {
+            echo "<!-- agent-claude-review -->"
+            echo "🤖 **Claude Review**"
+            echo
+            echo "$REVIEW"
+          } > /tmp/review.md
+
+          EXISTING_COMMENT_ID=$(
+            gh api "repos/${{ github.repository }}/issues/$PR_NUMBER/comments" \
+              --jq '.[] | select(.user.login=="github-actions[bot]") | select(.body | contains("<!-- agent-claude-review -->")) | .id' \
+              | head -n1
+          )
+
+          if [ -n "$EXISTING_COMMENT_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$EXISTING_COMMENT_ID" \
+              --method PATCH \
+              -f "body=$(cat /tmp/review.md)" >/dev/null
+          else
+            gh pr comment "$PR_NUMBER" --body-file /tmp/review.md
+          fi
