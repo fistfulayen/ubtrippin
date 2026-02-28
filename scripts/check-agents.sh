@@ -29,6 +29,29 @@ except (FileNotFoundError, json.JSONDecodeError):
 alerts = []
 updated = False
 
+def safe_json(stdout):
+    try:
+        return json.loads(stdout)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+
+def looks_like_gemini(entry):
+    user = ((entry or {}).get("user") or {}).get("login", "").lower()
+    body = ((entry or {}).get("body") or "").lower()
+    return (
+        "gemini" in user or
+        "gemini code assist" in body or
+        ("google" in user and "assist" in body)
+    )
+
+def looks_like_claude(entry):
+    user = ((entry or {}).get("user") or {}).get("login", "").lower()
+    body = ((entry or {}).get("body") or "").lower()
+    return (
+        "<!-- agent-claude-review -->" in body or
+        ("claude review" in body and "github-actions[bot]" in user)
+    )
+
 for task in tasks:
     if task.get("status") in ("done", "merged", "cleaned"):
         continue
@@ -85,7 +108,7 @@ for task in tasks:
                         pr_num = int(pr_url.split("/")[-1])
                         task["pr"] = pr_num
                         task["pr_url"] = pr_url
-                    except:
+                    except (IndexError, TypeError, ValueError):
                         pass
 
             task["status"] = "review"
@@ -141,30 +164,33 @@ for task in tasks:
                     task["checks"]["ci"] = "passed"
             else:
                 task["checks"]["ci"] = "no-checks"
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             task["checks"]["ci"] = "unknown"
 
-        # Review comments count (Gemini + Claude)
-        result = subprocess.run(
-            ["gh", "api", f"repos/fistfulayen/ubtrippin/pulls/{pr_num}/comments",
-             "--jq", "length"],
+        # Review sources (Gemini + Claude)
+        issue_comments_result = subprocess.run(
+            ["gh", "api", f"repos/fistfulayen/ubtrippin/issues/{pr_num}/comments"],
             capture_output=True, text=True, cwd=REPO
         )
-        try:
-            task["checks"]["reviewComments"] = int(result.stdout.strip())
-        except:
-            pass
+        review_threads_result = subprocess.run(
+            ["gh", "api", f"repos/fistfulayen/ubtrippin/pulls/{pr_num}/reviews"],
+            capture_output=True, text=True, cwd=REPO
+        )
 
-        # Review bodies (approvals, etc)
-        result = subprocess.run(
-            ["gh", "api", f"repos/fistfulayen/ubtrippin/pulls/{pr_num}/reviews",
-             "--jq", '[.[] | .body] | length'],
-            capture_output=True, text=True, cwd=REPO
+        issue_comments = safe_json(issue_comments_result.stdout) or []
+        review_threads = safe_json(review_threads_result.stdout) or []
+
+        has_gemini = any(looks_like_gemini(c) for c in issue_comments) or any(
+            looks_like_gemini(r) for r in review_threads
         )
-        try:
-            task["checks"]["reviews"] = int(result.stdout.strip())
-        except:
-            pass
+        has_claude = any(looks_like_claude(c) for c in issue_comments) or any(
+            looks_like_claude(r) for r in review_threads
+        )
+
+        automated_reviews = int(has_gemini) + int(has_claude)
+        task["checks"]["gemini"] = "present" if has_gemini else "missing"
+        task["checks"]["claude"] = "present" if has_claude else "missing"
+        task["checks"]["reviews"] = automated_reviews
 
         # Determine overall readiness
         ci = task["checks"].get("ci")
@@ -172,7 +198,10 @@ for task in tasks:
 
         if ci == "passed" and reviews >= 2 and task["status"] != "ready":
             task["status"] = "ready"
-            alerts.append(f"✅ PR #{pr_num} ({task_id}) — CI passed, {reviews} reviews. Ready for merge.")
+            alerts.append(
+                f"✅ PR #{pr_num} ({task_id}) — CI passed with Gemini + Claude reviews. "
+                "Ready for Ian human approval (Signal only; no auto-merge)."
+            )
             updated = True
         elif ci == "failed" and task["status"] != "ci_failed":
             task["status"] = "ci_failed"
