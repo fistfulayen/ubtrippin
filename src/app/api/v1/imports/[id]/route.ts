@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +28,7 @@ export async function GET(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   const { data: importJob, error } = await supabase
     .from('imports')

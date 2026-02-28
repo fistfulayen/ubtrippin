@@ -18,7 +18,7 @@ export default async function NewTripPage() {
   let limitMax = 3
 
   if (user) {
-    const tripLimit = await checkTripLimit(user.id)
+    const tripLimit = await checkTripLimit(user.id, supabase)
     if (!tripLimit.allowed) {
       limitHit = true
       limitUsed = tripLimit.used

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import crypto from 'crypto'
 
 const BASE_URL = 'https://www.ubtrippin.xyz'
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   if (limited) return limited
 
   // 3. Fetch profile
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('calendar_token')
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
   const token = crypto.randomBytes(24).toString('base64url')
 
   // 4. Update profile
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { error } = await supabase
     .from('profiles')
     .update({ calendar_token: token })

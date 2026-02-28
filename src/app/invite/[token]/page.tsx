@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { redirect } from 'next/navigation'
 import { notFound } from 'next/navigation'
 import Image from 'next/image'
@@ -15,7 +14,7 @@ export default async function InvitePage({ params }: InvitePageProps) {
   const { token } = await params
 
   // Lookup the invite (public — no auth required yet)
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   const { data: invite, error } = await supabase
     .from('trip_collaborators')

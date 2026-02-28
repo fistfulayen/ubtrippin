@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -33,7 +33,7 @@ export async function GET(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 4. Fetch the item (must belong to this user)
   const { data: item, error } = await supabase
@@ -93,8 +93,8 @@ const ITEM_SELECT = `id,
        created_at,
        updated_at`
 
-async function fetchTripSummary(tripId: string) {
-  const supabase = createSecretClient()
+async function fetchTripSummary(tripId: string, userId: string) {
+  const supabase = await createUserScopedClient(userId)
   const { data } = await supabase
     .from('trips')
     .select('id, user_id, title, primary_location')
@@ -149,7 +149,7 @@ export async function PATCH(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 6. Verify ownership
   const { data: existing } = await supabase
@@ -227,7 +227,7 @@ export async function PATCH(
     )
   }
 
-  const trip = await fetchTripSummary(updatedItem.trip_id as string)
+  const trip = await fetchTripSummary(updatedItem.trip_id as string, auth.userId)
   if (trip) {
     void dispatchWebhookEvent({
       userId: trip.user_id as string,
@@ -268,7 +268,7 @@ export async function DELETE(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 4. Verify ownership before deleting
   const { data: existing } = await supabase
@@ -301,7 +301,7 @@ export async function DELETE(
   }
 
   const deletedItem = sanitizeItem(existing as Record<string, unknown>)
-  const trip = await fetchTripSummary(existing.trip_id as string)
+  const trip = await fetchTripSummary(existing.trip_id as string, auth.userId)
   if (trip) {
     void dispatchWebhookEvent({
       userId: trip.user_id as string,

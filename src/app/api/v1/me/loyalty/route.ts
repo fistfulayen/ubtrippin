@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
 
@@ -40,8 +40,10 @@ function isProviderType(value: unknown): value is ProviderType {
   return typeof value === 'string' && PROVIDER_TYPES.includes(value as ProviderType)
 }
 
-async function isProUser(userId: string): Promise<boolean> {
-  const supabase = createSecretClient()
+async function isProUser(
+  userId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<boolean> {
   const { data } = await supabase
     .from('profiles')
     .select('tier, subscription_tier')
@@ -52,10 +54,11 @@ async function isProUser(userId: string): Promise<boolean> {
   return row?.tier === 'pro' || row?.subscription_tier === 'pro'
 }
 
-async function getAllianceMap(providerKeys: string[]): Promise<Map<string, string | null>> {
+async function getAllianceMap(
+  providerKeys: string[],
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<Map<string, string | null>> {
   if (providerKeys.length === 0) return new Map()
-
-  const supabase = createSecretClient()
   const { data } = await supabase
     .from('provider_catalog')
     .select('provider_key, alliance_group')
@@ -91,7 +94,7 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('loyalty_programs')
     .select('*')
@@ -108,7 +111,10 @@ export async function GET() {
   }
 
   const rows = (data ?? []) as LoyaltyProgramRow[]
-  const allianceMap = await getAllianceMap([...new Set(rows.map((row) => row.provider_key))])
+  const allianceMap = await getAllianceMap(
+    [...new Set(rows.map((row) => row.provider_key))],
+    supabase
+  )
 
   const output = rows.map((row) =>
     withPlaintext(row, allianceMap.get(row.provider_key) ?? null)
@@ -166,13 +172,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
   const { count } = await supabase
     .from('loyalty_programs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', auth.userId)
 
-  const pro = await isProUser(auth.userId)
+  const pro = await isProUser(auth.userId, supabase)
   if (!pro && (count ?? 0) >= 3) {
     return NextResponse.json(
       {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 const SEAT_PREFERENCES = ['window', 'aisle', 'middle', 'no_preference'] as const
@@ -52,8 +52,10 @@ function normalizeNullableString(value: unknown): string | null | undefined {
   return trimmed ? trimmed : null
 }
 
-async function getLoyaltyCount(userId: string): Promise<number> {
-  const supabase = createSecretClient()
+async function getLoyaltyCount(
+  userId: string,
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<number> {
   const { count } = await supabase
     .from('loyalty_programs')
     .select('id', { count: 'exact', head: true })
@@ -66,7 +68,7 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('user_profiles')
     .select('*')
@@ -82,7 +84,7 @@ export async function GET() {
   }
 
   const profile = (data as UserProfileRow | null) ?? defaultProfile(auth.userId)
-  const loyaltyCount = await getLoyaltyCount(auth.userId)
+  const loyaltyCount = await getLoyaltyCount(auth.userId, supabase)
 
   const response: ProfileResponse = {
     ...profile,
@@ -164,7 +166,7 @@ async function upsertProfile(request: NextRequest) {
       ? body.currency_preference.trim().toUpperCase()
       : undefined
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
   const payload = {
     id: auth.userId,
     ...(body.seat_preference !== undefined ? { seat_preference: body.seat_preference } : {}),
@@ -191,7 +193,7 @@ async function upsertProfile(request: NextRequest) {
     )
   }
 
-  const loyaltyCount = await getLoyaltyCount(auth.userId)
+  const loyaltyCount = await getLoyaltyCount(auth.userId, supabase)
 
   return NextResponse.json({
     data: {

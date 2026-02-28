@@ -2,7 +2,6 @@
 
 import { render } from '@react-email/components'
 import { WelcomeEmail } from '@/components/email/welcome'
-import { createSecretClient } from '@/lib/supabase/service'
 import { createClient } from '@/lib/supabase/server'
 import { getResendClient } from '@/lib/resend/client'
 import { generateTripName } from '@/lib/trips/naming'
@@ -12,7 +11,7 @@ export async function sendWelcomeEmail(
   userName: string,
   userEmail: string
 ): Promise<void> {
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   // Check if already sent
   const { data: profile } = await supabase
@@ -48,9 +47,7 @@ export async function dismissFirstTripBanner(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  // Use secret client to bypass RLS for the update
-  const secretClient = createSecretClient()
-  await secretClient
+  await supabase
     .from('profiles')
     .update({ onboarding_completed: true })
     .eq('id', user.id)
@@ -69,7 +66,7 @@ export async function sendCollaboratorInvite(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'You must be signed in.' }
 
-  const sc = createSecretClient()
+  const sc = await createClient()
   const cleanEmail = email.trim().toLowerCase()
 
   // Verify user owns the trip
@@ -140,7 +137,7 @@ export async function removeCollaborator(
 
   if (!user) return { error: 'You must be signed in.' }
 
-  const sc = createSecretClient()
+  const sc = await createClient()
 
   // Owner check using service client to avoid relying on client-provided IDs.
   const { data: trip } = await sc
@@ -168,7 +165,7 @@ export async function removeCollaborator(
  * Called after item deletion or move to keep the title accurate.
  */
 export async function regenerateTripName(tripId: string): Promise<void> {
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   const { data: trip } = await supabase
     .from('trips')

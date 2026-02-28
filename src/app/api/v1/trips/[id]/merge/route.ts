@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeItem } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 
 const TRIP_SELECT = `id,
@@ -92,7 +92,7 @@ export async function POST(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 6. Verify target trip ownership
   const { data: targetTrip } = await supabase

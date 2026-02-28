@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { authenticateWebhookRequest, isWebhookAuthError } from '@/lib/api/webhook-auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { queueWebhookTestDelivery } from '@/lib/webhooks'
 
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: webhook } = await supabase
     .from('webhooks')
     .select('id, url')

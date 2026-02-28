@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 /** Basic email format validation (RFC 5322 simplified). */
 function isValidEmail(value: string): boolean {
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
   if (limited) return limited
 
   // 3. Fetch senders for this user
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: senders, error } = await supabase
     .from('allowed_senders')
     .select('*')
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   }
 
   // 6. Insert
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: sender, error } = await supabase
     .from('allowed_senders')
     .insert({

@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { authenticateWebhookRequest, isWebhookAuthError } from '@/lib/api/webhook-auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { encryptWebhookSecret, maskWebhookSecret } from '@/lib/webhook-crypto'
 import { validateWebhookUrl } from '@/lib/webhook-url'
 import { WEBHOOK_EVENTS } from '@/lib/webhooks'
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (limited) return limited
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data, error } = await supabase
     .from('webhooks')
     .select('id, user_id, url, description, secret_masked, events, enabled, created_at, updated_at')
@@ -145,10 +145,10 @@ export async function POST(request: NextRequest) {
 
   const events = normalizeEvents(body.events)
 
-  const tier = await getUserTier(auth.userId)
+  const supabase = await createUserScopedClient(auth.userId)
+  const tier = await getUserTier(auth.userId, supabase)
   const maxWebhooks = tier === 'pro' ? PRO_WEBHOOK_LIMIT : FREE_WEBHOOK_LIMIT
 
-  const supabase = createSecretClient()
   const { count } = await supabase
     .from('webhooks')
     .select('id', { count: 'exact', head: true })

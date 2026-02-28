@@ -1,6 +1,9 @@
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
 import { createSecretClient } from '@/lib/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+type DbClient = SupabaseClient
 
 interface LoyaltyProgramRow {
   id: string
@@ -31,11 +34,13 @@ function normalizeAlnum(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
-async function matchProviderForUser(userId: string, providerName: string): Promise<ProviderMatch | null> {
+async function matchProviderForUser(
+  supabase: DbClient,
+  userId: string,
+  providerName: string
+): Promise<ProviderMatch | null> {
   const resolvedProviderKey = resolveProviderKey(providerName)
   if (!resolvedProviderKey) return null
-
-  const supabase = createSecretClient()
 
   const { data: providerRow } = await supabase
     .from('provider_catalog')
@@ -92,8 +97,11 @@ async function matchProviderForUser(userId: string, providerName: string): Promi
   }
 }
 
-async function setTripItemFlag(tripItemId: string, loyaltyFlag: Record<string, unknown>) {
-  const supabase = createSecretClient()
+async function setTripItemFlag(
+  supabase: DbClient,
+  tripItemId: string,
+  loyaltyFlag: Record<string, unknown>
+) {
   await supabase
     .from('trip_items')
     .update({ loyalty_flag: loyaltyFlag })
@@ -101,6 +109,7 @@ async function setTripItemFlag(tripItemId: string, loyaltyFlag: Record<string, u
 }
 
 export async function applyEmailLoyaltyFlag(params: {
+  supabase?: DbClient
   userId: string
   tripItemId: string
   providerName: string | null
@@ -109,7 +118,8 @@ export async function applyEmailLoyaltyFlag(params: {
   const providerName = params.providerName?.trim()
   if (!providerName) return
 
-  const match = await matchProviderForUser(params.userId, providerName)
+  const supabase = params.supabase ?? createSecretClient()
+  const match = await matchProviderForUser(supabase, params.userId, providerName)
   if (!match) return
 
   const now = new Date().toISOString()
@@ -118,7 +128,7 @@ export async function applyEmailLoyaltyFlag(params: {
     const number = decryptLoyaltyNumber(match.exactProgram.program_number_encrypted)
     const numberInEmail = normalizeAlnum(params.rawEmailText).includes(normalizeAlnum(number))
 
-    await setTripItemFlag(params.tripItemId, {
+    await setTripItemFlag(supabase, params.tripItemId, {
       status: numberInEmail ? 'applied' : 'missing_from_booking',
       provider_key: match.resolvedProviderKey,
       program: match.exactProgram.provider_name,
@@ -130,7 +140,7 @@ export async function applyEmailLoyaltyFlag(params: {
   }
 
   if (match.compatibleProgram) {
-    await setTripItemFlag(params.tripItemId, {
+    await setTripItemFlag(supabase, params.tripItemId, {
       status: 'compatible_available',
       provider_key: match.resolvedProviderKey,
       provider_name: match.providerName,
@@ -145,7 +155,7 @@ export async function applyEmailLoyaltyFlag(params: {
     return
   }
 
-  await setTripItemFlag(params.tripItemId, {
+  await setTripItemFlag(supabase, params.tripItemId, {
     status: 'no_vault_entry',
     provider_name: match.providerName,
     provider_key: match.resolvedProviderKey,
@@ -154,6 +164,7 @@ export async function applyEmailLoyaltyFlag(params: {
 }
 
 export async function applyNoVaultEntryFlag(params: {
+  supabase?: DbClient
   userId: string
   tripItemId: string
   providerName: string | null
@@ -161,16 +172,16 @@ export async function applyNoVaultEntryFlag(params: {
   const providerName = params.providerName?.trim()
   if (!providerName) return
 
-  const match = await matchProviderForUser(params.userId, providerName)
+  const supabase = params.supabase ?? createSecretClient()
+  const match = await matchProviderForUser(supabase, params.userId, providerName)
   if (!match) return
 
   if (match.exactProgram || match.compatibleProgram) return
 
-  await setTripItemFlag(params.tripItemId, {
+  await setTripItemFlag(supabase, params.tripItemId, {
     status: 'no_vault_entry',
     provider_name: match.providerName,
     provider_key: match.resolvedProviderKey,
     flagged_at: new Date().toISOString(),
   })
 }
-

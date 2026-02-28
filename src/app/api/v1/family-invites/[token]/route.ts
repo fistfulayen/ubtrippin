@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 type Params = { params: Promise<{ token: string }> }
 
@@ -13,7 +13,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const secret = createSecretClient()
+  const secret = await createClient()
 
   const { data: invite, error: inviteError } = await secret
     .from('family_members')

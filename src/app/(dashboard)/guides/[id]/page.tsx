@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -85,8 +84,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
 
   const authorNameById = new Map<string, string | null>()
   if (authorIds.length > 0) {
-    const secret = createSecretClient()
-    const { data: authorProfiles } = await secret
+    const { data: authorProfiles } = await supabase
       .from('profiles')
       .select('id, full_name, email')
       .in('id', authorIds)

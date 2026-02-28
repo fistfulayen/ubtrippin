@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { sendInviteAcceptedEmail } from '@/lib/email/collaborator-invite'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(user.id)
 
   // Lookup the invite
   const { data: invite, error: lookupError } = await supabase

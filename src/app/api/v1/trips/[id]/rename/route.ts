@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { generateTripName } from '@/lib/trips/naming'
 
@@ -39,7 +39,7 @@ export async function POST(
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(userId!)
 
   // Verify trip ownership
   const { data: trip } = await supabase

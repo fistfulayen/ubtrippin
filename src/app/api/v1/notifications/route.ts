@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 export async function GET(request: NextRequest) {
   // 1. Authenticate
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const rawLimit = parseInt(searchParams.get('limit') ?? '20', 10)
   const limit = Math.min(Math.max(1, isNaN(rawLimit) ? 20 : rawLimit), 100)
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   let query = supabase
     .from('notifications')

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 
@@ -23,7 +23,7 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('loyalty_programs')
     .select('*')

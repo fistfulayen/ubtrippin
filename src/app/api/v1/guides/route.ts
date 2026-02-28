@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { nanoid } from 'nanoid'
 
 export async function GET(request: NextRequest) {
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const city = searchParams.get('city')
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   let query = supabase
     .from('city_guides')
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // If caller passes find_or_create=true, return existing guide for this city
   if (body.find_or_create) {

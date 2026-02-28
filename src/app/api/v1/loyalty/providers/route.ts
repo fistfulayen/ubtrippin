@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET() {
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('provider_catalog')

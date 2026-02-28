@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { sanitizeTrip, sanitizeTripInput } from '@/lib/api/sanitize'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { trackTripCreated } from '@/lib/activation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   const limited = rateLimitResponse(auth.keyHash)
   if (limited) return limited
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // 3a. Fetch owned trips
   const { data: ownedTrips, error: ownedError } = await supabase
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
   const clean = result.data
 
   // 5. Insert — never spread raw body; use only validated fields
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
   const { data: trip, error } = await supabase
     .from('trips')
     .insert({
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Track activation milestone (idempotent, fire-and-forget)
-  trackTripCreated(auth.userId).catch((err) =>
+  trackTripCreated(auth.userId, supabase).catch((err) =>
     console.error('[activation] trackTripCreated failed:', err)
   )
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ exact_match: false })
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   // Step 1: exact provider match
   const { data: exactProgram } = await supabase

@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 export async function GET(request: NextRequest) {
   const auth = await validateApiKey(request)
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   const radiusMeters = radiusKm * 1000
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // Use earth_distance via RPC — requires earthdistance extension
   // We filter by user_id in the guides join, so only the user's entries are returned

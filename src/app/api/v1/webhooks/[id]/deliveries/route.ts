@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { authenticateWebhookRequest, isWebhookAuthError } from '@/lib/api/webhook-auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { getUserTier } from '@/lib/usage/limits'
 import { isValidUUID } from '@/lib/validation'
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   const { data: webhook } = await supabase
     .from('webhooks')
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     )
   }
 
-  const tier = await getUserTier(auth.userId)
+  const tier = await getUserTier(auth.userId, supabase)
   const limit = tier === 'pro' ? PRO_DELIVERY_LOG_LIMIT : FREE_DELIVERY_LOG_LIMIT
 
   const { data, error } = await supabase

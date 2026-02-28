@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -52,7 +52,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // Verify ownership
   const { data: trip } = await supabase
@@ -102,7 +102,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = createSecretClient()
+  const supabase = await createUserScopedClient(auth.userId)
 
   // Verify ownership
   const { data: trip } = await supabase
