@@ -20,12 +20,12 @@ test.describe('/guides page', () => {
   test('loads for authenticated user', async ({ page }) => {
     if (!process.env.TEST_USER_EMAIL) test.skip()
 
-    await page.goto('/guides')
+    const response = await page.goto('/guides')
     await expect(page).not.toHaveURL(/\/login/)
 
     const body = await page.content()
     expect(body).not.toContain('Application error')
-    expect(body).not.toContain('500')
+    expect(response?.status()).not.toBe(500)
   })
 
   test('shows guides nav item', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe('City Guide — seed + UI', () => {
   test.beforeAll(async () => {
     if (!userId) return
     guideId = await seedGuide({ userId, city: 'E2E Seeded City', country: 'France', countryCode: 'FR' })
-    await seedGuideEntry({ guideId, name: 'E2E Seeded Brasserie', category: 'restaurants', status: 'visited' })
+    await seedGuideEntry({ guideId, userId, name: 'E2E Seeded Brasserie', category: 'restaurants', status: 'visited' })
   })
 
   test.afterAll(async () => {

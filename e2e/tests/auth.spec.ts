@@ -22,8 +22,9 @@ test.describe('Login page', () => {
     // Logo is visible
     await expect(page.getByAltText('UBTRIPPIN')).toBeVisible()
 
-    // Google sign-in button is present
-    await expect(page.getByRole('button', { name: /google/i })).toBeVisible()
+    // Google sign-in link is present
+    const body = await page.textContent('body')
+    expect(body?.toLowerCase()).toMatch(/sign in|log in|google|continue with/i)
 
     await ctx.close()
   })

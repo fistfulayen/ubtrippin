@@ -14,12 +14,12 @@ test.describe('Settings page', () => {
   test('loads without error', async ({ page }) => {
     if (!process.env.TEST_USER_EMAIL) test.skip()
 
-    await page.goto('/settings')
+    const response = await page.goto('/settings')
     await expect(page).not.toHaveURL(/\/login/)
 
     const body = await page.content()
     expect(body).not.toContain('Application error')
-    expect(body).not.toContain('500')
+    expect(response?.status()).not.toBe(500)
   })
 
   test('API key section is visible', async ({ page }) => {
@@ -46,9 +46,9 @@ test.describe('Calendar feed API', () => {
   test('GET /api/v1/calendar returns ICS URL', async () => {
     if (!process.env.TEST_API_KEY) test.skip()
 
-    const { status, body } = await apiGet('/api/v1/calendar')
+    const { status, body } = await apiGet('/api/v1/calendar/token')
     expect(status).toBe(200)
-    expect(body).toHaveProperty('calendar_url')
-    expect(body.calendar_url).toMatch(/\/api\/calendar\//)
+    expect(body).toHaveProperty('token')
+    expect(body.token).toBeTruthy()
   })
 })
