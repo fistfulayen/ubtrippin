@@ -12,14 +12,15 @@ import {
   MapPin,
   Bookmark,
   CheckCircle2,
-  Download,
   FileText,
+  ImagePlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CityGuide, GuideEntry } from '@/types/database'
 import { GuideShareToggle } from './guide-share-toggle'
 import { EntryActions } from './entry-actions'
 import { DeleteGuideButton } from './delete-guide-button'
+import { refreshGuideCoverImage } from '../actions'
 
 interface GuidePageProps {
   params: Promise<{ id: string }>
@@ -142,6 +143,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   const shareUrl = g.share_token
     ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ubtrippin.xyz'}/guide/${g.share_token}`
     : null
+  const refreshCoverAction = refreshGuideCoverImage.bind(null, g.id)
 
   return (
     <div className="space-y-6">
@@ -194,6 +196,13 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
               Add place
             </Button>
           </Link>
+
+          <form action={refreshCoverAction}>
+            <Button size="sm" variant="outline" type="submit">
+              <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
+              Cover image
+            </Button>
+          </form>
 
           <DeleteGuideButton guideId={g.id} />
         </div>

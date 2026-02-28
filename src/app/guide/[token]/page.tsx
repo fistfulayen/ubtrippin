@@ -3,9 +3,11 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Globe, Star, MapPin, ExternalLink, Bookmark } from 'lucide-react'
 import type { CityGuide, GuideEntry } from '@/types/database'
+import { GuideMapSection } from '@/components/maps/guide-map-section'
 
 interface Props {
   params: Promise<{ token: string }>
+  searchParams: Promise<{ view?: string }>
 }
 
 type GuideEntryWithAuthor = GuideEntry & {
@@ -29,8 +31,9 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Hidden Gems': '💎',
 }
 
-export default async function PublicGuidePage({ params }: Props) {
+export default async function PublicGuidePage({ params, searchParams }: Props) {
   const { token } = await params
+  const { view } = await searchParams
 
   const supabase = createSecretClient()
 
@@ -94,6 +97,17 @@ export default async function PublicGuidePage({ params }: Props) {
   })
   const hasMultipleAuthors =
     new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
+  const mapEntries = entries
+    .filter((entry) => typeof entry.latitude === 'number' && typeof entry.longitude === 'number')
+    .map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      category: entry.category,
+      latitude: entry.latitude as number,
+      longitude: entry.longitude as number,
+    }))
+  const hasMapEntries = mapEntries.length > 0
+  const showMapView = hasMapEntries && view === 'map'
 
   // Group visited entries by category; separate to_try section
   const visited = entries.filter((e) => e.status === 'visited')
@@ -154,34 +168,68 @@ export default async function PublicGuidePage({ params }: Props) {
           </p>
         </div>
 
-        {/* Visited entries by category */}
-        {Object.entries(grouped).map(([category, catEntries]) => (
-          <section key={category}>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
-              <span>{CATEGORY_ICONS[category] ?? '📍'}</span>
-              {category}
-            </h2>
-            <div className="space-y-4">
-              {catEntries.map((entry) => (
-                <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
-              ))}
-            </div>
-          </section>
-        ))}
+        {hasMapEntries && (
+          <div className="flex gap-2">
+            <Link
+              href={`/guide/${token}`}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                !showMapView
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              List
+            </Link>
+            <Link
+              href={`/guide/${token}?view=map`}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                showMapView
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              Map
+            </Link>
+          </div>
+        )}
 
-        {/* To Try (if any) */}
-        {toTry.length > 0 && (
-          <section>
-            <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
-              <Bookmark className="h-5 w-5 text-amber-500" />
-              On the list
-            </h2>
-            <div className="space-y-4">
-              {toTry.map((entry) => (
-                <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
-              ))}
-            </div>
+        {showMapView ? (
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold text-gray-900">Map View</h2>
+            <GuideMapSection entries={mapEntries} />
           </section>
+        ) : (
+          <>
+            {/* Visited entries by category */}
+            {Object.entries(grouped).map(([category, catEntries]) => (
+              <section key={category}>
+                <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
+                  <span>{CATEGORY_ICONS[category] ?? '📍'}</span>
+                  {category}
+                </h2>
+                <div className="space-y-4">
+                  {catEntries.map((entry) => (
+                    <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
+                  ))}
+                </div>
+              </section>
+            ))}
+
+            {/* To Try (if any) */}
+            {toTry.length > 0 && (
+              <section>
+                <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
+                  <Bookmark className="h-5 w-5 text-amber-500" />
+                  On the list
+                </h2>
+                <div className="space-y-4">
+                  {toTry.map((entry) => (
+                    <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
 
         {/* Footer CTA */}
