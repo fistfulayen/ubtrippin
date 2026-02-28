@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen, Award, MessageSquare } from 'lucide-react'
+import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen, Award, MessageSquare, CircleHelp } from 'lucide-react'
 import { useState } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -22,6 +22,7 @@ const navItems = [
   { href: '/loyalty', label: 'Loyalty', icon: Award },
   { href: '/guides', label: 'Guides', icon: BookOpen },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
+  { href: '/help', label: 'Help', icon: CircleHelp },
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/feedback', label: 'Feedback', icon: MessageSquare },
 ]
