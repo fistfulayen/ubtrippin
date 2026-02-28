@@ -40,7 +40,7 @@ interface DateNormalizationContext {
   sourceText: string
 }
 
-interface ParsedDateParts {
+export interface ParsedDateParts {
   year: number
   month: number
   day: number
@@ -237,7 +237,18 @@ function normalizeDate(
   return formatIsoDate(nextOccurrence)
 }
 
-function parseDateParts(dateStr: string, fallbackYear: number): ParsedDateParts | null {
+export function normalizeDateForTest(
+  dateStr: string | null | undefined,
+  referenceDate: Date,
+  sourceText: string
+): string | null {
+  return normalizeDate(dateStr, {
+    referenceDate: startOfUtcDay(referenceDate),
+    sourceText,
+  })
+}
+
+export function parseDateParts(dateStr: string, fallbackYear: number): ParsedDateParts | null {
   const raw = dateStr.trim()
   if (!raw) return null
 
@@ -392,4 +403,27 @@ function isYearExplicitForDate(sourceText: string, date: ParsedDateParts): boole
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function extractProviderFromSubject(subject: string): string | null {
+  const normalized = subject.trim()
+  if (!normalized) return null
+
+  const patterns = [
+    /(?:with|on|from)\s+([A-Za-z][A-Za-z0-9&.'\-\s]{1,50}?)(?=$|\s+(?:is|has|was|for)\b|[,:;-])/i,
+    /^([A-Za-z][A-Za-z0-9&.'\-\s]{1,50}?)\s+(?:booking|reservation|confirmation|itinerary)\b/i,
+  ]
+
+  for (const pattern of patterns) {
+    const match = normalized.match(pattern)
+    const provider = match?.[1]?.trim()
+    if (provider) return provider
+  }
+
+  return null
+}
+
+export function extractIataCodeFromFlightString(value: string): string | null {
+  const match = value.trim().match(/\b([A-Z0-9]{2})\s*\d{1,4}\b/i)
+  return match ? match[1].toUpperCase() : null
 }
