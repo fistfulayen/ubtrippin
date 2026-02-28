@@ -1014,13 +1014,16 @@ function extractRecommendationCandidates(bodyText: string): Array<{ name: string
 }
 
 function inferRecommendationCity(subject: string, bodyText: string): string | null {
-  const subjectMatch = subject.match(/\b(?:in|for|around)\s+([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\b/u)
+  const normalizedSubject = normalizeText(subject)
+  const normalizedBody = normalizeText(bodyText)
+
+  const subjectMatch = normalizedSubject.match(/\b(?:in|for|around)\s+([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\b/)
   if (subjectMatch?.[1]) return subjectMatch[1].trim()
 
-  const bodyMatch = bodyText.match(/\b(?:in|for|around)\s+([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\b/u)
+  const bodyMatch = normalizedBody.match(/\b(?:in|for|around)\s+([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\b/)
   if (bodyMatch?.[1]) return bodyMatch[1].trim()
 
-  const cityListMatch = subject.match(/^([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\s+(?:recommendations|recs|favorites)/ui)
+  const cityListMatch = normalizedSubject.match(/^([a-z][a-z' -]+(?:\s+[a-z][a-z' -]+){0,2})\s+(?:recommendations|recs|favorites)\b/)
   if (cityListMatch?.[1]) return cityListMatch[1].trim()
 
   return null
