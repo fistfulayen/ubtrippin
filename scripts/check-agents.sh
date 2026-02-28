@@ -32,8 +32,25 @@ updated = False
 def safe_json(stdout):
     try:
         return json.loads(stdout)
-    except Exception:
+    except (json.JSONDecodeError, ValueError, TypeError):
         return None
+
+def looks_like_gemini(entry):
+    user = ((entry or {}).get("user") or {}).get("login", "").lower()
+    body = ((entry or {}).get("body") or "").lower()
+    return (
+        "gemini" in user or
+        "gemini code assist" in body or
+        ("google" in user and "assist" in body)
+    )
+
+def looks_like_claude(entry):
+    user = ((entry or {}).get("user") or {}).get("login", "").lower()
+    body = ((entry or {}).get("body") or "").lower()
+    return (
+        "<!-- agent-claude-review -->" in body or
+        ("claude review" in body and "github-actions[bot]" in user)
+    )
 
 for task in tasks:
     if task.get("status") in ("done", "merged", "cleaned"):
@@ -162,23 +179,6 @@ for task in tasks:
 
         issue_comments = safe_json(issue_comments_result.stdout) or []
         review_threads = safe_json(review_threads_result.stdout) or []
-
-        def looks_like_gemini(entry):
-            user = ((entry or {}).get("user") or {}).get("login", "").lower()
-            body = ((entry or {}).get("body") or "").lower()
-            return (
-                "gemini" in user or
-                "gemini code assist" in body or
-                ("google" in user and "assist" in body)
-            )
-
-        def looks_like_claude(entry):
-            user = ((entry or {}).get("user") or {}).get("login", "").lower()
-            body = ((entry or {}).get("body") or "").lower()
-            return (
-                "<!-- agent-claude-review -->" in body or
-                ("claude review" in body and "github-actions[bot]" in user)
-            )
 
         has_gemini = any(looks_like_gemini(c) for c in issue_comments) or any(
             looks_like_gemini(r) for r in review_threads
