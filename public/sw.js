@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ubtrippin-v1'
+const CACHE_NAME = 'ubtrippin-v2'
 
 const PRECACHE_URLS = [
   '/',
