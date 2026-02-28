@@ -129,10 +129,14 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
 
     let data: Omit<FeedbackBoardItem, 'author_name' | 'comment_count' | 'voted_by_me'> | null = null
     try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
       const response = await fetch('/api/feedback', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
+      clearTimeout(timeout)
 
       if (response.ok) {
         const payload = (await response.json()) as {
