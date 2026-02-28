@@ -927,8 +927,12 @@ interface RecommendationImportResult {
   city: string | null
 }
 
+function normalizeText(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
-  const haystack = `${subject}\n${bodyText}`.toLowerCase()
+  const haystack = normalizeText(`${subject}\n${bodyText}`)
   const bookingSignals = [
     'booking confirmation',
     'reservation confirmed',
@@ -945,7 +949,7 @@ function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
 }
 
 function looksLikeRecommendationEmail(subject: string, bodyText: string): boolean {
-  const haystack = `${subject}\n${bodyText}`.toLowerCase()
+  const haystack = normalizeText(`${subject}\n${bodyText}`)
   const recommendationSignals = [
     'recommend',
     'recommendation',
@@ -971,12 +975,12 @@ function cleanRecommendationLine(line: string): string {
 }
 
 function inferCategoryFromLine(line: string): string {
-  const lower = line.toLowerCase()
-  if (/(coffee|cafe|espresso|roaster)/.test(lower)) return 'Coffee'
-  if (/(bar|wine|cocktail|brewery|pub)/.test(lower)) return 'Bars & Wine'
-  if (/(museum|gallery|exhibit|exhibition)/.test(lower)) return 'Museums & Galleries'
-  if (/(park|garden|hike|trail|nature)/.test(lower)) return 'Parks & Nature'
-  if (/(restaurant|dinner|lunch|brunch|food|eat)/.test(lower)) return 'Restaurants'
+  const lower = normalizeText(line)
+  if (/(coffee|cafe|espresso|roaster)/u.test(lower)) return 'Coffee'
+  if (/(bar|wine|cocktail|brewery|pub)/u.test(lower)) return 'Bars & Wine'
+  if (/(museum|gallery|exhibit|exhibition)/u.test(lower)) return 'Museums & Galleries'
+  if (/(park|garden|hike|trail|nature)/u.test(lower)) return 'Parks & Nature'
+  if (/(restaurant|dinner|lunch|brunch|food|eat)/u.test(lower)) return 'Restaurants'
   return 'Hidden Gems'
 }
 
@@ -990,12 +994,12 @@ function extractRecommendationCandidates(bodyText: string): Array<{ name: string
   const results: Array<{ name: string; description: string | null; category: string }> = []
 
   for (const line of lines) {
-    const bulletLike = /^([A-Z0-9][A-Za-z0-9 '&().,-]{2,80})(\s*[-–:]\s*(.+))?$/.exec(line)
+    const bulletLike = /^([\p{Lu}0-9][\p{L}0-9 '&().,-]{2,80})(\s*[-\u2013:]\s*(.+))?$/u.exec(line)
     if (!bulletLike) continue
 
     const name = bulletLike[1].trim()
     if (name.split(' ').length > 8) continue
-    const normalized = name.toLowerCase()
+    const normalized = normalizeText(name)
     if (seen.has(normalized)) continue
     seen.add(normalized)
 
@@ -1010,13 +1014,13 @@ function extractRecommendationCandidates(bodyText: string): Array<{ name: string
 }
 
 function inferRecommendationCity(subject: string, bodyText: string): string | null {
-  const subjectMatch = subject.match(/\b(?:in|for|around)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,2})\b/)
+  const subjectMatch = subject.match(/\b(?:in|for|around)\s+([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\b/u)
   if (subjectMatch?.[1]) return subjectMatch[1].trim()
 
-  const bodyMatch = bodyText.match(/\b(?:in|for|around)\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,2})\b/)
+  const bodyMatch = bodyText.match(/\b(?:in|for|around)\s+([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\b/u)
   if (bodyMatch?.[1]) return bodyMatch[1].trim()
 
-  const cityListMatch = subject.match(/^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+){0,2})\s+(?:recommendations|recs|favorites)/i)
+  const cityListMatch = subject.match(/^([\p{Lu}][\p{L}]+(?:\s+[\p{Lu}][\p{L}]+){0,2})\s+(?:recommendations|recs|favorites)/ui)
   if (cityListMatch?.[1]) return cityListMatch[1].trim()
 
   return null
