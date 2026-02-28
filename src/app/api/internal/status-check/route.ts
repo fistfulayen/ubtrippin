@@ -7,6 +7,13 @@ import {
   normalizeStatusRow,
   type ExistingTripItemStatus,
 } from '@/lib/flight-status'
+import {
+  buildTrainStatusUpsertValues,
+  extractTrainNumberFromItem,
+  isSncfFamilyProvider,
+  isTrainLikeItem,
+  lookupTrainStatus,
+} from '@/lib/train/sncf'
 import { createSecretClient } from '@/lib/supabase/service'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -16,10 +23,11 @@ const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
 const DEFAULT_FLIGHT_DURATION_MS = 6 * HOUR_MS
 
-interface FlightItemRow {
+interface StatusCheckItemRow {
   id: string
   trip_id: string | null
   user_id: string
+  kind: string
   start_date: string
   end_date: string | null
   start_ts: string | null
@@ -60,7 +68,7 @@ function parseDateOnly(date: string | null, endOfDay = false): Date | null {
   return new Date(ms)
 }
 
-function resolveDepartureTime(item: FlightItemRow, existing: ExistingStatusRow | undefined): Date | null {
+function resolveDepartureTime(item: StatusCheckItemRow, existing: ExistingStatusRow | undefined): Date | null {
   return (
     parseIso(existing?.actual_departure) ||
     parseIso(existing?.estimated_departure) ||
@@ -70,7 +78,7 @@ function resolveDepartureTime(item: FlightItemRow, existing: ExistingStatusRow |
 }
 
 function resolveArrivalTime(
-  item: FlightItemRow,
+  item: StatusCheckItemRow,
   existing: ExistingStatusRow | undefined,
   departureAt: Date | null
 ): Date | null {
@@ -87,7 +95,7 @@ function resolveArrivalTime(
 
 function isStaleForSchedule(
   now: Date,
-  item: FlightItemRow,
+  item: StatusCheckItemRow,
   existing: ExistingStatusRow | undefined
 ): boolean {
   const lastCheckedAt = parseIso(existing?.last_checked_at)
@@ -135,17 +143,17 @@ async function processStatusChecks() {
 
   const { data: itemRows, error: itemError } = await supabase
     .from('trip_items')
-    .select('id, trip_id, user_id, start_date, end_date, start_ts, end_ts, provider, summary, details_json')
-    .eq('kind', 'flight')
+    .select('id, trip_id, user_id, kind, start_date, end_date, start_ts, end_ts, provider, summary, details_json')
     .gte('start_date', minDate)
     .lte('start_date', maxDate)
     .order('start_date', { ascending: true })
 
   if (itemError) {
-    throw new Error(`Failed to load flight items: ${itemError.message}`)
+    throw new Error(`Failed to load status-check items: ${itemError.message}`)
   }
 
-  const items = (itemRows ?? []) as FlightItemRow[]
+  const allItems = (itemRows ?? []) as StatusCheckItemRow[]
+  const items = allItems.filter((item) => item.kind === 'flight' || isTrainLikeItem(item))
   if (items.length === 0) {
     return {
       eligible: 0,
@@ -203,26 +211,85 @@ async function processStatusChecks() {
     }
     staleCount += 1
 
-    const lookup = buildFlightLookup({
-      start_date: item.start_date,
-      details_json: item.details_json,
-    })
-    if (!lookup) {
+    let upsert:
+      | ReturnType<typeof buildStatusUpsertValues>
+      | ReturnType<typeof buildTrainStatusUpsertValues>
+      | null = null
+
+    if (item.kind === 'flight') {
+      const lookup = buildFlightLookup({
+        start_date: item.start_date,
+        details_json: item.details_json,
+      })
+      if (!lookup) {
+        skippedCount += 1
+        continue
+      }
+
+      const result = await getFlightStatus(lookup.ident, lookup.date)
+      if (!result) {
+        failedCount += 1
+        continue
+      }
+
+      upsert = buildStatusUpsertValues({
+        itemId: item.id,
+        result,
+        existing: existing ?? null,
+      })
+    } else {
+      const providerHint = item.provider ?? item.summary
+      const trainNumber = extractTrainNumberFromItem({
+        details_json: item.details_json,
+        summary: item.summary,
+        provider: item.provider,
+      })
+
+      if (!isSncfFamilyProvider(providerHint)) {
+        upsert = buildTrainStatusUpsertValues({
+          itemId: item.id,
+          result: {
+            status: 'unknown',
+            delayMinutes: null,
+            platform: null,
+            departureStation: null,
+            arrivalStation: null,
+            scheduledDeparture: null,
+            scheduledArrival: null,
+            actualDeparture: null,
+            actualArrival: null,
+            monthlyRegularity: null,
+            raw: {
+              reason: 'unsupported_provider',
+              provider: providerHint,
+            },
+          },
+          existing: existing ?? null,
+        })
+      } else {
+        if (!trainNumber) {
+          skippedCount += 1
+          continue
+        }
+
+        const result = await lookupTrainStatus(trainNumber, item.start_date)
+        if (!result) {
+          failedCount += 1
+          continue
+        }
+
+        upsert = buildTrainStatusUpsertValues({
+          itemId: item.id,
+          result,
+          existing: existing ?? null,
+        })
+      }
+    }
+
+    if (!upsert) {
       skippedCount += 1
       continue
     }
-
-    const result = await getFlightStatus(lookup.ident, lookup.date)
-    if (!result) {
-      failedCount += 1
-      continue
-    }
-
-    const upsert = buildStatusUpsertValues({
-      itemId: item.id,
-      result,
-      existing: existing ?? null,
-    })
 
     const { data: upserted, error: upsertError } = await supabase
       .from('trip_item_status')

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 
 import { extractFlightIdentFromDetails, normalizeStatusRow } from '@/lib/flight-status'
+import { extractTrainNumberFromItem } from '@/lib/train/sncf'
 import { createClient } from '@/lib/supabase/server'
 import { isValidUUID } from '@/lib/validation'
 
-interface FlightItemRow {
+interface StatusItemRow {
   id: string
   trip_id: string | null
   kind: string
@@ -46,7 +47,7 @@ export async function GET(
     .from('trip_items')
     .select('id, trip_id, kind, provider, summary, start_date, end_date, start_ts, end_ts, details_json')
     .eq('id', itemId)
-    .eq('kind', 'flight')
+    .in('kind', ['flight', 'train'])
     .maybeSingle()
 
   if (itemError) {
@@ -59,7 +60,7 @@ export async function GET(
 
   if (!item) {
     return NextResponse.json(
-      { error: { code: 'not_found', message: 'Flight item not found.' } },
+      { error: { code: 'not_found', message: 'Flight or train item not found.' } },
       { status: 404 }
     )
   }
@@ -78,20 +79,26 @@ export async function GET(
     )
   }
 
-  const flight = item as FlightItemRow
+  const statusItem = item as StatusItemRow
 
   return NextResponse.json({
     data: {
       item: {
-        id: flight.id,
-        trip_id: flight.trip_id,
-        provider: flight.provider,
-        summary: flight.summary,
-        start_date: flight.start_date,
-        end_date: flight.end_date,
-        start_ts: flight.start_ts,
-        end_ts: flight.end_ts,
-        flight_number: extractFlightIdentFromDetails(flight.details_json),
+        id: statusItem.id,
+        trip_id: statusItem.trip_id,
+        kind: statusItem.kind,
+        provider: statusItem.provider,
+        summary: statusItem.summary,
+        start_date: statusItem.start_date,
+        end_date: statusItem.end_date,
+        start_ts: statusItem.start_ts,
+        end_ts: statusItem.end_ts,
+        flight_number: extractFlightIdentFromDetails(statusItem.details_json),
+        train_number: extractTrainNumberFromItem({
+          details_json: statusItem.details_json,
+          summary: statusItem.summary,
+          provider: statusItem.provider,
+        }),
       },
       status: normalizeStatusRow(itemId, statusRow as Record<string, unknown> | null),
     },
