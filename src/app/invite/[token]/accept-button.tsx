@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { buildOAuthCallbackUrl } from '@/lib/supabase/auth'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
 
@@ -55,7 +56,7 @@ export function AcceptInviteButton({
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+        redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectTo),
         queryParams: {
           login_hint: invitedEmail,
         },

@@ -1,21 +1,25 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import { buildOAuthCallbackUrl, resolveSafeRedirectFromSearchParams } from '@/lib/supabase/auth'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import Image from 'next/image'
 
 function LoginContent() {
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || searchParams.get('redirect') || '/trips'
 
   const handleGoogleLogin = async () => {
     const supabase = createClient()
+    const redirectTo = resolveSafeRedirectFromSearchParams(searchParams, {
+      fallbackPath: '/trips',
+      origin: window.location.origin,
+    })
 
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+        redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectTo),
       },
     })
   }
