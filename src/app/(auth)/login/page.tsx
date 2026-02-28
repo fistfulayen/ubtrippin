@@ -3,33 +3,65 @@
 import { createClient } from '@/lib/supabase/client'
 import { buildOAuthCallbackUrl, resolveSafeRedirectFromSearchParams } from '@/lib/supabase/auth'
 import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
+import { EmailForm } from './email-form'
 
 function LoginContent() {
   const searchParams = useSearchParams()
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [googleError, setGoogleError] = useState<string | null>(null)
+
+  const redirectPath = useMemo(
+    () =>
+      resolveSafeRedirectFromSearchParams(searchParams, {
+        fallbackPath: '/trips',
+        origin: window.location.origin,
+      }),
+    [searchParams]
+  )
+
+  const authError = searchParams.get('error')
+  const authErrorDescription = searchParams.get('error_description')
+
+  const decodeSafely = (value: string) => {
+    try {
+      return decodeURIComponent(value)
+    } catch {
+      return value
+    }
+  }
+
+  const callbackErrorMessage = useMemo(() => {
+    if (!authError) return null
+    if (authError === 'auth_callback_error') return 'Could not complete authentication. Please try again.'
+    return authErrorDescription ? decodeSafely(authErrorDescription) : decodeSafely(authError)
+  }, [authError, authErrorDescription])
 
   const handleGoogleLogin = async () => {
+    setGoogleError(null)
+    setGoogleLoading(true)
     const supabase = createClient()
-    const redirectTo = resolveSafeRedirectFromSearchParams(searchParams, {
-      fallbackPath: '/trips',
-      origin: window.location.origin,
-    })
 
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectTo),
+        redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
       },
     })
+
+    if (error) {
+      setGoogleError(error.message)
+      setGoogleLoading(false)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#ffffff] to-[#f1f5f9] flex items-center justify-center p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#ffffff] to-[#f1f5f9] p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8 space-y-8">
-          {/* Logo/Brand */}
-          <div className="text-center space-y-2">
+        <div className="space-y-6 rounded-2xl bg-white p-8 shadow-xl">
+          <div className="space-y-2 text-center">
             <Image
               src="/ubtrippin_logo_simple.png"
               alt="UBTRIPPIN"
@@ -38,40 +70,36 @@ function LoginContent() {
               className="mx-auto w-full max-w-xs blend-multiply"
               priority
             />
-            <p className="text-gray-600">
-              Turn your booking emails into beautiful itineraries
-            </p>
+            <p className="text-slate-600">Turn your booking emails into beautiful itineraries</p>
           </div>
 
-          {/* How it works */}
-          <div className="bg-[#ffffff] rounded-xl p-4 space-y-3">
-            <h2 className="font-medium text-[#1e293b]">How it works</h2>
-            <ol className="text-sm text-[#1e293b] space-y-2">
-              <li className="flex gap-2">
-                <span className="font-semibold">1.</span>
-                <span>Sign in with Google</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold">2.</span>
-                <span>Add your email to allowed senders</span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold">3.</span>
-                <span>Forward booking emails to <strong>trips@ubtrippin.xyz</strong></span>
-              </li>
-              <li className="flex gap-2">
-                <span className="font-semibold">4.</span>
-                <span>Your trips are organized automatically</span>
-              </li>
+          <div className="space-y-2 rounded-xl bg-white p-4">
+            <h2 className="font-medium text-slate-800">How it works</h2>
+            <ol className="space-y-2 text-sm text-slate-700">
+              <li className="flex gap-2"><span className="font-semibold">1.</span><span>Sign in with Google or email</span></li>
+              <li className="flex gap-2"><span className="font-semibold">2.</span><span>Add your email to allowed senders</span></li>
+              <li className="flex gap-2"><span className="font-semibold">3.</span><span>Forward booking emails to <strong>trips@ubtrippin.xyz</strong></span></li>
+              <li className="flex gap-2"><span className="font-semibold">4.</span><span>Your trips are organized automatically</span></li>
             </ol>
           </div>
 
-          {/* Sign in button */}
+          {callbackErrorMessage ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {callbackErrorMessage}
+            </p>
+          ) : null}
+          {googleError ? (
+            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {googleError}
+            </p>
+          ) : null}
+
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 rounded-xl px-4 py-3 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-300 transition-colors"
+            disabled={googleLoading}
+            className="flex w-full items-center justify-center gap-3 rounded-xl border-2 border-slate-200 bg-white px-4 py-3 font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -89,15 +117,20 @@ function LoginContent() {
                 fill="#EA4335"
               />
             </svg>
-            Continue with Google
+            {googleLoading ? 'Redirecting...' : 'Continue with Google'}
           </button>
 
-          {/* Privacy note */}
-          <p className="text-xs text-center text-gray-500">
-            By signing in, you agree to our{' '}
-            <a href="#" className="underline hover:text-gray-700">Terms of Service</a>
-            {' '}and{' '}
-            <a href="#" className="underline hover:text-gray-700">Privacy Policy</a>
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-slate-200" />
+            <span className="text-xs uppercase tracking-wide text-slate-500">or</span>
+            <div className="h-px flex-1 bg-slate-200" />
+          </div>
+
+          <EmailForm redirectPath={redirectPath} />
+
+          <p className="text-center text-xs text-slate-500">
+            By signing in, you agree to our <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link>{' '}
+            and <Link href="/privacy" className="underline hover:text-slate-700">Privacy Policy</Link>
           </p>
         </div>
       </div>
@@ -107,11 +140,13 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-b from-[#ffffff] to-[#f1f5f9] flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-[#ffffff] to-[#f1f5f9]">
+          <div className="text-slate-500">Loading...</div>
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   )

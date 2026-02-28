@@ -70,7 +70,7 @@ export function resolveSafeRedirectFromSearchParams(
 }
 
 export function buildOAuthCallbackUrl(origin: string, redirectPath: string): string {
-  const callbackUrl = new URL('/callback', origin)
+  const callbackUrl = new URL('/auth/callback', origin)
   callbackUrl.searchParams.set('redirectTo', redirectPath)
   return callbackUrl.toString()
 }
