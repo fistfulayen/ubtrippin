@@ -123,7 +123,7 @@ export default async function TripPage({ params }: TripPageProps) {
       />
 
       {/* Timeline */}
-      <TripTimeline items={items || []} tripId={trip.id} allTrips={allTrips || []} />
+      <TripTimeline items={items || []} tripId={trip.id} allTrips={allTrips || []} currentUserId={user?.id} />
     </div>
   )
 }

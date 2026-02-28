@@ -52,6 +52,7 @@ import { ItemStatusBadge } from './item-status-badge'
 interface TripItemCardProps {
   item: TripItem
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
+  currentUserId?: string
 }
 
 function loyaltyChip(loyaltyFlag: unknown): { text: string; className: string } | null {
@@ -108,7 +109,7 @@ const kindLabels: Record<string, string> = {
   other: 'Other',
 }
 
-export function TripItemCard({ item, allTrips }: TripItemCardProps) {
+export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProps) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -153,7 +154,8 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
 
   const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
   const otherTrips = safeAllTrips.filter((t) => t.id !== item.trip_id)
-  const sourceEmailId = typeof item.source_email_id === 'string' && item.source_email_id.length > 0
+  const isMyItem = !currentUserId || item.user_id === currentUserId
+  const sourceEmailId = isMyItem && typeof item.source_email_id === 'string' && item.source_email_id.length > 0
     ? item.source_email_id
     : null
 

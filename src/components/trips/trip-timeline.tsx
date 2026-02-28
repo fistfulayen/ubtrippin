@@ -10,9 +10,10 @@ interface TripTimelineProps {
   items: TripItem[]
   tripId: string
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
+  currentUserId?: string
 }
 
-export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
+export function TripTimeline({ items, tripId, allTrips, currentUserId }: TripTimelineProps) {
   const safeItems = Array.isArray(items) ? items : []
   const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
 
@@ -70,7 +71,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
             {/* Items for this day */}
             <div className="ml-5 border-l-2 border-[#cbd5e1] pl-8 space-y-4">
               {sortedDayItems.map((item) => (
-                <TripItemCard key={item.id} item={item} allTrips={safeAllTrips} />
+                <TripItemCard key={item.id} item={item} allTrips={safeAllTrips} currentUserId={currentUserId} />
               ))}
             </div>
           </div>
