@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { resolveSafeRedirectFromSearchParams } from '@/lib/supabase/auth'
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -50,7 +51,11 @@ export async function updateSession(request: NextRequest) {
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('redirectTo', request.nextUrl.pathname)
+    url.search = ''
+    url.searchParams.set(
+      'redirectTo',
+      `${request.nextUrl.pathname}${request.nextUrl.search}`
+    )
     const redirect = NextResponse.redirect(url)
     // CRITICAL: Copy refreshed auth cookies to the redirect response.
     // Without this, getClaims() token refresh is lost and auth breaks.
@@ -60,10 +65,13 @@ export async function updateSession(request: NextRequest) {
     return redirect
   }
 
-  // If user is logged in and trying to access login page, redirect to trips
+  // If user is logged in and trying to access login, honor redirect target.
   if (request.nextUrl.pathname === '/login' && user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/trips'
+    const redirectPath = resolveSafeRedirectFromSearchParams(request.nextUrl.searchParams, {
+      fallbackPath: '/trips',
+      origin: request.nextUrl.origin,
+    })
+    const url = new URL(redirectPath, request.url)
     const redirect = NextResponse.redirect(url)
     supabaseResponse.cookies.getAll().forEach(({ name, value, ...options }) => {
       redirect.cookies.set(name, value, options)
