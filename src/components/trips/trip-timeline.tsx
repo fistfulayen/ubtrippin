@@ -13,7 +13,10 @@ interface TripTimelineProps {
 }
 
 export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
-  if (items.length === 0) {
+  const safeItems = Array.isArray(items) ? items : []
+  const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
+
+  if (safeItems.length === 0) {
     return (
       <div className="rounded-xl border-2 border-dashed border-gray-200 p-8 text-center">
         <Calendar className="mx-auto h-12 w-12 text-gray-400" />
@@ -33,7 +36,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
   }
 
   // Group items by date
-  const groupedItems = groupByDate(items)
+  const groupedItems = groupByDate(safeItems)
   const sortedDates = Array.from(groupedItems.keys()).sort()
 
   return (
@@ -67,7 +70,7 @@ export function TripTimeline({ items, tripId, allTrips }: TripTimelineProps) {
             {/* Items for this day */}
             <div className="ml-5 border-l-2 border-[#cbd5e1] pl-8 space-y-4">
               {sortedDayItems.map((item) => (
-                <TripItemCard key={item.id} item={item} allTrips={allTrips} />
+                <TripItemCard key={item.id} item={item} allTrips={safeAllTrips} />
               ))}
             </div>
           </div>

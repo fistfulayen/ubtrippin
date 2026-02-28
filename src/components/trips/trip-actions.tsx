@@ -36,7 +36,8 @@ export function TripActions({ trip, allTrips, isOwner = true, isPro = false }: T
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [showPdfUpsell, setShowPdfUpsell] = useState(false)
 
-  const otherTrips = allTrips.filter((t) => t.id !== trip.id)
+  const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
+  const otherTrips = safeAllTrips.filter((t) => t.id !== trip.id)
 
   const handleDelete = async () => {
     setDeleting(true)
@@ -76,6 +77,7 @@ export function TripActions({ trip, allTrips, isOwner = true, isPro = false }: T
       setShowPdfUpsell(true)
       return
     }
+    if (typeof window === 'undefined') return
     window.open(`/trips/${trip.id}/pdf`, '_blank', 'noopener,noreferrer')
   }
 

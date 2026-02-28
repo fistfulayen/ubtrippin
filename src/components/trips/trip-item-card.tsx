@@ -118,7 +118,10 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
 
   const [logoError, setLogoError] = useState(false)
   const Icon = kindIcons[item.kind] || Calendar
-  const details = item.details_json as FlightDetails | HotelDetails | null
+  const details =
+    item.details_json && typeof item.details_json === 'object' && !Array.isArray(item.details_json)
+      ? (item.details_json as Record<string, Json>)
+      : null
   const providerLogoUrl = item.provider
     ? getProviderLogoUrl(item.provider, item.kind)
     : null
@@ -146,7 +149,8 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
     router.refresh()
   }
 
-  const otherTrips = allTrips.filter((t) => t.id !== item.trip_id)
+  const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
+  const otherTrips = safeAllTrips.filter((t) => t.id !== item.trip_id)
 
   return (
     <>
@@ -336,7 +340,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
                     <CarDetailsView details={details as CarRentalDetails} />
                   )}
                   {!['flight', 'hotel', 'train', 'car'].includes(item.kind) && (
-                    <GenericDetailsView details={details as Record<string, Json>} />
+                    <GenericDetailsView details={details} />
                   )}
                 </div>
               )}
@@ -344,7 +348,7 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
           )}
 
           {/* Travelers */}
-          {item.traveler_names && item.traveler_names.length > 0 && (
+          {Array.isArray(item.traveler_names) && item.traveler_names.length > 0 && (
             <div className="mt-3 text-sm text-gray-600">
               <span className="font-medium">Travelers:</span>{' '}
               {item.traveler_names.join(', ')}

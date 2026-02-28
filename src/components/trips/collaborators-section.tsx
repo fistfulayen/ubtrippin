@@ -86,7 +86,9 @@ export function CollaboratorsSection({
     }
   }
 
-  if (!isOwner && collaborators.length === 0) return null
+  const safeCollaborators = Array.isArray(collaborators) ? collaborators : []
+
+  if (!isOwner && safeCollaborators.length === 0) return null
 
   return (
     <div className="space-y-3">
@@ -191,9 +193,9 @@ export function CollaboratorsSection({
         )}
       </div>
 
-      {collaborators.length > 0 && (
+      {safeCollaborators.length > 0 && (
         <div className="divide-y divide-gray-100 rounded-lg border border-gray-200">
-          {collaborators.map((collab) => (
+          {safeCollaborators.map((collab) => (
             <div
               key={collab.id}
               className="flex items-center justify-between px-4 py-3"
@@ -239,7 +241,7 @@ export function CollaboratorsSection({
         </div>
       )}
 
-      {isOwner && collaborators.length === 0 && (
+      {isOwner && safeCollaborators.length === 0 && (
         <p className="text-sm text-gray-500">No co-travelers yet. Invite someone!</p>
       )}
     </div>

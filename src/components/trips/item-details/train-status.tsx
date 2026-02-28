@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 
 import { cn } from '@/lib/utils'
@@ -108,13 +108,11 @@ export function TrainStatusBadge({ itemId }: TrainStatusBadgeProps) {
 
   if (!status) return null
 
-  const heading = useMemo(() => {
-    const base = STATUS_META[status.status].label
-    if (status.status === 'delayed' && (status.delay_minutes ?? 0) > 0) {
-      return `${base} ${status.delay_minutes} min`
-    }
-    return base
-  }, [status.delay_minutes, status.status])
+  const baseLabel = STATUS_META[status.status].label
+  const heading =
+    status.status === 'delayed' && (status.delay_minutes ?? 0) > 0
+      ? `${baseLabel} ${status.delay_minutes} min`
+      : baseLabel
 
   return (
     <div

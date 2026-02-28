@@ -135,12 +135,18 @@ export function TripHeader({ trip }: TripHeaderProps) {
 
   const handleCopy = useCallback(async () => {
     if (!shareUrl) return
-    await navigator.clipboard.writeText(shareUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Ignore clipboard write failures (permissions/browser support).
+    }
   }, [shareUrl])
 
   const handleDownloadCalendar = useCallback(() => {
+    if (typeof window === 'undefined') return
     window.location.href = `/api/trips/${trip.id}/calendar`
   }, [trip.id])
 

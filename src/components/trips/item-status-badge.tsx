@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 
@@ -143,14 +143,15 @@ export function ItemStatusBadge({ itemId }: ItemStatusBadgeProps) {
 
   const effective = status
 
-  const heading = useMemo(() => {
-    const base = STATUS_META[effective.status].label
-    if (effective.status === 'delayed' && (effective.delay_minutes ?? 0) > 0) {
-      const newDeparture = effective.estimated_departure ? ` · New departure ${formatTime(effective.estimated_departure)}` : ''
-      return `${base} ${effective.delay_minutes} min${newDeparture}`
-    }
-    return base
-  }, [effective.delay_minutes, effective.estimated_departure, effective.status])
+  const baseLabel = STATUS_META[effective.status].label
+  const heading =
+    effective.status === 'delayed' && (effective.delay_minutes ?? 0) > 0
+      ? `${baseLabel} ${effective.delay_minutes} min${
+          effective.estimated_departure
+            ? ` · New departure ${formatTime(effective.estimated_departure)}`
+            : ''
+        }`
+      : baseLabel
 
   const previousText = effective.previous_status
     ? `(was ${STATUS_META[effective.previous_status].label.toLowerCase()})`
