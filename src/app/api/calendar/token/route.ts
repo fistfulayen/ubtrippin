@@ -20,7 +20,7 @@ export async function GET(_request: NextRequest) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('calendar_token, subscription_tier')
+    .select('calendar_token')
     .eq('id', user.id)
     .single()
 
