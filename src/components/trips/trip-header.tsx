@@ -39,6 +39,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(trip.title)
   const [loading, setLoading] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [showImagePicker, setShowImagePicker] = useState(false)
 
   // Share dialog state
@@ -53,12 +54,34 @@ export function TripHeader({ trip }: TripHeaderProps) {
   const [copied, setCopied] = useState(false)
 
   const handleSave = async () => {
-    if (!title.trim()) return
+    const nextTitle = title.trim()
+    if (!nextTitle) {
+      setSaveError('Trip title cannot be empty.')
+      return
+    }
 
     setLoading(true)
+    setSaveError(null)
     const supabase = createClient()
 
-    await supabase.from('trips').update({ title: title.trim() }).eq('id', trip.id)
+    const { data: updatedTrip, error } = await supabase
+      .from('trips')
+      .update({ title: nextTitle })
+      .eq('id', trip.id)
+      .select('id')
+      .maybeSingle()
+
+    if (error) {
+      setSaveError('Failed to save title. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    if (!updatedTrip) {
+      setSaveError('You do not have permission to edit this trip title.')
+      setLoading(false)
+      return
+    }
 
     setLoading(false)
     setEditing(false)
@@ -67,6 +90,7 @@ export function TripHeader({ trip }: TripHeaderProps) {
 
   const handleCancel = () => {
     setTitle(trip.title)
+    setSaveError(null)
     setEditing(false)
   }
 
@@ -183,7 +207,10 @@ export function TripHeader({ trip }: TripHeaderProps) {
         {/* Edit title button */}
         {!editing && (
           <button
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              setSaveError(null)
+              setEditing(true)
+            }}
             className={`rounded-full p-2 transition-opacity opacity-60 hover:opacity-100 ${
               trip.cover_image_url
                 ? 'bg-black/40 text-white hover:bg-black/60'
@@ -227,6 +254,11 @@ export function TripHeader({ trip }: TripHeaderProps) {
             </>
           )}
         </div>
+        {editing && saveError && (
+          <p className={`mt-2 text-sm ${trip.cover_image_url ? 'text-red-100' : 'text-red-600'}`}>
+            {saveError}
+          </p>
+        )}
 
         {/* Meta info */}
         <div
