@@ -71,7 +71,10 @@ export async function POST(
   // 5. Sanitize & validate (kind + start_date required)
   const result = sanitizeItemInput(body, true)
   if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 400 })
+    return NextResponse.json(
+      { error: { code: result.error.code, message: result.error.message } },
+      { status: 400 }
+    )
   }
   const clean = result.data
 

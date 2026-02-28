@@ -563,14 +563,20 @@ export async function POST(request: NextRequest) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   if (!webhookSecret) {
     console.error('[stripe webhook] missing STRIPE_WEBHOOK_SECRET')
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+    return NextResponse.json(
+      { error: { code: 'server_misconfigured', message: 'Webhook secret not configured.' } },
+      { status: 500 }
+    )
   }
 
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')
 
   if (!sig) {
-    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+    return NextResponse.json(
+      { error: { code: 'invalid_signature', message: 'Missing signature.' } },
+      { status: 400 }
+    )
   }
 
   let event: Stripe.Event
@@ -579,7 +585,10 @@ export async function POST(request: NextRequest) {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     console.error('[stripe webhook] signature verification failed', err)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
+    return NextResponse.json(
+      { error: { code: 'invalid_signature', message: 'Invalid signature.' } },
+      { status: 400 }
+    )
   }
 
   const supabase = createSecretClient()

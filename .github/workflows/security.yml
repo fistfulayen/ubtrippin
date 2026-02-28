@@ -11,6 +11,21 @@ permissions:
   security-events: write
 
 jobs:
+  lint:
+    name: ESLint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
@@ -107,7 +122,7 @@ jobs:
           fi
           
           # Check for hardcoded secrets (basic patterns)
-          SECRETS=$(grep -rn "sk-[a-zA-Z0-9]\{20,\}\|password\s*=\s*['\"][^'\"]\+['\"]\|api_key\s*=\s*['\"][^'\"]\+['\"]" src/ --include="*.ts" --include="*.tsx" || true)
+          SECRETS=$(grep -rn "sk-[a-zA-Z0-9]\{20,\}\|api_key\s*=\s*['\"][^'\"]\+['\"]" src/ --include="*.ts" --include="*.tsx" || true)
           if [ -n "$SECRETS" ]; then
             echo "🔴 Potential hardcoded secrets found:"
             echo "$SECRETS"

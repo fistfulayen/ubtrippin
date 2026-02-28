@@ -169,7 +169,10 @@ export async function PATCH(
   // 5. Sanitize (title not required for PATCH)
   const result = sanitizeTripInput(body, false)
   if ('error' in result) {
-    return NextResponse.json({ error: result.error }, { status: 400 })
+    return NextResponse.json(
+      { error: { code: result.error.code, message: result.error.message } },
+      { status: 400 }
+    )
   }
   const clean = result.data
 

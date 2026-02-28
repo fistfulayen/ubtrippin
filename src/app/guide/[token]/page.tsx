@@ -148,7 +148,6 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 space-y-10">
         {/* Hero */}
         {g.cover_image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={g.cover_image_url}
             alt={g.city}

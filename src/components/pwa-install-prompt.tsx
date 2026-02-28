@@ -9,6 +9,10 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+interface IOSNavigator extends Navigator {
+  standalone?: boolean
+}
+
 const DISMISS_KEY = 'ubt-pwa-dismiss'
 
 export function PWAInstallPrompt() {
@@ -17,8 +21,10 @@ export function PWAInstallPrompt() {
   const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
+    const isNavigatorStandalone = (navigator as IOSNavigator).standalone === true
+
     // Already running as PWA
-    if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+    if (window.matchMedia('(display-mode: standalone)').matches || isNavigatorStandalone) {
       setIsStandalone(true)
       return
     }
@@ -46,7 +52,7 @@ export function PWAInstallPrompt() {
 
     // For iOS (no beforeinstallprompt), show a manual hint after a delay
     const iosTimer = setTimeout(() => {
-      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !(navigator as any).standalone
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !isNavigatorStandalone
       if (isIOS && !deferredPrompt) {
         setVisible(true)
       }
@@ -56,7 +62,7 @@ export function PWAInstallPrompt() {
       window.removeEventListener('beforeinstallprompt', handler)
       clearTimeout(iosTimer)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   if (isStandalone || !visible) return null
 
