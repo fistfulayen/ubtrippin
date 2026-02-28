@@ -15,6 +15,15 @@ type GuideEntryWithAuthor = GuideEntry & {
   author_name?: string | null
 }
 
+function toCoordinate(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
+
 const CATEGORY_ICONS: Record<string, string> = {
   Coffee: '☕',
   Restaurants: '🍽️',
@@ -98,14 +107,19 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
   const hasMultipleAuthors =
     new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
   const mapEntries = entries
-    .filter((entry) => typeof entry.latitude === 'number' && typeof entry.longitude === 'number')
-    .map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      category: entry.category,
-      latitude: entry.latitude as number,
-      longitude: entry.longitude as number,
-    }))
+    .map((entry) => {
+      const latitude = toCoordinate(entry.latitude)
+      const longitude = toCoordinate(entry.longitude)
+      if (latitude === null || longitude === null) return null
+      return {
+        id: entry.id,
+        name: entry.name,
+        category: entry.category,
+        latitude,
+        longitude,
+      }
+    })
+    .filter((entry): entry is { id: string; name: string; category: string; latitude: number; longitude: number } => entry !== null)
   const hasMapEntries = mapEntries.length > 0
   const showMapView = hasMapEntries && view === 'map'
 

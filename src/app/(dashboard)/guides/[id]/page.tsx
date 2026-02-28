@@ -5,21 +5,20 @@ import {
   ArrowLeft,
   Plus,
   Globe,
-  Lock,
   Star,
   ExternalLink,
   MapPin,
   Bookmark,
   CheckCircle2,
   FileText,
-  ImagePlus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CityGuide, GuideEntry } from '@/types/database'
 import { GuideShareToggle } from './guide-share-toggle'
 import { EntryActions } from './entry-actions'
 import { DeleteGuideButton } from './delete-guide-button'
-import { refreshGuideCoverImage } from '../actions'
+import { GuideMapSection } from '@/components/maps/guide-map-section'
+import { GuideCoverImageButton } from './guide-cover-image-button'
 
 interface GuidePageProps {
   params: Promise<{ id: string }>
@@ -29,6 +28,15 @@ interface GuidePageProps {
 type GuideEntryWithAuthor = GuideEntry & {
   author_id?: string | null
   author_name?: string | null
+}
+
+function toCoordinate(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
 }
 
 const CATEGORY_ICONS: Record<string, string> = {
@@ -128,6 +136,21 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   const visitedCount = entries.filter((e) => e.status === 'visited').length
   const hasMultipleAuthors =
     new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
+  const mapEntries = entries
+    .map((entry) => {
+      const latitude = toCoordinate(entry.latitude)
+      const longitude = toCoordinate(entry.longitude)
+      if (latitude === null || longitude === null) return null
+      return {
+        id: entry.id,
+        name: entry.name,
+        category: entry.category,
+        latitude,
+        longitude,
+      }
+    })
+    .filter((entry): entry is { id: string; name: string; category: string; latitude: number; longitude: number } => entry !== null)
+  const hasMapEntries = mapEntries.length > 0
 
   const flag = g.country_code
     ? String.fromCodePoint(
@@ -141,8 +164,6 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   const shareUrl = g.share_token
     ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ubtrippin.xyz'}/guide/${g.share_token}`
     : null
-  const refreshCoverAction = refreshGuideCoverImage.bind(null, g.id)
-
   return (
     <div className="space-y-6">
       {/* Back */}
@@ -195,12 +216,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
             </Button>
           </Link>
 
-          <form action={refreshCoverAction}>
-            <Button size="sm" variant="outline" type="submit">
-              <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
-              Cover image
-            </Button>
-          </form>
+          <GuideCoverImageButton guideId={g.id} currentImageUrl={g.cover_image_url} />
 
           <DeleteGuideButton guideId={g.id} />
         </div>
@@ -231,6 +247,13 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
           To Try ({toTryCount})
         </Link>
       </div>
+
+      {hasMapEntries && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold text-gray-900">Map</h2>
+          <GuideMapSection entries={mapEntries} />
+        </section>
+      )}
 
       {/* Entries */}
       {displayEntries.length === 0 ? (

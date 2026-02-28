@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/utils'
 import { Mail, AlertCircle, CheckCircle, XCircle, Clock, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 import type { SourceEmail, EmailParseStatus } from '@/types/database'
+import { InboxHighlightScroll } from './inbox-highlight-scroll'
 
 const statusConfig: Record<EmailParseStatus, { label: string; icon: typeof Clock; variant: 'secondary' | 'default' | 'success' | 'error' | 'warning' }> = {
   pending: {
@@ -34,7 +35,12 @@ const statusConfig: Record<EmailParseStatus, { label: string; icon: typeof Clock
   },
 }
 
-export default async function InboxPage() {
+interface InboxPageProps {
+  searchParams: Promise<{ highlight?: string }>
+}
+
+export default async function InboxPage({ searchParams }: InboxPageProps) {
+  const { highlight } = await searchParams
   const supabase = await createClient()
 
   const { data: emailsData } = await supabase
@@ -48,6 +54,7 @@ export default async function InboxPage() {
 
   return (
     <div className="space-y-6">
+      <InboxHighlightScroll />
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Inbox</h1>
@@ -70,10 +77,18 @@ export default async function InboxPage() {
           {emails.map((email) => {
             const status = statusConfig[email.parse_status]
             const StatusIcon = status.icon
+            const isHighlighted = highlight === email.id
 
             return (
               <Link key={email.id} href={`/inbox/${email.id}`}>
-                <Card className="group cursor-pointer transition-all hover:shadow-md hover:border-[#cbd5e1]">
+                <Card
+                  data-email-id={email.id}
+                  className={`group cursor-pointer transition-all hover:shadow-md hover:border-[#cbd5e1] ${
+                    isHighlighted
+                      ? 'border-indigo-500 ring-2 ring-indigo-200 shadow-md'
+                      : ''
+                  }`}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       {/* Status indicator */}

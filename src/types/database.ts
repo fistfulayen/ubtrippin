@@ -371,6 +371,7 @@ export interface Database {
           title: string
           body: string
           page_url: string | null
+          image_url: string | null
           status: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
           votes: number
           admin_notes: string | null
@@ -384,6 +385,7 @@ export interface Database {
           title: string
           body: string
           page_url?: string | null
+          image_url?: string | null
           status?: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
           votes?: number
           admin_notes?: string | null
@@ -397,6 +399,7 @@ export interface Database {
           title?: string
           body?: string
           page_url?: string | null
+          image_url?: string | null
           status?: 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
           votes?: number
           admin_notes?: string | null
