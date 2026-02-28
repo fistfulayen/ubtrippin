@@ -4,5 +4,18 @@
       "path": "/api/internal/status-check",
       "schedule": "*/15 * * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "ubtrippin.xyz"
+        }
+      ],
+      "destination": "https://www.ubtrippin.xyz/:path",
+      "permanent": true
+    }
   ]
 }
