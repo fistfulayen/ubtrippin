@@ -11,6 +11,7 @@ import { sanitizeTrip, sanitizeItem, sanitizeTripInput } from '@/lib/api/sanitiz
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
+import { resolveTripWriteAccess } from '@/lib/trips/access'
 
 export async function GET(
   request: NextRequest,
@@ -179,18 +180,30 @@ export async function PATCH(
     )
   }
 
-  // 6. Update — verify ownership via .eq('user_id') + check rows affected
+  // 6. Resolve write access (owner OR editor collaborator OR family member)
   const supabase = await createUserScopedClient(auth.userId)
 
-  // First check ownership
-  const { data: existing } = await supabase
-    .from('trips')
-    .select('id')
-    .eq('id', tripId)
-    .eq('user_id', auth.userId)
-    .single()
+  const access = await resolveTripWriteAccess({
+    supabase,
+    tripId,
+    userId: auth.userId,
+  })
 
-  if (!existing) {
+  if (!access.allowed) {
+    if (access.reason === 'internal_error') {
+      return NextResponse.json(
+        { error: { code: 'internal_error', message: 'Failed to check trip permissions.' } },
+        { status: 500 }
+      )
+    }
+
+    if (access.reason === 'viewer') {
+      return NextResponse.json(
+        { error: { code: 'forbidden', message: 'You do not have permission to edit this trip.' } },
+        { status: 403 }
+      )
+    }
+
     return NextResponse.json(
       { error: { code: 'not_found', message: 'Trip not found.' } },
       { status: 404 }
@@ -211,7 +224,6 @@ export async function PATCH(
     .from('trips')
     .update(updates)
     .eq('id', tripId)
-    .eq('user_id', auth.userId)
     .select(
       `id,
        title,
@@ -225,9 +237,9 @@ export async function PATCH(
        created_at,
        updated_at`
     )
-    .single()
+    .maybeSingle()
 
-  if (error || !updatedTrip) {
+  if (error) {
     console.error('[v1/trips/[id] PATCH] Supabase error:', error)
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to update trip.' } },
@@ -235,8 +247,15 @@ export async function PATCH(
     )
   }
 
+  if (!updatedTrip) {
+    return NextResponse.json(
+      { error: { code: 'not_found', message: 'Trip not found.' } },
+      { status: 404 }
+    )
+  }
+
   void dispatchWebhookEvent({
-    userId: auth.userId,
+    userId: access.trip.user_id,
     tripId,
     event: 'trip.updated',
     data: {
