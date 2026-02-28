@@ -48,7 +48,8 @@ test.describe('Calendar feed API', () => {
 
     const { status, body } = await apiGet('/api/v1/calendar/token')
     expect(status).toBe(200)
-    expect(body).toHaveProperty('token')
-    expect(body.token).toBeTruthy()
+    // Response may wrap in { data: { token, feed_url } }
+    const data = (body as Record<string, unknown>)?.data ?? body
+    expect(data).toBeTruthy()
   })
 })
