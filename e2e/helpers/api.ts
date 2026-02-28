@@ -6,7 +6,20 @@
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? 'https://www.ubtrippin.xyz'
 const API_KEY = process.env.TEST_API_KEY ?? ''
 
-function authHeaders(): HeadersInit {
+type AuthMode = 'apiKey' | 'none'
+
+interface ApiRequestOptions {
+  auth?: AuthMode
+  headers?: HeadersInit
+}
+
+function authHeaders(auth: AuthMode): HeadersInit {
+  if (auth === 'none') {
+    return {
+      'Content-Type': 'application/json',
+    }
+  }
+
   return {
     Authorization: `Bearer ${API_KEY}`,
     'Content-Type': 'application/json',
@@ -21,33 +34,46 @@ async function parseBody(res: Response) {
   return null
 }
 
-export async function apiGet(path: string) {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders() })
-  return { status: res.status, body: await parseBody(res) }
+async function request(
+  path: string,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  data?: unknown,
+  options: ApiRequestOptions = {}
+) {
+  const auth = options.auth ?? 'apiKey'
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      ...authHeaders(auth),
+      ...(options.headers ?? {}),
+    },
+    ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+  })
+
+  return {
+    status: res.status,
+    body: res.status === 204 ? null : await parseBody(res),
+  }
 }
 
-export async function apiPost(path: string, data: unknown) {
+export async function apiGet(path: string, options?: ApiRequestOptions) {
   const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(data),
+    headers: {
+      ...authHeaders(options?.auth ?? 'apiKey'),
+      ...(options?.headers ?? {}),
+    },
   })
   return { status: res.status, body: await parseBody(res) }
 }
 
-export async function apiPatch(path: string, data: unknown) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'PATCH',
-    headers: authHeaders(),
-    body: JSON.stringify(data),
-  })
-  return { status: res.status, body: await parseBody(res) }
+export async function apiPost(path: string, data: unknown, options?: ApiRequestOptions) {
+  return request(path, 'POST', data, options)
 }
 
-export async function apiDelete(path: string) {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: 'DELETE',
-    headers: authHeaders(),
-  })
-  return { status: res.status, body: res.status === 204 ? null : await parseBody(res) }
+export async function apiPatch(path: string, data: unknown, options?: ApiRequestOptions) {
+  return request(path, 'PATCH', data, options)
+}
+
+export async function apiDelete(path: string, options?: ApiRequestOptions) {
+  return request(path, 'DELETE', undefined, options)
 }
