@@ -189,6 +189,6 @@ export function getAirlineLogoUrl(airlineNameOrCode: string): string | null {
  * Extract IATA airline code from a flight number (e.g., "AF1234" → "AF")
  */
 export function extractAirlineCode(flightNumber: string): string | null {
-  const match = flightNumber.match(/^([A-Z]{2})\d/)
+  const match = flightNumber.trim().match(/^([A-Z]{2})\s*\d/i)
   return match ? match[1] : null
 }

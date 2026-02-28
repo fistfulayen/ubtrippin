@@ -43,6 +43,40 @@ function isSubscribed(events: string[] | null, event: string): boolean {
   return events.includes(event)
 }
 
+export interface WebhookDeliveryPayload {
+  version: '1'
+  event: WebhookEvent
+  webhook_id: string
+  delivery_id: string
+  timestamp: string
+  data: Record<string, unknown>
+}
+
+export function buildWebhookDeliveryPayload(args: {
+  event: WebhookEvent
+  webhookId: string
+  deliveryId: string
+  timestamp: string
+  data: Record<string, unknown>
+}): WebhookDeliveryPayload {
+  return {
+    version: '1',
+    event: args.event,
+    webhook_id: args.webhookId,
+    delivery_id: args.deliveryId,
+    timestamp: args.timestamp,
+    data: args.data,
+  }
+}
+
+export function serializeWebhookPayload(payload: WebhookDeliveryPayload): string {
+  return JSON.stringify(payload)
+}
+
+export function signWebhookPayload(payload: string, secret: string): string {
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex')
+}
+
 function removeSensitiveFields(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((entry) => removeSensitiveFields(entry))
@@ -109,14 +143,13 @@ async function queueDeliveriesForWebhooks(
 
   const deliveries = webhooks.map((webhook) => {
     const deliveryId = crypto.randomUUID()
-    const payload = {
-      version: '1',
+    const payload = buildWebhookDeliveryPayload({
       event,
-      webhook_id: webhook.id,
-      delivery_id: deliveryId,
+      webhookId: webhook.id,
+      deliveryId,
       timestamp,
       data: sanitizedData,
-    }
+    })
 
     return {
       id: deliveryId,
