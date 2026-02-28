@@ -550,9 +550,8 @@ export async function POST(request: NextRequest) {
           travelers: mergedTravelers,
         }
 
-        // Re-generate trip name if it's still a default title
-        if (trip.title && isDefaultTitle(trip.title)) {
-          // Fetch all items for this trip to generate a comprehensive name
+        // Re-generate trip name whenever new items are added
+        {
           const { data: allTripItems } = await supabase
             .from('trip_items')
             .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
@@ -560,7 +559,7 @@ export async function POST(request: NextRequest) {
 
           if (allTripItems && allTripItems.length > 0) {
             const newTitle = await generateTripName(allTripItems, trip.title)
-            if (newTitle && !isDefaultTitle(newTitle)) {
+            if (newTitle) {
               tripUpdate.title = newTitle
             }
           }
