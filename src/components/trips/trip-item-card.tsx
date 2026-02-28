@@ -275,7 +275,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
             {/* Actions */}
             <div className="relative flex items-center gap-1">
               {sourceEmailId ? (
-                <Link href={`/inbox?highlight=${encodeURIComponent(sourceEmailId)}`}>
+                <Link href={`/inbox/${sourceEmailId}`}>
                   <Button
                     variant="ghost"
                     size="sm"
