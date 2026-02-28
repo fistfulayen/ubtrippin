@@ -24,6 +24,7 @@ export default async function SettingsPage() {
 
   // Type assertion needed due to Supabase codegen quirks
   const profile = profileData as Profile | null
+  const isPro = profile?.subscription_tier === 'pro'
 
   const { data: sendersData } = await supabase
     .from('allowed_senders')
@@ -126,7 +127,7 @@ export default async function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CalendarFeedSection />
+          <CalendarFeedSection isPro={isPro} />
         </CardContent>
       </Card>
 

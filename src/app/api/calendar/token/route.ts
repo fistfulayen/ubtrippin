@@ -42,6 +42,19 @@ export async function POST(_request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('subscription_tier')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profile?.subscription_tier !== 'pro') {
+    return NextResponse.json(
+      { error: { code: 'pro_required', message: 'Calendar feed is available on Pro.' } },
+      { status: 403 }
+    )
+  }
+
   const token = nanoid(32)
   const { error } = await supabase
     .from('profiles')

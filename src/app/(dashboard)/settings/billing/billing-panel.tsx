@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, CreditCard, PauseCircle } from 'lucide-react'
 
 import { EarlyAdopterCounter } from '@/components/billing/early-adopter-counter'
@@ -85,16 +84,11 @@ function formatCheckoutLabel(price: BillingPrice | null, fallback: string): stri
 }
 
 export function BillingPanel({ initialSubscription }: BillingPanelProps) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
-
   const [subscription, setSubscription] = useState<BillingSubscriptionResponse>(initialSubscription)
   const [prices, setPrices] = useState<BillingPrice[]>([])
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [showUpgradeToast, setShowUpgradeToast] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -132,56 +126,6 @@ export function BillingPanel({ initialSubscription }: BillingPanelProps) {
       active = false
     }
   }, [])
-
-  useEffect(() => {
-    if (searchParams.get('upgraded') !== 'true') {
-      return
-    }
-
-    setShowUpgradeToast(true)
-
-    import('canvas-confetti').then((confettiModule) => {
-      const confetti = confettiModule.default
-
-      confetti({
-        particleCount: 110,
-        spread: 70,
-        origin: { x: 0.5, y: 0.5 },
-        colors: ['#4f46e5', '#0f172a', '#f59e0b', '#ffffff'],
-      })
-
-      setTimeout(() => {
-        confetti({
-          particleCount: 45,
-          angle: 60,
-          spread: 50,
-          origin: { x: 0, y: 0.6 },
-          colors: ['#4f46e5', '#f59e0b'],
-        })
-      }, 220)
-
-      setTimeout(() => {
-        confetti({
-          particleCount: 45,
-          angle: 120,
-          spread: 50,
-          origin: { x: 1, y: 0.6 },
-          colors: ['#0f172a', '#4f46e5'],
-        })
-      }, 320)
-    })
-
-    const query = new URLSearchParams(searchParams.toString())
-    query.delete('upgraded')
-    const nextUrl = query.size > 0 ? `${pathname}?${query.toString()}` : pathname
-    router.replace(nextUrl, { scroll: false })
-
-    const timer = setTimeout(() => {
-      setShowUpgradeToast(false)
-    }, 4500)
-
-    return () => clearTimeout(timer)
-  }, [pathname, router, searchParams])
 
   const earlyPrice = useMemo(
     () => prices.find((price) => typeof price.available === 'boolean') ?? null,
@@ -260,12 +204,6 @@ export function BillingPanel({ initialSubscription }: BillingPanelProps) {
 
   return (
     <div className="space-y-6">
-      {showUpgradeToast && (
-        <div className="fixed right-4 top-20 z-50 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 shadow-md">
-          Welcome to Pro! All limits have been removed.
-        </div>
-      )}
-
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}

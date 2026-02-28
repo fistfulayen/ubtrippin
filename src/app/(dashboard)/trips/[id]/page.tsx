@@ -76,6 +76,15 @@ export default async function TripPage({ params }: TripPageProps) {
 
   const canEdit = isOwner || collabRole === 'editor'
 
+  const { data: profileData } = user
+    ? await supabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', user.id)
+        .maybeSingle()
+    : { data: null }
+  const isPro = profileData?.subscription_tier === 'pro'
+
   return (
     <div className="space-y-6">
       {/* Back link */}
@@ -103,7 +112,7 @@ export default async function TripPage({ params }: TripPageProps) {
 
       {/* Actions bar — show to owners and editors */}
       {canEdit && (
-        <TripActions trip={trip} allTrips={allTrips || []} isOwner={isOwner} />
+        <TripActions trip={trip} allTrips={allTrips || []} isOwner={isOwner} isPro={isPro} />
       )}
 
       {/* Collaborators section */}

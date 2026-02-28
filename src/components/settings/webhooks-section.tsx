@@ -137,8 +137,10 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
   const [expandedDeliveries, setExpandedDeliveries] = useState<Record<string, boolean>>({})
   const [loadingDeliveries, setLoadingDeliveries] = useState(false)
   const [deliveriesError, setDeliveriesError] = useState<string | null>(null)
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
 
-  const maxWebhooks = subscriptionTier === 'pro' ? 10 : 1
+  const isPro = subscriptionTier === 'pro'
+  const maxWebhooks = isPro ? 10 : 0
   const reachedLimit = webhooks.length >= maxWebhooks
 
   const selectedWebhook = useMemo(
@@ -283,7 +285,12 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
       })
 
       if (!response.ok) {
-        setCreateError(await parseApiError(response))
+        const message = await parseApiError(response)
+        setCreateError(message)
+        if (message.toLowerCase().includes('pro feature')) {
+          setShowUpgradePrompt(true)
+          setAddOpen(false)
+        }
         return
       }
 
@@ -397,12 +404,20 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
     setTimeout(() => setCopiedSecret(false), 1800)
   }
 
+  const onOpenAdd = () => {
+    if (!isPro) {
+      setShowUpgradePrompt(true)
+      return
+    }
+    setAddOpen(true)
+  }
+
   return (
     <div className="space-y-6">
-      {subscriptionTier === 'free' && reachedLimit && (
+      {showUpgradePrompt && (
         <UpgradeCard
-          title="Webhooks are a Pro feature"
-          description="Let your AI agents react to trip updates in real-time."
+          title="Webhook registration is a Pro feature"
+          description="Connect your systems to real-time trip updates with signed webhook events on Pro."
           variant="card"
           showEarlyAdopter
         />
@@ -415,7 +430,7 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
             <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', loading && 'animate-spin')} />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => setAddOpen(true)} disabled={reachedLimit}>
+          <Button size="sm" onClick={onOpenAdd} disabled={isPro && reachedLimit}>
             <Plus className="mr-1.5 h-4 w-4" />
             Add Webhook
           </Button>
@@ -843,7 +858,7 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
               <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={creating || reachedLimit}>
+              <Button type="submit" disabled={creating || (isPro && reachedLimit)}>
                 {creating ? 'Creating...' : 'Create Webhook'}
               </Button>
             </DialogFooter>

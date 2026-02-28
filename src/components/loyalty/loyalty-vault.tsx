@@ -142,6 +142,7 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
   const [form, setForm] = useState<LoyaltyFormState>(EMPTY_FORM)
   const [providerKeyTouched, setProviderKeyTouched] = useState(false)
   const [activeTraveler, setActiveTraveler] = useState<string>('all')
+  const [showLimitUpsell, setShowLimitUpsell] = useState(false)
 
   const freeLimitReached = !isPro && programs.length >= 3
   const userFullName = fullName?.trim().toLowerCase() ?? ''
@@ -239,6 +240,11 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
   }
 
   function openAdd() {
+    if (freeLimitReached) {
+      setShowLimitUpsell(true)
+      return
+    }
+
     setForm({
       ...EMPTY_FORM,
       traveler_name: fullName?.trim() ?? '',
@@ -283,8 +289,14 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
       }),
     })
 
-    const payload = (await response.json()) as { data?: LoyaltyProgram; error?: { message?: string } }
+    const payload = (await response.json()) as {
+      data?: LoyaltyProgram
+      error?: { message?: string; code?: string }
+    }
     if (!response.ok || !payload.data) {
+      if (payload.error?.code === 'pro_required') {
+        setShowLimitUpsell(true)
+      }
       setError(payload.error?.message ?? 'Failed to add loyalty program.')
       setSaving(false)
       return
@@ -452,16 +464,16 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
             {travelerCount === 1 ? 'traveler' : 'travelers'}
           </p>
         </div>
-        <Button onClick={openAdd} disabled={freeLimitReached}>
+        <Button onClick={openAdd}>
           <Plus className="mr-2 h-4 w-4" />
           Add program
         </Button>
       </header>
 
-      {freeLimitReached && (
+      {showLimitUpsell && (
         <UpgradeCard
-          title="Unlock unlimited loyalty programs"
-          description="Free tier supports 3 programs. Upgrade to Pro for unlimited loyalty tracking across all travelers."
+          title="Loyalty vault limit reached"
+          description="You can store up to 3 programs on Free. Upgrade to Pro to add program #4 and keep unlimited loyalty records."
           variant="card"
           showEarlyAdopter
         />
@@ -474,7 +486,7 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
           <p className="mt-2 max-w-md text-sm text-gray-500">
             Add your frequent flyer and hotel membership numbers so we can check your bookings automatically.
           </p>
-          <Button className="mt-5" onClick={openAdd} disabled={freeLimitReached}>
+          <Button className="mt-5" onClick={openAdd}>
             <Plus className="mr-2 h-4 w-4" />
             Add your first program
           </Button>

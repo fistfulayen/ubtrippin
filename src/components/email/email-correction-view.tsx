@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Mail, FileText, Shield } from 'lucide-react'
 import { sanitizeHtml, formatDateTime } from '@/lib/utils'
 import { ExtractionEditor, type ExtractedItemData } from './extraction-editor'
@@ -43,6 +43,7 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
   )
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const extractionLimitHit = email.parse_error?.toLowerCase().includes('extraction limit reached') ?? false
 
   // Reset items when email changes
   useEffect(() => {
@@ -164,11 +165,17 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
             {email.parse_error && (
               <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 <p>{email.parse_error}</p>
-                {email.parse_error.includes('Upgrade to Pro') && (
-                  <Link href="/settings/billing" className="mt-2 inline-block font-medium underline underline-offset-2">
-                    Upgrade in Billing
-                  </Link>
-                )}
+              </div>
+            )}
+
+            {extractionLimitHit && (
+              <div className="mb-4">
+                <UpgradeCard
+                  title="Monthly extraction limit reached"
+                  description="Free includes 10 email extractions each month. Upgrade to Pro to keep processing incoming bookings without waiting for reset."
+                  variant="card"
+                  showEarlyAdopter
+                />
               </div>
             )}
 

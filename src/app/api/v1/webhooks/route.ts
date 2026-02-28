@@ -13,7 +13,7 @@ import { validateWebhookUrl } from '@/lib/webhook-url'
 import { WEBHOOK_EVENTS } from '@/lib/webhooks'
 import { getUserTier } from '@/lib/usage/limits'
 
-const FREE_WEBHOOK_LIMIT = 1
+const FREE_WEBHOOK_LIMIT = 0
 const PRO_WEBHOOK_LIMIT = 10
 
 function stripHtml(value: string): string {
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
           message:
             tier === 'pro'
               ? `Pro tier supports up to ${PRO_WEBHOOK_LIMIT} webhooks.`
-              : `The free tier supports ${FREE_WEBHOOK_LIMIT} webhook. Upgrade to Pro for up to ${PRO_WEBHOOK_LIMIT} webhooks.`,
+              : 'Webhook registration is a Pro feature. Upgrade to register signed webhook endpoints.',
         },
       },
       { status: 403 }

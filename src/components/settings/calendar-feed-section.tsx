@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { Copy, Check, RefreshCw, Calendar, ExternalLink, Rss } from 'lucide-react'
+import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Button } from '@/components/ui/button'
 
 interface CalendarTokenState {
@@ -10,11 +11,27 @@ interface CalendarTokenState {
   feed_url: string | null
 }
 
-export function CalendarFeedSection() {
+interface CalendarFeedSectionProps {
+  isPro: boolean
+}
+
+interface CalendarApiError {
+  error?: { message?: string } | string
+}
+
+function parseError(payload: CalendarApiError | null, fallback: string): string {
+  if (!payload?.error) return fallback
+  if (typeof payload.error === 'string') return payload.error
+  return payload.error.message ?? fallback
+}
+
+export function CalendarFeedSection({ isPro }: CalendarFeedSectionProps) {
   const [state, setState] = useState<CalendarTokenState | null>(null)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const [error, setError] = useState<string | null>(null)
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
 
   const fetchToken = async () => {
     try {
@@ -35,11 +52,24 @@ export function CalendarFeedSection() {
   }, [])
 
   const generateToken = () => {
+    if (!isPro) {
+      setShowUpgradePrompt(true)
+      return
+    }
+
     startTransition(async () => {
       const res = await fetch('/api/calendar/token', { method: 'POST' })
       if (res.ok) {
         const data = await res.json()
         setState({ has_token: true, token: data.token, feed_url: data.feed_url })
+        setError(null)
+      } else {
+        const payload = (await res.json().catch(() => null)) as CalendarApiError | null
+        const message = parseError(payload, 'Failed to generate calendar feed.')
+        setError(message)
+        if (res.status === 403 || message.toLowerCase().includes('pro')) {
+          setShowUpgradePrompt(true)
+        }
       }
     })
   }
@@ -49,6 +79,7 @@ export function CalendarFeedSection() {
       const res = await fetch('/api/calendar/token', { method: 'DELETE' })
       if (res.ok) {
         setState({ has_token: false, token: null, feed_url: null })
+        setError(null)
       }
     })
   }
@@ -75,6 +106,15 @@ export function CalendarFeedSection() {
   if (!state?.has_token) {
     return (
       <div className="space-y-4">
+        {showUpgradePrompt && (
+          <UpgradeCard
+            title="Live calendar feed is a Pro feature"
+            description="Upgrade to enable a private iCal feed that auto-updates as trips change."
+            variant="card"
+            showEarlyAdopter
+          />
+        )}
+        {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         <div className="rounded-lg border border-dashed border-[#c7c2b8] bg-[#f5f3ef]/50 p-6 text-center">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[#eceae4]">
             <Rss className="h-5 w-5 text-[#b45309]" />
@@ -93,6 +133,7 @@ export function CalendarFeedSection() {
 
   return (
     <div className="space-y-4">
+      {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {/* Feed URL */}
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">

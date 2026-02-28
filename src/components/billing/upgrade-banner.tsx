@@ -8,7 +8,9 @@ import { useEarlyAdopterSpots } from '@/hooks/use-early-adopter-spots'
 import { PRICE_EARLY_ADOPTER, PRICE_PRO_MONTHLY } from '@/lib/billing'
 
 const DISMISS_KEY = 'upgrade-banner-dismissed'
+const DISMISS_COUNT_KEY = 'upgrade-banner-dismiss-count'
 const REAPPEAR_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_DISMISSALS = 3
 
 interface UpgradeBannerProps {
   subscriptionTier?: string | null
@@ -28,6 +30,13 @@ export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
     }
 
     try {
+      const dismissCountRaw = window.localStorage.getItem(DISMISS_COUNT_KEY)
+      const dismissCount = Number.parseInt(dismissCountRaw ?? '0', 10)
+      if (Number.isFinite(dismissCount) && dismissCount >= MAX_DISMISSALS) {
+        setDismissed(true)
+        return
+      }
+
       const raw = window.localStorage.getItem(DISMISS_KEY)
       if (!raw) {
         setDismissed(false)
@@ -65,6 +74,10 @@ export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
     setDismissed(true)
     try {
       window.localStorage.setItem(DISMISS_KEY, String(Date.now()))
+      const dismissCountRaw = window.localStorage.getItem(DISMISS_COUNT_KEY)
+      const dismissCount = Number.parseInt(dismissCountRaw ?? '0', 10)
+      const nextDismissCount = Number.isFinite(dismissCount) ? dismissCount + 1 : 1
+      window.localStorage.setItem(DISMISS_COUNT_KEY, String(nextDismissCount))
     } catch {
       // Ignore localStorage failures.
     }
