@@ -41,6 +41,7 @@ import {
   FlightDetailsView,
   HotelDetailsView,
   TrainDetailsView,
+  TrainStatusBadge,
   CarDetailsView,
   GenericDetailsView,
 } from './item-details'
@@ -253,6 +254,10 @@ export function TripItemCard({ item, allTrips }: TripItemCardProps) {
 
               {item.kind === 'flight' && (
                 <ItemStatusBadge itemId={item.id} />
+              )}
+
+              {item.kind === 'train' && (
+                <TrainStatusBadge itemId={item.id} />
               )}
             </div>
 

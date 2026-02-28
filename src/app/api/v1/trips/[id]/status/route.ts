@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 
 import { extractFlightIdentFromDetails, normalizeStatusRow } from '@/lib/flight-status'
+import { extractTrainNumberFromItem } from '@/lib/train/sncf'
 import { createClient } from '@/lib/supabase/server'
 import { isValidUUID } from '@/lib/validation'
 
-interface FlightItemRow {
+interface StatusItemRow {
   id: string
   trip_id: string | null
+  kind: string
   start_date: string
   end_date: string | null
   start_ts: string | null
@@ -56,9 +58,9 @@ export async function GET(
 
   const { data: itemRows, error: itemError } = await supabase
     .from('trip_items')
-    .select('id, trip_id, start_date, end_date, start_ts, end_ts, provider, summary, details_json')
+    .select('id, trip_id, kind, start_date, end_date, start_ts, end_ts, provider, summary, details_json')
     .eq('trip_id', tripId)
-    .eq('kind', 'flight')
+    .in('kind', ['flight', 'train'])
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
 
@@ -70,7 +72,7 @@ export async function GET(
     )
   }
 
-  const items = (itemRows ?? []) as FlightItemRow[]
+  const items = (itemRows ?? []) as StatusItemRow[]
   const itemIds = items.map((item) => item.id)
 
   const { data: statusRows, error: statusError } = itemIds.length
@@ -107,7 +109,13 @@ export async function GET(
       end_ts: item.end_ts,
       provider: item.provider,
       summary: item.summary,
+      kind: item.kind,
       flight_number: extractFlightIdentFromDetails(item.details_json),
+      train_number: extractTrainNumberFromItem({
+        details_json: item.details_json,
+        summary: item.summary,
+        provider: item.provider,
+      }),
     }
   })
 
