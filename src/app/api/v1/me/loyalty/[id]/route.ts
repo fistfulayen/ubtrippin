@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { isValidUUID } from '@/lib/validation'
@@ -71,8 +70,7 @@ export async function PATCH(
     )
   }
 
-  const supabase = await createClient()
-  const { data: existing } = await supabase
+  const { data: existing } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
     .eq('id', id)
@@ -152,7 +150,7 @@ export async function PATCH(
     )
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from('loyalty_programs')
     .update(updates)
     .eq('id', id)
@@ -186,8 +184,7 @@ export async function DELETE(
     )
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
+  const { data, error } = await auth.supabase
     .from('loyalty_programs')
     .delete()
     .eq('id', id)

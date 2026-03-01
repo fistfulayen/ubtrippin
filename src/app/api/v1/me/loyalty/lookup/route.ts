@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
@@ -63,10 +62,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ exact_match: false })
   }
 
-  const supabase = await createClient()
-
+  
   // Step 1: exact provider match
-  const { data: exactProgram } = await supabase
+  const { data: exactProgram } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
     .eq('user_id', auth.userId)
@@ -76,7 +74,7 @@ export async function GET(request: NextRequest) {
     .limit(1)
     .maybeSingle()
 
-  const { data: providerRow } = await supabase
+  const { data: providerRow } = await auth.supabase
     .from('provider_catalog')
     .select('provider_key, provider_name, provider_type, alliance_group')
     .eq('provider_key', resolvedProviderKey)
@@ -96,7 +94,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ exact_match: false })
   }
 
-  const { data: allianceProviders } = await supabase
+  const { data: allianceProviders } = await auth.supabase
     .from('provider_catalog')
     .select('provider_key')
     .eq('alliance_group', allianceGroup)
@@ -109,7 +107,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ exact_match: false })
   }
 
-  const { data: compatible } = await supabase
+  const { data: compatible } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
     .eq('user_id', auth.userId)
