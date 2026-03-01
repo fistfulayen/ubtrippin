@@ -242,22 +242,26 @@ function generateTripIcal(trip: TripWithItems): string {
 // ---------------------------------------------------------------------------
 
 const server = new McpServer(
-  { name: 'ubtrippin', version: '1.8.0' },
+  { name: 'ubtrippin', version: '2.0.0' },
   {
     capabilities: { resources: {}, tools: {} },
     instructions: `
 This server provides access to your UBTRIPPIN travel data and city guides.
 Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 
-Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar
-Write (trips): create_trip, update_trip, delete_trip, merge_trips
-Write (items): add_item, add_items, update_item, delete_item, move_item
-City Guides: list_guides, get_guide, add_guide_entry, update_guide_entry, get_guide_markdown, get_nearby_places
+Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar, get_trip_status, get_item_status
+Write (trips): create_trip, update_trip, delete_trip, merge_trips, rename_trip
+Write (items): add_item, add_items, update_item, delete_item, move_item, refresh_item_status
+City Guides: list_guides, get_guide, find_or_create_guide, add_guide_entry, update_guide_entry, delete_guide_entry, update_guide, delete_guide, get_guide_markdown, get_nearby_places
 Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
 Notifications: get_notifications, mark_notification_read
-Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, lookup_loyalty_program
-Family Sharing: list_families, get_family, get_family_loyalty, lookup_family_loyalty, get_family_profiles, get_family_trips, get_family_guides
+Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, delete_loyalty_program, lookup_loyalty_program, export_loyalty_data, list_loyalty_providers
+Family Sharing: list_families, get_family, create_family, update_family, delete_family, invite_family_member, remove_family_member, get_family_loyalty, lookup_family_loyalty, get_family_profiles, get_family_trips, get_family_guides
 Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender, list_webhooks, register_webhook, delete_webhook, test_webhook, list_deliveries
+Billing: get_subscription, get_billing_portal, get_prices
+Imports: list_imports, get_import
+Trains: get_train_status
+Activation: get_activation_status
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
 
@@ -1473,6 +1477,425 @@ server.registerTool(
 
 registerFamilyTools(server, apiFetch)
 
+
+// ---------------------------------------------------------------------------
+// Billing Tools (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_subscription',
+  {
+    title: 'Get Subscription Status',
+    description: 'Get the current subscription plan, tier, and billing period for the authenticated user.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown }>('/api/v1/billing/subscription')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'get_billing_portal',
+  {
+    title: 'Get Billing Portal URL',
+    description: 'Get a Stripe billing portal link for the user to manage their subscription, payment method, and invoices.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown }>('/api/v1/billing/portal')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'get_prices',
+  {
+    title: 'Get Available Plans',
+    description: 'Get available subscription plans and pricing. Useful when the user asks about upgrading.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown }>('/api/v1/billing/prices')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Import Tools (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'list_imports',
+  {
+    title: 'List Imports',
+    description: 'List all email imports (parsed booking emails) for the authenticated user.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown[]; meta: unknown }>('/api/v1/imports')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'get_import',
+  {
+    title: 'Get Import Detail',
+    description: 'Get details of a specific email import by ID, including parsed items and processing status.',
+    inputSchema: {
+      import_id: z.string().uuid().describe('UUID of the import'),
+    },
+  },
+  async ({ import_id }) => {
+    const result = await apiFetch<{ data: unknown }>(`/api/v1/imports/${import_id}`)
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Train Status Tool (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_train_status',
+  {
+    title: 'Get Train Status',
+    description: 'Get real-time status for a train by number — delays, platform changes, etc. Works with European train operators (SNCF, Eurostar, Thalys, etc.).',
+    inputSchema: {
+      train_number: z.string().min(1).describe('Train number (e.g. "9024", "TGV6621")'),
+    },
+  },
+  async ({ train_number }) => {
+    const result = await apiFetch<{ data: unknown }>(`/api/v1/trains/${encodeURIComponent(train_number)}/status`)
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Trip Status & Rename (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_trip_status',
+  {
+    title: 'Get Trip Processing Status',
+    description: 'Get the processing status for a trip — useful to check if email imports are still being parsed.',
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+    },
+  },
+  async ({ trip_id }) => {
+    const result = await apiFetch<{ data: unknown }>(`/api/v1/trips/${trip_id}/status`)
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'rename_trip',
+  {
+    title: 'Rename Trip',
+    description: 'Rename a trip. Shorthand for updating just the title.',
+    inputSchema: {
+      trip_id: z.string().uuid().describe('UUID of the trip'),
+      title: z.string().min(1).max(200).describe('New title for the trip'),
+    },
+  },
+  async ({ trip_id, title }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/trips/${trip_id}/rename`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ title }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Item Status Tools (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_item_status',
+  {
+    title: 'Get Item Status',
+    description: 'Get the processing/live status for a trip item (e.g. flight delay info, gate changes).',
+    inputSchema: {
+      item_id: z.string().uuid().describe('UUID of the item'),
+    },
+  },
+  async ({ item_id }) => {
+    const result = await apiFetch<{ data: unknown }>(`/api/v1/items/${item_id}/status`)
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'refresh_item_status',
+  {
+    title: 'Refresh Item Status',
+    description: 'Re-check live status for a trip item (e.g. re-query flight delays, gate changes). Triggers a fresh lookup.',
+    inputSchema: {
+      item_id: z.string().uuid().describe('UUID of the item'),
+    },
+  },
+  async ({ item_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/items/${item_id}/status/refresh`, {
+      method: 'POST',
+      headers: authHeaders(),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Activation Status (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_activation_status',
+  {
+    title: 'Get Activation Status',
+    description: 'Check whether the user\'s UBTRIPPIN account is activated and ready to use.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown }>('/api/v1/activation/status')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Additional Loyalty Tools (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'delete_loyalty_program',
+  {
+    title: 'Delete Loyalty Program',
+    description: 'Remove a loyalty program from the vault. Use the ID from list_loyalty_programs.',
+    inputSchema: {
+      id: z.string().uuid().describe('UUID of the loyalty program entry'),
+    },
+  },
+  async ({ id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/me/loyalty/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'export_loyalty_data',
+  {
+    title: 'Export Loyalty Data',
+    description: 'Export all loyalty program data in a downloadable format.',
+  },
+  async () => {
+    const result = await apiFetch<unknown>('/api/v1/me/loyalty/export')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'list_loyalty_providers',
+  {
+    title: 'List Known Loyalty Providers',
+    description: 'Get the full list of supported loyalty providers. No auth required but auth is sent anyway. Useful for validating provider keys before adding a program.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: unknown[] }>('/api/v1/loyalty/providers')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Additional Guide Tools (PRD 026)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'update_guide',
+  {
+    title: 'Update City Guide',
+    description: 'Update a city guide\'s metadata (title, sharing settings, etc.).',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('UUID of the guide'),
+      city: z.string().optional(),
+      country: z.string().optional(),
+      country_code: z.string().optional(),
+      is_public: z.boolean().optional().describe('Make guide publicly shareable'),
+    },
+  },
+  async ({ guide_id, ...updates }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/guides/${guide_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(updates),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'delete_guide',
+  {
+    title: 'Delete City Guide',
+    description: 'Delete a city guide and all its entries. Irreversible — confirm with user before calling.',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('UUID of the guide to delete'),
+    },
+  },
+  async ({ guide_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/guides/${guide_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, guide_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'delete_guide_entry',
+  {
+    title: 'Delete Guide Entry',
+    description: 'Delete a single entry (place) from a city guide.',
+    inputSchema: {
+      guide_id: z.string().uuid().describe('UUID of the city guide'),
+      entry_id: z.string().uuid().describe('UUID of the entry to delete'),
+    },
+  },
+  async ({ guide_id, entry_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/guides/${guide_id}/entries/${entry_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, entry_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Additional Family Tools (PRD 026) — write operations
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'create_family',
+  {
+    title: 'Create Family',
+    description: 'Create a new family group. The authenticated user becomes the owner.',
+    inputSchema: {
+      name: z.string().min(1).max(200).describe('Family name (e.g. "The Rogers Family")'),
+    },
+  },
+  async ({ name }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/families`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ name }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'update_family',
+  {
+    title: 'Update Family',
+    description: 'Update a family group\'s name.',
+    inputSchema: {
+      family_id: z.string().uuid().describe('UUID of the family'),
+      name: z.string().min(1).max(200).describe('New family name'),
+    },
+  },
+  async ({ family_id, name }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/families/${family_id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ name }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'delete_family',
+  {
+    title: 'Delete Family',
+    description: 'Delete a family group. Irreversible — confirm with user before calling. Requires owner.',
+    inputSchema: {
+      family_id: z.string().uuid().describe('UUID of the family to delete'),
+    },
+  },
+  async ({ family_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/families/${family_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, family_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'invite_family_member',
+  {
+    title: 'Invite Family Member',
+    description: 'Invite someone to join a family group by email. They\'ll receive an invite email.',
+    inputSchema: {
+      family_id: z.string().uuid().describe('UUID of the family'),
+      email: z.string().email().describe('Email address of the person to invite'),
+      role: z.enum(['member', 'admin']).optional().default('member').describe('Role in the family'),
+    },
+  },
+  async ({ family_id, email, role }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/families/${family_id}/members`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ email, role }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'remove_family_member',
+  {
+    title: 'Remove Family Member',
+    description: 'Remove a member from a family group.',
+    inputSchema: {
+      family_id: z.string().uuid().describe('UUID of the family'),
+      member_id: z.string().uuid().describe('UUID of the member to remove'),
+    },
+  },
+  async ({ family_id, member_id }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/families/${family_id}/members/${member_id}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    })
+    if (res.status === 204) {
+      return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, member_id }) }] }
+    }
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
 // ---------------------------------------------------------------------------
 // Resources
 // ---------------------------------------------------------------------------

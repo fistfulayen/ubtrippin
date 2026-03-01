@@ -1,6 +1,6 @@
 {
   "name": "ubtrippin-mcp",
-  "version": "1.8.0",
+  "version": "2.0.0",
   "description": "MCP server for UBTRIPPIN — read travel itineraries and city guides from any MCP-compatible AI client",
   "type": "module",
   "main": "dist/index.js",
@@ -29,7 +29,7 @@
     "directory": "mcp"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
