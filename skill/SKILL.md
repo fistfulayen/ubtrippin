@@ -1,11 +1,12 @@
 ---
 name: ubtrippin
-description: Manages travel for your user via UBTRIPPIN — reads trips, items, and booking details. Use when the user asks about their trips, upcoming travel, flights, hotels, train bookings, or wants to add a new booking to their travel tracker. Requires a UBTRIPPIN API key from ubtrippin.xyz/settings.
+version: 2.0.0
+description: Manages travel for your user via UBTRIPPIN — trips, items, loyalty programs, family, city guides, notifications, and more. Use when the user asks about their trips, upcoming travel, flights, hotels, train bookings, loyalty numbers, family travel, or wants to manage their travel tracker. Requires a UBTRIPPIN API key from ubtrippin.xyz/settings.
 ---
 
 # UBTRIPPIN Skill
 
-**UBTRIPPIN** is a personal travel tracker that parses booking confirmation emails and organises them into trips. As an agent, you can read a user's trips and items via REST API, and add new bookings by forwarding confirmation emails on their behalf.
+**UBTRIPPIN** is a personal travel tracker that parses booking confirmation emails and organises them into trips. As an agent, you can read and manage a user's trips, items, loyalty vault, family groups, city guides, and more via REST API.
 
 ---
 
@@ -14,7 +15,7 @@ description: Manages travel for your user via UBTRIPPIN — reads trips, items, 
 1. Ask your user to visit **ubtrippin.xyz/settings** and generate an API key.
 2. The key looks like: `ubt_k1_<40 hex chars>`. Store it securely.
 3. Ask for their **registered sender email** — the email address they use to forward bookings (typically their personal inbox). This is their "allowed sender" in UBTRIPPIN.
-4. You'll need both to operate: the API key for reads, the email address for adding new bookings.
+4. You'll need both to operate: the API key for reads/writes, the email address for adding new bookings via forwarding.
 
 ---
 
@@ -34,11 +35,14 @@ Base URL: `https://www.ubtrippin.xyz`
 
 ## API Endpoints
 
-### List All Trips
+### Trips
+
+#### List All Trips
 ```
 GET /api/v1/trips
-Authorization: Bearer <key>
 ```
+
+Query params: `?status=upcoming` (optional filter)
 
 Response:
 ```json
@@ -64,62 +68,591 @@ Response:
 
 Ordered by start_date descending (soonest upcoming / most recent first).
 
----
-
-### Get Trip with All Items
+#### Get Trip with All Items
 ```
 GET /api/v1/trips/:id
-Authorization: Bearer <key>
+```
+
+Response includes full trip object with nested `items` array. Each item has: `id`, `trip_id`, `kind`, `provider`, `traveler_names`, `start_ts`, `end_ts`, `start_date`, `end_date`, `start_location`, `end_location`, `summary`, `details_json`, `status`, `confidence`, `needs_review`, timestamps.
+
+**Item kinds:** `flight`, `hotel`, `train`, `car`, `ferry`, `activity`, `other`
+
+#### Create Trip
+```
+POST /api/v1/trips
+Content-Type: application/json
+
+{ "title": "Summer in Provence", "start_date": "2026-07-01", "end_date": "2026-07-14" }
+```
+
+#### Update Trip
+```
+PATCH /api/v1/trips/:id
+Content-Type: application/json
+
+{ "title": "Updated Title", "notes": "Remember sunscreen" }
+```
+
+#### Delete Trip
+```
+DELETE /api/v1/trips/:id
+```
+
+#### Rename Trip
+```
+POST /api/v1/trips/:id/rename
+Content-Type: application/json
+
+{ "title": "New Trip Name" }
+```
+
+#### Merge Trips
+```
+POST /api/v1/trips/:id/merge
+Content-Type: application/json
+
+{ "source_trip_id": "uuid-of-trip-to-merge-in" }
+```
+
+Merges items from the source trip into the target trip.
+
+#### Trip Status
+```
+GET /api/v1/trips/:id/status
+```
+
+Returns processing status for the trip.
+
+#### Demo Trip
+```
+GET /api/v1/trips/demo
+```
+
+Returns a sample trip for onboarding — no auth required.
+
+---
+
+### Items
+
+#### Get Single Item
+```
+GET /api/v1/items/:id
+```
+
+Response: `{ "data": <item> }` — full Item shape with `details_json` containing confirmation numbers, seat assignments, etc.
+
+#### Update Item
+```
+PATCH /api/v1/items/:id
+Content-Type: application/json
+
+{ "summary": "Updated summary", "start_location": "Paris CDG" }
+```
+
+#### Delete Item
+```
+DELETE /api/v1/items/:id
+```
+
+#### Add Item to Trip
+```
+POST /api/v1/trips/:id/items
+Content-Type: application/json
+
+{ "kind": "flight", "summary": "AF276 CDG→NRT", "start_ts": "2026-04-01T08:30:00Z" }
+```
+
+#### Batch Item Operations
+```
+POST /api/v1/trips/:id/items/batch
+Content-Type: application/json
+
+{ "items": [ ... ] }
+```
+
+#### Item Status
+```
+GET /api/v1/items/:id/status
+```
+
+#### Refresh Item Status
+```
+POST /api/v1/items/:id/status/refresh
+```
+
+Re-checks live status (e.g. flight delays, gate changes).
+
+---
+
+### Loyalty Vault
+
+#### List My Loyalty Programs
+```
+GET /api/v1/me/loyalty
 ```
 
 Response:
 ```json
 {
-  "data": {
-    "id": "uuid",
-    "title": "Tokyo Spring 2026",
-    "start_date": "2026-04-01",
-    "end_date": "2026-04-14",
-    "primary_location": "Tokyo, Japan",
-    "travelers": ["Ian Rogers"],
-    "items": [
-      {
-        "id": "uuid",
-        "trip_id": "uuid",
-        "kind": "flight",
-        "provider": "Air France",
-        "traveler_names": ["Ian Rogers"],
-        "start_ts": "2026-04-01T08:30:00Z",
-        "end_ts": "2026-04-01T18:45:00Z",
-        "start_date": "2026-04-01",
-        "end_date": "2026-04-01",
-        "start_location": "Paris CDG",
-        "end_location": "Tokyo NRT",
-        "summary": "Flight AF276 Paris → Tokyo",
-        "details_json": { "flight_number": "AF276", "seat": "12A", "confirmation": "XYZ123" },
-        "status": "confirmed",
-        "confidence": 0.98,
-        "needs_review": false,
-        "created_at": "2026-02-15T10:00:00Z",
-        "updated_at": "2026-02-15T10:00:00Z"
-      }
-    ]
-  },
-  "meta": { "item_count": 1 }
+  "data": [
+    {
+      "id": "uuid",
+      "provider_key": "delta_skymiles",
+      "provider_name": "Delta SkyMiles",
+      "member_number": "1234567890",
+      "tier": "Gold",
+      "notes": null
+    }
+  ]
 }
 ```
 
-**Item kinds:** `flight`, `hotel`, `train`, `car`, `ferry`, `activity`, `other`
+#### Lookup by Provider
+```
+GET /api/v1/me/loyalty/lookup?provider_key=delta_skymiles
+```
+
+Returns matching loyalty entry for a specific provider.
+
+#### Add Loyalty Program
+```
+POST /api/v1/me/loyalty
+Content-Type: application/json
+
+{ "provider_key": "delta_skymiles", "member_number": "1234567890", "tier": "Gold" }
+```
+
+#### Update Loyalty Program
+```
+PATCH /api/v1/me/loyalty/:id
+Content-Type: application/json
+
+{ "member_number": "9876543210", "tier": "Platinum" }
+```
+
+#### Delete Loyalty Program
+```
+DELETE /api/v1/me/loyalty/:id
+```
+
+#### Export Loyalty Data
+```
+GET /api/v1/me/loyalty/export
+```
+
+Returns all loyalty data in a downloadable format.
+
+#### List Known Providers
+```
+GET /api/v1/loyalty/providers
+```
+
+Returns the full list of supported loyalty providers (no auth required).
 
 ---
 
-### Get Single Item
+### Profile
+
+#### Get My Profile
 ```
-GET /api/v1/items/:id
-Authorization: Bearer <key>
+GET /api/v1/me/profile
 ```
 
-Response: `{ "data": <item> }` — same Item shape as above.
+Response includes name, email, preferences, tier, and settings.
+
+#### Update My Profile
+```
+PUT /api/v1/me/profile
+Content-Type: application/json
+
+{ "display_name": "Ian Rogers", "timezone": "Europe/Paris" }
+```
+
+Also accepts `POST` with the same body.
+
+---
+
+### Family
+
+#### List My Families
+```
+GET /api/v1/families
+```
+
+#### Create Family
+```
+POST /api/v1/families
+Content-Type: application/json
+
+{ "name": "The Rogers Family" }
+```
+
+#### Get Family
+```
+GET /api/v1/families/:id
+```
+
+#### Update Family
+```
+PATCH /api/v1/families/:id
+Content-Type: application/json
+
+{ "name": "Updated Family Name" }
+```
+
+#### Delete Family
+```
+DELETE /api/v1/families/:id
+```
+
+#### Invite Member to Family
+```
+POST /api/v1/families/:id/members
+Content-Type: application/json
+
+{ "email": "partner@example.com", "role": "member" }
+```
+
+#### Remove Family Member
+```
+DELETE /api/v1/families/:id/members/:uid
+```
+
+#### Family Member Profiles
+```
+GET /api/v1/families/:id/profiles
+```
+
+#### Family Trips
+```
+GET /api/v1/families/:id/trips
+```
+
+Returns all trips visible to family members.
+
+#### Family Loyalty Programs
+```
+GET /api/v1/families/:id/loyalty
+```
+
+#### Family Loyalty Lookup
+```
+GET /api/v1/families/:id/loyalty/lookup?provider_key=delta_skymiles
+```
+
+Look up a loyalty number across all family members.
+
+#### Family City Guides
+```
+GET /api/v1/families/:id/guides
+```
+
+#### Family Invites
+```
+GET /api/v1/family-invites/:token
+POST /api/v1/family-invites/:token/accept
+```
+
+View and accept family invite links.
+
+---
+
+### Collaborators (Trip Sharing)
+
+#### List Collaborators
+```
+GET /api/v1/trips/:id/collaborators
+```
+
+#### Invite Collaborator
+```
+POST /api/v1/trips/:id/collaborators
+Content-Type: application/json
+
+{ "email": "friend@example.com", "role": "viewer" }
+```
+
+#### Update Collaborator Role
+```
+PATCH /api/v1/trips/:id/collaborators/:uid
+Content-Type: application/json
+
+{ "role": "editor" }
+```
+
+#### Remove Collaborator
+```
+DELETE /api/v1/trips/:id/collaborators/:uid
+```
+
+#### Trip Invites
+```
+GET /api/v1/invites/:token
+POST /api/v1/invites/:token/accept
+```
+
+View and accept trip collaboration invite links.
+
+---
+
+### City Guides
+
+#### List Guides
+```
+GET /api/v1/guides
+```
+
+Query params: `?family_id=uuid` (optional)
+
+#### Create Guide
+```
+POST /api/v1/guides
+Content-Type: application/json
+
+{ "city": "Tokyo", "title": "Tokyo Eats" }
+```
+
+#### Get Guide
+```
+GET /api/v1/guides/:id
+```
+
+#### Update Guide
+```
+PATCH /api/v1/guides/:id
+```
+
+#### Delete Guide
+```
+DELETE /api/v1/guides/:id
+```
+
+#### List Guide Entries
+```
+GET /api/v1/guides/:id/entries
+```
+
+#### Add Guide Entry
+```
+POST /api/v1/guides/:id/entries
+Content-Type: application/json
+
+{ "name": "Tsukiji Outer Market", "category": "food", "notes": "Go early" }
+```
+
+#### Update Guide Entry
+```
+PATCH /api/v1/guides/:id/entries/:eid
+```
+
+#### Delete Guide Entry
+```
+DELETE /api/v1/guides/:id/entries/:eid
+```
+
+#### Nearby Guides
+```
+GET /api/v1/guides/nearby?lat=35.6762&lng=139.6503
+```
+
+Find guides near a location.
+
+---
+
+### Senders (Allowed Email Addresses)
+
+#### List Senders
+```
+GET /api/v1/settings/senders
+```
+
+#### Add Sender
+```
+POST /api/v1/settings/senders
+Content-Type: application/json
+
+{ "email": "mywork@company.com" }
+```
+
+#### Remove Sender
+```
+DELETE /api/v1/settings/senders/:id
+```
+
+---
+
+### Calendar
+
+#### Get Calendar Token
+```
+GET /api/v1/calendar/token
+```
+
+Returns an iCal subscription URL for syncing trips to calendar apps.
+
+#### Regenerate Calendar Token
+```
+POST /api/v1/calendar/token
+```
+
+Invalidates the old token and generates a new one.
+
+---
+
+### Notifications
+
+#### List Notifications
+```
+GET /api/v1/notifications
+```
+
+Query params: `?unread=true` (optional)
+
+#### Mark Notification Read
+```
+PATCH /api/v1/notifications/:id
+Content-Type: application/json
+
+{ "read": true }
+```
+
+---
+
+### Webhooks
+
+#### List Webhooks
+```
+GET /api/v1/webhooks
+```
+
+#### Create Webhook
+```
+POST /api/v1/webhooks
+Content-Type: application/json
+
+{ "url": "https://example.com/hook", "events": ["trip.created", "item.added"] }
+```
+
+#### Get Webhook
+```
+GET /api/v1/webhooks/:id
+```
+
+#### Update Webhook
+```
+PATCH /api/v1/webhooks/:id
+Content-Type: application/json
+
+{ "url": "https://example.com/new-hook", "active": true }
+```
+
+#### Delete Webhook
+```
+DELETE /api/v1/webhooks/:id
+```
+
+#### Test Webhook
+```
+POST /api/v1/webhooks/:id/test
+```
+
+Sends a test payload to verify the endpoint.
+
+#### Webhook Deliveries
+```
+GET /api/v1/webhooks/:id/deliveries
+```
+
+Lists recent delivery attempts with status codes.
+
+---
+
+### Trains
+
+#### Train Status
+```
+GET /api/v1/trains/:trainNumber/status
+```
+
+Returns real-time status for a train by number (delays, platform, etc.).
+
+---
+
+### Images
+
+#### Search Images
+```
+GET /api/v1/images/search?q=tokyo+tower
+```
+
+Search for destination/cover images.
+
+---
+
+### Imports
+
+#### List Imports
+```
+GET /api/v1/imports
+```
+
+#### Create Import
+```
+POST /api/v1/imports
+```
+
+Upload booking data for batch import.
+
+#### Get Import
+```
+GET /api/v1/imports/:id
+```
+
+---
+
+### Billing
+
+#### Get Subscription
+```
+GET /api/v1/billing/subscription
+```
+
+Returns current plan, tier, and billing period.
+
+#### Get Billing Portal URL
+```
+GET /api/v1/billing/portal
+```
+
+Returns a Stripe billing portal link for managing subscription.
+
+#### Get Prices
+```
+GET /api/v1/billing/prices
+```
+
+Returns available plans and pricing.
+
+#### Checkout
+```
+POST /api/v1/checkout
+Content-Type: application/json
+
+{ "price_id": "price_xxx" }
+```
+
+Creates a Stripe checkout session.
+
+---
+
+### Activation
+
+#### Check Activation Status
+```
+GET /api/v1/activation/status
+```
+
+Returns whether the user's account is activated.
 
 ---
 
@@ -158,9 +691,39 @@ The primary way to add bookings is **email forwarding**. When your user receives
 2. Or if you have email access: forward it yourself
 3. Wait ~30 seconds, then `GET /api/v1/trips/:id` to confirm it appeared
 
-### "Get me a calendar file for my Tokyo trip"
-- The `.ics` calendar download is available at `ubtrippin.xyz/trips/:id` (requires the user to be logged in)
-- Direct them to the web UI, or use the share link if sharing is enabled
+### "What's my Delta SkyMiles number?"
+1. `GET /api/v1/me/loyalty/lookup?provider_key=delta_skymiles`
+2. Return the `member_number` from the response
+
+### "Add my Marriott Bonvoy membership"
+1. `POST /api/v1/me/loyalty` with `{ "provider_key": "marriott_bonvoy", "member_number": "123456789" }`
+
+### "What loyalty programs does my family have for Delta?"
+1. Get the family ID: `GET /api/v1/families`
+2. `GET /api/v1/families/:id/loyalty/lookup?provider_key=delta_skymiles`
+3. Returns all family members' Delta numbers
+
+### "Add my family members"
+1. `POST /api/v1/families` to create a family group (if none exists)
+2. `POST /api/v1/families/:id/members` with `{ "email": "partner@example.com" }` for each member
+3. They'll receive an invite email to accept
+
+### "Share my trip with a friend"
+1. `POST /api/v1/trips/:id/collaborators` with `{ "email": "friend@example.com", "role": "viewer" }`
+
+### "Is my train on time?"
+1. `GET /api/v1/trains/:trainNumber/status`
+2. Report delays, platform changes, etc.
+
+### "Show me city guides near me"
+1. `GET /api/v1/guides/nearby?lat=48.8566&lng=2.3522`
+
+### "Set up a webhook for new bookings"
+1. `POST /api/v1/webhooks` with `{ "url": "https://...", "events": ["item.added"] }`
+
+### "Get me a calendar link for my trips"
+1. `GET /api/v1/calendar/token`
+2. Give the user the iCal URL to add to their calendar app
 
 ---
 
@@ -184,7 +747,6 @@ All errors return: `{ "error": { "code": "...", "message": "..." } }`
 - Dates are ISO 8601 (`YYYY-MM-DD` for dates, `YYYY-MM-DDTHH:MM:SSZ` for timestamps).
 - `details_json` contains raw parsed data — useful for confirmation numbers, seat assignments, loyalty numbers, etc.
 - `confidence` (0–1): how confident the AI parser was. Items with `needs_review: true` may have errors.
-- API keys are read-only — you cannot create, edit, or delete trips/items via the API (v1). Use email forwarding to add bookings.
 - The API key is the user's — never share it, log it, or store it beyond the session unless the user explicitly asks.
 
 ---
