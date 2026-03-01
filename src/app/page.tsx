@@ -7,7 +7,7 @@ import { AgentTabs } from '@/components/agent-tabs'
 export const metadata = {
   title: 'UBTRIPPIN — Forward your booking emails. Your trip appears.',
   description:
-    'Flights, hotels, trains, restaurants — extracted by AI, organized by trip, shared with your family and your agent.',
+    'Stop digging through email for confirmation numbers. Forward your bookings, your trip appears. Share with family. Remember your favorite places.',
 }
 
 export default async function HomePage() {
@@ -19,6 +19,39 @@ export default async function HomePage() {
   if (user) {
     redirect('/trips')
   }
+
+  const features = [
+    {
+      icon: '/airplane_icon.png',
+      title: 'All your bookings',
+      body: 'Stop digging through email for that confirmation number. Forward your booking emails and everything appears — flights, hotels, trains, restaurants.',
+    },
+    {
+      icon: '/family_icon.png',
+      title: 'Family sharing',
+      body: "Traveling with family? Everyone sees everyone's trips. Forward an email and the whole family knows the plan.",
+    },
+    {
+      icon: '/loyalty_icon.png',
+      title: 'Loyalty vault',
+      body: "All your frequent flyer and hotel numbers in one place. Encrypted, always at hand when you're booking.",
+    },
+    {
+      icon: '/calendar_icon.png',
+      title: 'Calendar sync',
+      body: 'Subscribe once. Your trips show up in your calendar with real-time flight and train status.',
+    },
+    {
+      icon: '/guides_icon.png',
+      title: 'City guides',
+      body: 'Remember that incredible coffee shop in Lisbon? Add it. Share your city favorites with friends.',
+    },
+    {
+      icon: '/collaborate_icon.png',
+      title: 'Collaborate',
+      body: 'Invite co-travelers. Everyone can add and edit. Plan together.',
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-white" style={{ scrollBehavior: 'smooth' }}>
@@ -56,7 +89,9 @@ export default async function HomePage() {
                 Forward your booking emails. Your trip appears.
               </h1>
               <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-xl">
-                Flights, hotels, trains, restaurants — extracted by AI, organized by trip, shared with your family and your agent.
+                We got tired of digging through email for confirmation numbers, so we made this thing.
+                Forward a booking email, and everything gets organized — flights, hotels, trains, restaurants.
+                Share it with your family. Remember your favorite places. That&apos;s it.
               </p>
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
                 <Link
@@ -73,11 +108,13 @@ export default async function HomePage() {
                   See how it works ↓
                 </a>
               </div>
-              <div className="inline-block border-2 border-[#312e81] px-5 py-3 bg-[#f8fafc]">
-                <p className="text-sm font-bold text-[#312e81] tracking-wide uppercase mb-0">
-                  $10/year for the first 100 subscribers
+              <div className="inline-block border-2 border-[#312e81] px-6 py-4 bg-[#f8fafc] rounded-lg">
+                <p className="text-base font-bold text-[#312e81] tracking-wide mb-1">
+                  Join us early — $10/year for the first 100
                 </p>
-                <p className="text-xs text-slate-500 mt-1">Early bird pricing. Limited spots.</p>
+                <p className="text-sm text-slate-500">
+                  That price is yours forever. We&apos;re building this in the open and we want you along for the ride.
+                </p>
               </div>
             </div>
             <div className="flex justify-center lg:justify-end">
@@ -143,63 +180,27 @@ export default async function HomePage() {
         {/* ─── Features ─── */}
         <section id="features" className="py-24 px-6">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-16 tracking-tight">
+            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-4 tracking-tight">
               Everything in one place
             </h2>
+            <p className="text-center text-slate-500 mb-16 max-w-2xl mx-auto">
+              We built the things we wished existed when we were on the road.
+            </p>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {[
-                {
-                  icon: '/airplane_icon.png',
-                  title: 'All your bookings',
-                  body: 'Forward confirmation emails. AI extracts flights, hotels, trains, cars, restaurants.',
-                },
-                {
-                  icon: '/evelope_icon.png',
-                  title: 'Family sharing',
-                  body: "Everyone sees everyone's trips. One family, one view.",
-                },
-                {
-                  /* TODO: need hand-drawn lock/vault icon */
-                  icon: null,
-                  title: 'Loyalty vault',
-                  body: 'Store frequent flyer and hotel numbers. Encrypted, always at hand.',
-                },
-                {
-                  icon: '/calendar_icon.png',
-                  title: 'Calendar sync',
-                  body: 'Subscribe once. Trips in your calendar with real-time status.',
-                },
-                {
-                  /* TODO: need hand-drawn city/map icon */
-                  icon: null,
-                  title: 'City guides',
-                  body: 'Restaurant recs, museum tips, local knowledge by city.',
-                },
-                {
-                  /* TODO: need hand-drawn collaborate/people icon */
-                  icon: null,
-                  title: 'Collaborate',
-                  body: 'Invite co-travelers. Everyone can add and edit.',
-                },
-              ].map((feat) => (
+              {features.map((feat) => (
                 <div
                   key={feat.title}
-                  className="p-6 border-2 border-[#cbd5e1] hover:border-[#312e81] transition-colors bg-[#f8fafc]"
+                  className="p-6 border-2 border-[#cbd5e1] hover:border-[#312e81] transition-colors bg-[#f8fafc] rounded-lg"
                 >
-                  {feat.icon ? (
+                  <div className="w-14 h-14 mb-4 rounded-lg bg-[#f5f0e8] flex items-center justify-center">
                     <Image
                       src={feat.icon}
                       alt=""
                       width={40}
                       height={40}
-                      className="w-10 h-10 object-contain mb-4"
+                      className="w-10 h-10 object-contain"
                     />
-                  ) : (
-                    /* TODO: replace with hand-drawn icon */
-                    <div className="w-10 h-10 mb-4 border-2 border-dashed border-[#cbd5e1] flex items-center justify-center text-xs text-slate-400">
-                      ?
-                    </div>
-                  )}
+                  </div>
                   <h3 className="text-sm font-bold text-[#1e293b] mb-2 uppercase tracking-wide">{feat.title}</h3>
                   <p className="text-sm text-slate-500 leading-relaxed">{feat.body}</p>
                 </div>
@@ -208,8 +209,29 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* ─── Open Source ─── */}
+        <section className="py-16 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-2xl font-bold text-[#1e293b] mb-4 tracking-tight">
+              Built in the open
+            </h2>
+            <p className="text-slate-500 leading-relaxed mb-6 max-w-xl mx-auto">
+              UBTRIPPIN is open source under the AGPL license. We believe travel tools should be transparent.
+              Found a bug? Want a feature? Submit a PR. This isn&apos;t a walled garden — it&apos;s a community project.
+            </p>
+            <a
+              href="https://github.com/fistfulayen/ubtrippin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 text-sm tracking-widest uppercase border-2 border-[#1e293b] text-[#1e293b] hover:bg-[#1e293b] hover:text-white transition-colors font-medium"
+            >
+              View on GitHub →
+            </a>
+          </div>
+        </section>
+
         {/* ─── For Agents ─── */}
-        <section id="agents" className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
+        <section id="agents" className="py-24 px-6">
           <div className="max-w-3xl mx-auto">
             <div className="inline-block text-xs font-mono uppercase tracking-widest text-[#312e81] border border-[#312e81] px-3 py-1 mb-6">
               For AI agents
@@ -235,14 +257,14 @@ export default async function HomePage() {
         </section>
 
         {/* ─── Pricing ─── */}
-        <section id="pricing" className="py-24 px-6">
+        <section id="pricing" className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
           <div className="max-w-4xl mx-auto">
             <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-4 tracking-tight">
               Simple, transparent pricing
             </h2>
-            <p className="text-center text-slate-500 mb-16">Start for free, upgrade when you need more.</p>
+            <p className="text-center text-slate-500 mb-16">Start for free. Upgrade when you&apos;re ready.</p>
 
-            <div className="grid md:grid-cols-2 gap-0 border border-[#cbd5e1]">
+            <div className="grid md:grid-cols-2 gap-0 border border-[#cbd5e1] rounded-lg overflow-hidden">
               {/* Free */}
               <div className="p-8 md:border-r border-[#cbd5e1]">
                 <div className="text-center mb-8">
@@ -276,18 +298,26 @@ export default async function HomePage() {
               </div>
 
               {/* Pro */}
-              <div className="p-8 bg-[#f8fafc] relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#312e81] text-white text-xs font-bold tracking-widest uppercase px-3 py-1">
-                  Recommended
-                </div>
-                <div className="text-center mb-8">
+              <div className="p-8 bg-white relative">
+                <div className="absolute -top-0 left-0 right-0 h-1 bg-[#312e81]" />
+                <div className="text-center mb-8 pt-2">
                   <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Pro</h3>
                   <p className="text-4xl font-bold text-[#312e81]">
-                    $10<span className="text-lg text-slate-500">/year</span>
+                    $24.99<span className="text-lg text-slate-500">/year</span>
                   </p>
-                  <p className="text-sm text-slate-500">First 100 subscribers, then $24.99/year</p>
-                  <p className="text-xs text-slate-400">Billed annually</p>
+                  <p className="text-sm text-slate-500">Billed annually</p>
                 </div>
+
+                {/* Early bird callout */}
+                <div className="mb-8 bg-[#f5f0e8] rounded-lg px-5 py-4 text-center">
+                  <p className="text-sm font-bold text-[#312e81] mb-1">
+                    🎒 Early bird: $10/year — forever
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    First 100 travelers get this price locked in. Come build with us.
+                  </p>
+                </div>
+
                 <ul className="space-y-0 mb-8">
                   {[
                     ['Trips', 'Unlimited'],
@@ -311,7 +341,7 @@ export default async function HomePage() {
                   href="/login"
                   className="block text-center py-3 text-sm tracking-widest uppercase bg-[#312e81] text-white hover:bg-[#1e293b] transition-colors font-medium"
                 >
-                  Claim Your Spot
+                  Join Us Early
                 </Link>
               </div>
             </div>
@@ -319,7 +349,7 @@ export default async function HomePage() {
         </section>
 
         {/* ─── FAQ ─── */}
-        <section className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
+        <section className="py-24 px-6">
           <div className="max-w-3xl mx-auto">
             <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-16 tracking-tight">
               Frequently asked questions
@@ -327,11 +357,11 @@ export default async function HomePage() {
             {[
               {
                 q: 'Do you read my email?',
-                a: 'No. You forward specific emails. We never access your inbox.',
+                a: 'No. You forward specific emails to us. We never access your inbox.',
               },
               {
                 q: 'What if AI gets it wrong?',
-                a: 'You can edit any extraction in two clicks.',
+                a: 'You can edit any extraction in two clicks. And let us know — we improve from every correction.',
               },
               {
                 q: 'Can my AI agent use this?',
@@ -339,11 +369,15 @@ export default async function HomePage() {
               },
               {
                 q: 'Is my data safe?',
-                a: 'Encrypted at rest, EU-hosted, GDPR compliant.',
+                a: 'Encrypted at rest, EU-hosted, GDPR compliant. We take this seriously.',
               },
               {
                 q: 'What emails do you understand?',
-                a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, and more.',
+                a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, and more. If we miss one, tell us.',
+              },
+              {
+                q: 'Is this open source?',
+                a: "Yes. AGPL licensed. Check us out on GitHub, submit issues, send PRs. We're building this together.",
               },
             ].map((faq) => (
               <details key={faq.q} className="border-b border-[#cbd5e1] group">
