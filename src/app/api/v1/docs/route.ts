@@ -97,9 +97,90 @@ Authorization: Bearer ubt_k1_abc123...
 | GET | /api/v1/items/:id/status | Item status |
 | POST | /api/v1/items/:id/status/refresh | Refresh live status |
 | POST | /api/v1/trips/:id/items | Add item to trip |
-| POST | /api/v1/trips/:id/items/batch | Batch add items |
+| POST | /api/v1/trips/:id/items/batch | Batch add items (up to 50) |
 
-Item kinds: flight, hotel, train, car, ferry, activity, other
+### Item Schema
+
+**Required:** \`kind\` + \`start_date\`
+
+| Field | Type | Notes |
+|-------|------|-------|
+| kind | string | \`flight\`, \`hotel\`, \`car_rental\`, \`train\`, \`activity\`, \`restaurant\`, \`other\` |
+| start_date | string | YYYY-MM-DD (required) |
+| end_date | string | YYYY-MM-DD |
+| start_ts | string | ISO 8601 with timezone, e.g. \`2026-04-01T08:30:00+01:00\` |
+| end_ts | string | ISO 8601 with timezone |
+| start_location | string | Origin / check-in location (max 300 chars) |
+| end_location | string | Destination / check-out location (max 300 chars) |
+| summary | string | One-line description (max 1000 chars) |
+| provider | string | Airline, hotel chain, etc. (max 200 chars) |
+| confirmation_code | string | Booking reference (max 200 chars) |
+| traveler_names | string[] | Up to 20 names, each max 200 chars |
+| details_json | object | Freeform metadata — seat, gate, room type, etc. (max 10KB) |
+| notes | string | User notes |
+
+### Example: Add a Flight
+
+\`\`\`
+POST /api/v1/trips/:id/items
+Authorization: Bearer ubt_k1_abc123...
+Content-Type: application/json
+
+{
+  "kind": "flight",
+  "start_date": "2026-04-01",
+  "start_ts": "2026-04-01T08:30:00+01:00",
+  "end_ts": "2026-04-01T15:45:00+09:00",
+  "start_location": "Paris CDG",
+  "end_location": "Tokyo NRT",
+  "summary": "AF276 CDG→NRT",
+  "provider": "Air France",
+  "confirmation_code": "XK7J3M",
+  "traveler_names": ["Ian Rogers"],
+  "details_json": { "flight_number": "AF276", "seat": "14A", "class": "Economy" }
+}
+
+201 Created
+{ "data": { "id": "uuid", "kind": "flight", ... } }
+\`\`\`
+
+### Example: Add a Hotel
+
+\`\`\`
+POST /api/v1/trips/:id/items
+Authorization: Bearer ubt_k1_abc123...
+Content-Type: application/json
+
+{
+  "kind": "hotel",
+  "start_date": "2026-04-01",
+  "end_date": "2026-04-05",
+  "start_location": "Tokyo, Japan",
+  "summary": "Park Hyatt Tokyo",
+  "provider": "Hyatt",
+  "confirmation_code": "HY-889923",
+  "traveler_names": ["Ian Rogers", "Hedvig Rogers"],
+  "details_json": { "room_type": "King Deluxe", "check_in": "15:00", "check_out": "11:00" }
+}
+\`\`\`
+
+### Example: Batch Add
+
+\`\`\`
+POST /api/v1/trips/:id/items/batch
+Authorization: Bearer ubt_k1_abc123...
+Content-Type: application/json
+
+{ "items": [
+  { "kind": "flight", "start_date": "2026-04-01", "summary": "AF276 CDG→NRT", "provider": "Air France" },
+  { "kind": "hotel", "start_date": "2026-04-01", "end_date": "2026-04-05", "summary": "Park Hyatt Tokyo" }
+]}
+
+201 Created
+{ "data": [...], "meta": { "count": 2 } }
+\`\`\`
+
+> **Agent tip:** Parse booking confirmations yourself and POST structured items. You handle extraction; UBTRIPPIN handles storage, grouping, and display.
 
 ---
 

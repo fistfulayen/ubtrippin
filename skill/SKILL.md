@@ -158,17 +158,102 @@ DELETE /api/v1/items/:id
 ```
 POST /api/v1/trips/:id/items
 Content-Type: application/json
-
-{ "kind": "flight", "summary": "AF276 CDG→NRT", "start_ts": "2026-04-01T08:30:00Z" }
 ```
 
-#### Batch Item Operations
+**Required fields:** `kind`, `start_date`
+
+**All fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `kind` | string | **Required.** One of: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `other` |
+| `start_date` | string | **Required.** ISO date: `YYYY-MM-DD` |
+| `end_date` | string | ISO date. For hotels = checkout, flights = arrival date if different |
+| `start_ts` | string | ISO 8601 datetime with timezone: `2026-04-01T08:30:00Z` |
+| `end_ts` | string | ISO 8601 datetime with timezone |
+| `start_location` | string | Departure/origin. City, airport code, or address (max 300 chars) |
+| `end_location` | string | Arrival/destination (max 300 chars) |
+| `summary` | string | One-line summary, e.g. "AF276 CDG→NRT" (max 1000 chars) |
+| `provider` | string | Airline, hotel chain, etc. e.g. "Air France" (max 200 chars) |
+| `confirmation_code` | string | Booking reference (max 200 chars) |
+| `traveler_names` | string[] | Array of traveler names (max 20, each max 200 chars) |
+| `details_json` | object | Freeform metadata — gate, seat, room type, etc. (max 10KB) |
+| `notes` | string | User notes |
+| `status` | string | Item status |
+
+**Example — Flight:**
+```json
+{
+  "kind": "flight",
+  "start_date": "2026-04-01",
+  "start_ts": "2026-04-01T08:30:00+01:00",
+  "end_ts": "2026-04-01T15:45:00+09:00",
+  "start_location": "Paris CDG",
+  "end_location": "Tokyo NRT",
+  "summary": "AF276 CDG→NRT",
+  "provider": "Air France",
+  "confirmation_code": "XK7J3M",
+  "traveler_names": ["Ian Rogers"],
+  "details_json": { "flight_number": "AF276", "seat": "14A", "class": "Economy" }
+}
+```
+
+**Example — Hotel:**
+```json
+{
+  "kind": "hotel",
+  "start_date": "2026-04-01",
+  "end_date": "2026-04-05",
+  "start_location": "Tokyo, Japan",
+  "summary": "Park Hyatt Tokyo",
+  "provider": "Hyatt",
+  "confirmation_code": "HY-889923",
+  "traveler_names": ["Ian Rogers", "Hedvig Rogers"],
+  "details_json": { "room_type": "King Deluxe", "check_in": "15:00", "check_out": "11:00" }
+}
+```
+
+**Example — Train:**
+```json
+{
+  "kind": "train",
+  "start_date": "2026-04-05",
+  "start_ts": "2026-04-05T09:00:00+09:00",
+  "end_ts": "2026-04-05T11:30:00+09:00",
+  "start_location": "Tokyo Station",
+  "end_location": "Kyoto Station",
+  "summary": "Shinkansen Nozomi 7",
+  "provider": "JR Central",
+  "confirmation_code": "JR-44521",
+  "details_json": { "car": "7", "seat": "3A", "class": "Green Car" }
+}
+```
+
+**Example — Restaurant:**
+```json
+{
+  "kind": "restaurant",
+  "start_date": "2026-04-03",
+  "start_ts": "2026-04-03T19:00:00+09:00",
+  "start_location": "Sukiyabashi Jiro, Ginza, Tokyo",
+  "summary": "Dinner at Sukiyabashi Jiro",
+  "details_json": { "party_size": 2, "reservation_name": "Rogers" }
+}
+```
+
+#### Batch Add Items
 ```
 POST /api/v1/trips/:id/items/batch
 Content-Type: application/json
 
-{ "items": [ ... ] }
+{ "items": [ <item>, <item>, ... ] }
 ```
+
+Up to 50 items per request. Same fields as single item creation above.
+
+Response: `{ "data": [...items], "meta": { "count": N } }`
+
+**Tip for agents:** When your user gives you a booking confirmation (email text, screenshot, pasted text), parse it yourself and use these endpoints to add structured items. You handle the extraction; UBTRIPPIN handles the storage, grouping, and display.
 
 #### Item Status
 ```
