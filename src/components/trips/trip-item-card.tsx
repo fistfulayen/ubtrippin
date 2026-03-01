@@ -109,6 +109,29 @@ const kindLabels: Record<string, string> = {
   other: 'Other',
 }
 
+
+function isWithin48Hours(item: { start_ts?: string | null; start_date?: string | null; end_ts?: string | null }): boolean {
+  const now = Date.now()
+  const h48 = 48 * 60 * 60 * 1000
+
+  // If the item has already ended, don't show status
+  if (item.end_ts) {
+    const end = new Date(item.end_ts).getTime()
+    if (end < now) return false
+  }
+
+  // Check if departure is within the next 48 hours
+  const dep = item.start_ts ? new Date(item.start_ts).getTime()
+    : item.start_date ? new Date(item.start_date + 'T00:00:00Z').getTime()
+    : null
+
+  if (!dep) return false
+
+  // Show status: from 48h before departure until end (or departure + 24h if no end)
+  const endTime = item.end_ts ? new Date(item.end_ts).getTime() : dep + 24 * 60 * 60 * 1000
+  return now >= dep - h48 && now <= endTime
+}
+
 export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProps) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
@@ -263,11 +286,11 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                 )}
               </div>
 
-              {item.kind === 'flight' && (
+              {item.kind === 'flight' && isWithin48Hours(item) && (
                 <ItemStatusBadge itemId={item.id} />
               )}
 
-              {item.kind === 'train' && (
+              {item.kind === 'train' && isWithin48Hours(item) && (
                 <TrainStatusBadge itemId={item.id} />
               )}
             </div>
