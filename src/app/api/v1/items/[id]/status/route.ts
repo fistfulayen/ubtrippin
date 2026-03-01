@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { extractFlightIdentFromDetails, normalizeStatusRow } from '@/lib/flight-status'
 import { extractTrainNumberFromItem } from '@/lib/train/sncf'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 
 interface StatusItemRow {
@@ -30,20 +30,10 @@ export async function GET(
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: item, error: itemError } = await supabase
+  const { data: item, error: itemError } = await auth.supabase
     .from('trip_items')
     .select('id, trip_id, kind, provider, summary, start_date, end_date, start_ts, end_ts, details_json')
     .eq('id', itemId)
@@ -65,7 +55,7 @@ export async function GET(
     )
   }
 
-  const { data: statusRow, error: statusError } = await supabase
+  const { data: statusRow, error: statusError } = await auth.supabase
     .from('trip_item_status')
     .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
     .eq('item_id', itemId)

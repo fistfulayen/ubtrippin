@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
 import { stripe } from '@/lib/stripe'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface CheckoutBody {
   priceId?: unknown
@@ -31,18 +31,8 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
   let body: CheckoutBody
   try {
@@ -62,10 +52,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await auth.supabase
     .from('profiles')
     .select('id, email, full_name, subscription_tier, stripe_customer_id')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   if (profileError || !profileData) {
@@ -87,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   let proSubscriberCount = 0
   try {
-    proSubscriberCount = await getProSubscriberCount(supabase)
+    proSubscriberCount = await getProSubscriberCount(auth.supabase)
   } catch (error) {
     console.error('[v1/checkout] pro subscriber count failed:', error)
     return NextResponse.json(
@@ -128,10 +118,10 @@ export async function POST(request: NextRequest) {
     let customer
     try {
       customer = await stripe.customers.create({
-        email: profile.email ?? user.email ?? undefined,
+        email: profile.email ?? undefined,
         name: profile.full_name ?? undefined,
         metadata: {
-          user_id: user.id,
+          user_id: auth.userId,
         },
       })
     } catch (error) {
@@ -144,10 +134,10 @@ export async function POST(request: NextRequest) {
 
     customerId = customer.id
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await auth.supabase
       .from('profiles')
       .update({ stripe_customer_id: customerId })
-      .eq('id', user.id)
+      .eq('id', auth.userId)
 
     if (updateError) {
       console.error('[v1/checkout] failed storing stripe customer id:', updateError)
@@ -165,7 +155,7 @@ export async function POST(request: NextRequest) {
     session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
-    client_reference_id: user.id,
+    client_reference_id: auth.userId,
     line_items: [{ price: requestedPriceId, quantity: 1 }],
     success_url: `${origin}/settings/billing?upgraded=true`,
     cancel_url: `${origin}/settings/billing`,

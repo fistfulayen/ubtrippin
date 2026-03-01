@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface ProfileRow {
   stripe_customer_id: string | null
@@ -11,23 +11,13 @@ function resolveOrigin(): string {
 }
 
 export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await auth.supabase
     .from('profiles')
     .select('stripe_customer_id')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   if (profileError || !profileData) {

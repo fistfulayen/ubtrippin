@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { nanoid } from 'nanoid'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 import { sendFamilyInviteEmail } from '@/lib/email/family-invite'
 
@@ -21,15 +21,8 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
   let body: Record<string, unknown>
   try {
@@ -49,10 +42,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: profileData } = await supabase
+  const { data: profileData } = await auth.supabase
     .from('profiles')
     .select('subscription_tier, full_name, email')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   const inviterProfile = profileData as {
@@ -73,11 +66,11 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: adminMembership } = await supabase
+  const { data: adminMembership } = await auth.supabase
     .from('family_members')
     .select('id')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .eq('role', 'admin')
     .not('accepted_at', 'is', null)
     .maybeSingle()
@@ -89,7 +82,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: family } = await supabase
+  const { data: family } = await auth.supabase
     .from('families')
     .select('id, name')
     .eq('id', familyId)
@@ -102,7 +95,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: existingInvite } = await supabase
+  const { data: existingInvite } = await auth.supabase
     .from('family_members')
     .select('id, accepted_at')
     .eq('family_id', familyId)
@@ -122,12 +115,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const inviteToken = nanoid()
 
-  const { data: pendingMember, error: insertError } = await supabase
+  const { data: pendingMember, error: insertError } = await auth.supabase
     .from('family_members')
     .insert({
       family_id: familyId,
       invited_email: email,
-      invited_by: user.id,
+      invited_by: auth.userId,
       role: 'member',
       invite_token: inviteToken,
     })
@@ -142,7 +135,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  const inviterName = inviterProfile?.full_name || inviterProfile?.email || user.email || 'Someone'
+  const inviterName = inviterProfile?.full_name || inviterProfile?.email || 'Someone'
   const inviteUrl = `${APP_URL}/invite/family/${inviteToken}`
 
   await sendFamilyInviteEmail({
