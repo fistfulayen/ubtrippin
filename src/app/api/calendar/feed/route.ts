@@ -43,10 +43,36 @@ export async function GET(request: NextRequest) {
   }
 
   const cutoffDate = getDateSixMonthsAgo()
+
+  // Get family member user IDs (accepted members in the same family)
+  const { data: myFamilies } = await supabase
+    .from('family_members')
+    .select('family_id')
+    .eq('user_id', profile.id)
+    .not('accepted_at', 'is', null)
+
+  const familyIds = (myFamilies ?? []).map((f: { family_id: string }) => f.family_id)
+  let familyUserIds: string[] = []
+
+  if (familyIds.length > 0) {
+    const { data: familyMembers } = await supabase
+      .from('family_members')
+      .select('user_id')
+      .in('family_id', familyIds)
+      .not('accepted_at', 'is', null)
+      .not('user_id', 'is', null)
+
+    familyUserIds = (familyMembers ?? [])
+      .map((m: { user_id: string | null }) => m.user_id)
+      .filter((id): id is string => id !== null && id !== profile.id)
+  }
+
+  // Fetch own trips + family members' trips
+  const allUserIds = [profile.id, ...familyUserIds]
   const { data: trips, error: tripsError } = await supabase
     .from('trips')
     .select('*')
-    .eq('user_id', profile.id)
+    .in('user_id', allUserIds)
     .or(`end_date.is.null,end_date.gt.${cutoffDate}`)
     .order('start_date', { ascending: true })
 
@@ -61,7 +87,6 @@ export async function GET(request: NextRequest) {
     const { data: fetchedItems, error: itemsError } = await supabase
       .from('trip_items')
       .select('*')
-      .eq('user_id', profile.id)
       .in('trip_id', tripIds)
       .order('start_date', { ascending: true })
       .order('start_ts', { ascending: true })
