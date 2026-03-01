@@ -1,0 +1,14 @@
+{
+  "name": "@ubtrippin/cli",
+  "version": "2.0.0",
+  "description": "UB Trippin CLI — manage travel from the terminal",
+  "bin": { "ubt": "./ubt" },
+  "files": ["ubt"],
+  "license": "AGPL-3.0",
+  "homepage": "https://www.ubtrippin.xyz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fistfulayen/ubtrippin.git",
+    "directory": "cli"
+  }
+}

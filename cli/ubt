@@ -3,6 +3,7 @@
 # ubt — UB Trippin CLI
 # Talk directly to Supabase REST API
 #
+UBT_VERSION="2.0.0"
 set -euo pipefail
 
 # Load config
@@ -1345,12 +1346,73 @@ for g in guides:
 "
 }
 
+cmd_version() {
+  echo "$UBT_VERSION"
+}
+
+cmd_login() {
+  echo -n "Enter your UBT API key (from ubtrippin.xyz/settings): "
+  read -r key
+  if [ -z "$key" ]; then
+    echo "No key entered." >&2
+    exit 1
+  fi
+  local result
+  result=$(curl -s -w "\n%{http_code}" "${API_V1}/me/profile" \
+    -H "Authorization: Bearer ${key}" \
+    -H "Content-Type: application/json")
+  local http_code body
+  http_code=$(echo "$result" | tail -1)
+  body=$(echo "$result" | sed \$d)
+  if [ "$http_code" != "200" ]; then
+    echo "Invalid API key (HTTP ${http_code})." >&2
+    exit 1
+  fi
+  local name
+  name=$(echo "$body" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('full_name','') or d.get('data',{}).get('email','user'))" 2>/dev/null || echo "user")
+  mkdir -p "$HOME/.ubt"
+  echo "UBT_API_KEY=${key}" > "$HOME/.ubt/config"
+  echo "Logged in as ${name}. Config saved to ~/.ubt/config"
+}
+
+cmd_selftest() {
+  if [ -z "$UBT_API_KEY" ]; then
+    echo "FAIL: No API key configured. Run 'ubt login' or set UBT_API_KEY." >&2
+    exit 1
+  fi
+  local endpoints="trips me/profile me/loyalty guides settings/senders"
+  local all_pass=true
+  for ep in $endpoints; do
+    local status
+    status=$(curl -s -o /dev/null -w "%{http_code}" "${API_V1}/${ep}" \
+      -H "Authorization: Bearer ${UBT_API_KEY}" \
+      -H "Content-Type: application/json")
+    if [ "$status" = "200" ]; then
+      echo "  PASS  GET /api/v1/${ep} (${status})"
+    else
+      echo "  FAIL  GET /api/v1/${ep} (${status})"
+      all_pass=false
+    fi
+  done
+  if [ "$all_pass" = true ]; then
+    echo "All checks passed."
+    exit 0
+  else
+    echo "Some checks failed." >&2
+    exit 1
+  fi
+}
+
 # Usage
 usage() {
   cat <<EOF
 ubt — UB Trippin CLI
 
 Usage: ubt <command> [args]
+
+  version                               Print CLI version
+  login                                 Authenticate with your API key
+  selftest                              Test API connectivity
 
 Commands:
   trips list [user_id]                  List all trips (owned + shared)
@@ -1539,6 +1601,9 @@ case "${1:-}" in
   users)    cmd_users ;;
   health)   cmd_health ;;
   rls-check) cmd_rls_check ;;
+  version)  cmd_version ;;
+  login)    cmd_login ;;
+  selftest) cmd_selftest ;;
   -h|--help|help|"") usage ;;
   *) echo "Unknown command: $1"; usage; exit 1 ;;
 esac
