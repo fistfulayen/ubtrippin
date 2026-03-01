@@ -394,9 +394,29 @@ function buildEventLines(
     if (startLocal) lines.push(`DTSTART:${startLocal}`)
     else lines.push(`DTSTART;VALUE=DATE:${toDateValue(item.start_date)}`)
 
-    if (endLocal) lines.push(`DTEND:${endLocal}`)
-    else if (item.end_date) lines.push(`DTEND;VALUE=DATE:${toDateValue(addDays(item.end_date, 1))}`)
-    else lines.push(`DTEND;VALUE=DATE:${toDateValue(addDays(item.start_date, 1))}`)
+    if (endLocal) {
+      lines.push(`DTEND:${endLocal}`)
+    } else if (startLocal) {
+      // No end time — estimate from duration string (e.g. "5h 29m") or default 2h
+      const durationStr = ((details as Record<string, unknown>).duration as string | undefined) ?? ''
+      const hMatch = durationStr.match(/(\d+)\s*h/)
+      const mMatch = durationStr.match(/(\d+)\s*m/)
+      const durationMin = (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0)
+      const fallbackMin = durationMin > 0 ? durationMin : 120
+      // Parse startLocal (YYYYMMDDTHHMMSS) and add duration
+      const sy = parseInt(startLocal.slice(0, 4))
+      const sm = parseInt(startLocal.slice(4, 6)) - 1
+      const sd = parseInt(startLocal.slice(6, 8))
+      const sh = parseInt(startLocal.slice(9, 11))
+      const si = parseInt(startLocal.slice(11, 13))
+      const endDt = new Date(sy, sm, sd, sh, si + fallbackMin)
+      const endStr = `${endDt.getFullYear()}${String(endDt.getMonth() + 1).padStart(2, '0')}${String(endDt.getDate()).padStart(2, '0')}T${String(endDt.getHours()).padStart(2, '0')}${String(endDt.getMinutes()).padStart(2, '0')}00`
+      lines.push(`DTEND:${endStr}`)
+    } else if (item.end_date) {
+      lines.push(`DTEND;VALUE=DATE:${toDateValue(addDays(item.end_date, 1))}`)
+    } else {
+      lines.push(`DTEND;VALUE=DATE:${toDateValue(addDays(item.start_date, 1))}`)
+    }
 
     const location = (trainDetails.departure_station ?? item.start_location ?? '').trim() || null
     if (location) lines.push(`LOCATION:${escapeIcsText(location)}`)
