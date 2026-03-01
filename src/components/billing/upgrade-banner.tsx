@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { useEarlyAdopterSpots } from '@/hooks/use-early-adopter-spots'
@@ -17,6 +18,7 @@ interface UpgradeBannerProps {
 }
 
 export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
+  const pathname = usePathname()
   const [ready, setReady] = useState(false)
   const [dismissed, setDismissed] = useState(false)
 
@@ -58,7 +60,7 @@ export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
     }
   }, [isFree])
 
-  if (!ready || !isFree || dismissed) {
+  if (!ready || !isFree || dismissed || pathname?.startsWith('/settings/billing')) {
     return null
   }
 

@@ -79,7 +79,9 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const memberUserIds = Array.from(new Set(access.ctx.members.map((member) => member.user_id)))
-  const { data: loyaltyRows, error: loyaltyError } = await access.ctx.supabase
+  // Service client for cross-user family loyalty lookup (auth verified via requireFamilyAccess)
+  const service = createSecretClient()
+  const { data: loyaltyRows, error: loyaltyError } = await service
     .from('loyalty_programs')
     .select('id, user_id, traveler_name, provider_name, provider_key, provider_type, program_number_encrypted, program_number_masked, status_tier, preferred, notes, created_at, updated_at')
     .in('user_id', memberUserIds)
