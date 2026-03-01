@@ -8,7 +8,7 @@ import {
   normalizeStatusRow,
   type ExistingTripItemStatus,
 } from '@/lib/flight-status'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -45,20 +45,10 @@ export async function POST(
     )
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: item, error: itemError } = await supabase
+  const { data: item, error: itemError } = await auth.supabase
     .from('trip_items')
     .select('id, trip_id, user_id, provider, summary, start_date, end_date, start_ts, end_ts, details_json')
     .eq('id', itemId)
@@ -98,10 +88,10 @@ export async function POST(
     )
   }
 
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await auth.supabase
     .from('profiles')
     .select('subscription_tier')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   if (profileError) {
@@ -116,10 +106,10 @@ export async function POST(
   let usedToday = 0
 
   if (!isPro) {
-    const { count, error: limitError } = await supabase
+    const { count, error: limitError } = await auth.supabase
       .from('trip_item_status_refresh_logs')
       .select('id', { head: true, count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('user_id', auth.userId)
       .gte('created_at', utcDayStartIso())
 
     if (limitError) {
@@ -144,7 +134,7 @@ export async function POST(
     }
   }
 
-  const { data: existingStatus } = await supabase
+  const { data: existingStatus } = await auth.supabase
     .from('trip_item_status')
     .select('status, previous_status, status_changed_at')
     .eq('item_id', itemId)
@@ -164,7 +154,7 @@ export async function POST(
     existing: (existingStatus as ExistingTripItemStatus | null) ?? null,
   })
 
-  const { data: savedStatus, error: saveError } = await supabase
+  const { data: savedStatus, error: saveError } = await auth.supabase
     .from('trip_item_status')
     .upsert(upsert.values, { onConflict: 'item_id' })
     .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
@@ -178,10 +168,10 @@ export async function POST(
     )
   }
 
-  const { error: logError } = await supabase
+  const { error: logError } = await auth.supabase
     .from('trip_item_status_refresh_logs')
     .insert({
-      user_id: user.id,
+      user_id: auth.userId,
       item_id: itemId,
     })
 
@@ -190,7 +180,7 @@ export async function POST(
   }
 
   if (upsert.statusChanged && flightItem.trip_id) {
-    const { data: trip } = await supabase
+    const { data: trip } = await auth.supabase
       .from('trips')
       .select('id, user_id, title, primary_location')
       .eq('id', flightItem.trip_id)

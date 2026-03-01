@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { createSecretClient } from '@/lib/supabase/service'
 
 type Params = { params: Promise<{ token: string }> }
@@ -14,15 +14,8 @@ export async function POST(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const userClient = await createClient()
-  const { data: { user }, error: authError } = await userClient.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'You must be signed in to accept a family invite.' } },
-      { status: 401 }
-    )
-  }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
   const secret = createSecretClient()
 
@@ -54,7 +47,9 @@ export async function POST(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const userEmail = user.email?.trim().toLowerCase() ?? ''
+  // Get user email for invite verification
+  const { data: { user: authUser } } = await auth.supabase.auth.getUser()
+  const userEmail = authUser?.email?.trim().toLowerCase() ?? ''
   const invitedEmail = String(invite.invited_email).trim().toLowerCase()
 
   if (!userEmail || userEmail !== invitedEmail) {
@@ -62,7 +57,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
       {
         error: {
           code: 'forbidden',
-          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${user.email}.`,
+          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${userEmail || 'a different account'}.`,
         },
       },
       { status: 403 }
@@ -72,7 +67,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const { error: acceptError } = await secret
     .from('family_members')
     .update({
-      user_id: user.id,
+      user_id: auth.userId,
       accepted_at: new Date().toISOString(),
       invite_token: null,
     })

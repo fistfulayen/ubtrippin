@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
 import { stripe } from '@/lib/stripe'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface ProfileRow {
   subscription_tier: string | null
@@ -45,23 +45,13 @@ async function fetchCurrentSubscriptionPrice(
 }
 
 export async function GET() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: profileData, error: profileError } = await supabase
+  const { data: profileData, error: profileError } = await auth.supabase
     .from('profiles')
     .select('subscription_tier, subscription_current_period_end, subscription_grace_until, stripe_subscription_id')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   if (profileError || !profileData) {
@@ -74,7 +64,7 @@ export async function GET() {
 
   let proSubscriberCount = 0
   try {
-    proSubscriberCount = await getProSubscriberCount(supabase)
+    proSubscriberCount = await getProSubscriberCount(auth.supabase)
   } catch (error) {
     console.error('[v1/billing/subscription] count failed:', error)
     return NextResponse.json(

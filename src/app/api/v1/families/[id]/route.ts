@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 
@@ -21,21 +21,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: viewerMembership } = await supabase
+  const { data: viewerMembership } = await auth.supabase
     .from('family_members')
     .select('id, role')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
     .maybeSingle()
 
@@ -46,7 +39,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: family, error: familyError } = await supabase
+  const { data: family, error: familyError } = await auth.supabase
     .from('families')
     .select('id, name, created_by, created_at, updated_at')
     .eq('id', familyId)
@@ -59,7 +52,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: memberRows, error: memberError } = await supabase
+  const { data: memberRows, error: memberError } = await auth.supabase
     .from('family_members')
     .select('id, user_id, role, invited_email, invite_token, invited_by, accepted_at, created_at')
     .eq('family_id', familyId)
@@ -143,15 +136,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
   let body: Record<string, unknown>
   try {
@@ -171,11 +157,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: adminMembership } = await supabase
+  const { data: adminMembership } = await auth.supabase
     .from('family_members')
     .select('id')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .eq('role', 'admin')
     .not('accepted_at', 'is', null)
     .maybeSingle()
@@ -187,7 +173,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: family, error } = await supabase
+  const { data: family, error } = await auth.supabase
     .from('families')
     .update({ name })
     .eq('id', familyId)
@@ -214,21 +200,14 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: adminMembership } = await supabase
+  const { data: adminMembership } = await auth.supabase
     .from('family_members')
     .select('id')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .eq('role', 'admin')
     .not('accepted_at', 'is', null)
     .maybeSingle()
@@ -240,7 +219,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const { error } = await supabase
+  const { error } = await auth.supabase
     .from('families')
     .delete()
     .eq('id', familyId)

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { createSecretClient } from '@/lib/supabase/service'
 
 function normalizeFamilyName(value: unknown): string | null {
@@ -10,20 +10,13 @@ function normalizeFamilyName(value: unknown): string | null {
 }
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: memberships, error } = await supabase
+  const { data: memberships, error } = await auth.supabase
     .from('family_members')
     .select('family_id, role, family:families(id, name, created_by, created_at, updated_at)')
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
 
   if (error) {
@@ -50,7 +43,7 @@ export async function GET() {
   const memberCountMap = new Map<string, number>()
 
   if (familyIds.length > 0) {
-    const { data: memberRows, error: countError } = await supabase
+    const { data: memberRows, error: countError } = await auth.supabase
       .from('family_members')
       .select('family_id')
       .in('family_id', familyIds)
@@ -90,15 +83,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
   let body: Record<string, unknown>
   try {
@@ -118,10 +104,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: profileData } = await supabase
+  const { data: profileData } = await auth.supabase
     .from('profiles')
     .select('subscription_tier, email')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .maybeSingle()
 
   const profile = profileData as { subscription_tier?: string | null; email?: string | null } | null
@@ -137,11 +123,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: family, error: familyError } = await supabase
+  const { data: family, error: familyError } = await auth.supabase
     .from('families')
     .insert({
       name,
-      created_by: user.id,
+      created_by: auth.userId,
     })
     .select('id, name, created_by, created_at, updated_at')
     .single()
@@ -154,7 +140,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const invitedEmail = (user.email || profile?.email || '').trim().toLowerCase()
+  const invitedEmail = (profile?.email || '').trim().toLowerCase()
   if (!invitedEmail) {
     const secret = createSecretClient()
     await secret.from('families').delete().eq('id', family.id)
@@ -165,14 +151,14 @@ export async function POST(request: NextRequest) {
   }
 
   // RLS allows this because the policy includes: invited_by = auth.uid()
-  const { error: memberError } = await supabase
+  const { error: memberError } = await auth.supabase
     .from('family_members')
     .insert({
       family_id: family.id,
-      user_id: user.id,
+      user_id: auth.userId,
       role: 'admin',
       invited_email: invitedEmail,
-      invited_by: user.id,
+      invited_by: auth.userId,
       accepted_at: new Date().toISOString(),
       invite_token: null,
     })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 
 type Params = { params: Promise<{ id: string; uid: string }> }
@@ -14,21 +14,14 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'Authentication required.' } },
-      { status: 401 }
-    )
-  }
-
-  const { data: requesterMembership } = await supabase
+  const { data: requesterMembership } = await auth.supabase
     .from('family_members')
     .select('id, role, user_id')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
     .maybeSingle()
 
@@ -39,7 +32,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const { data: targetMembership } = await supabase
+  const { data: targetMembership } = await auth.supabase
     .from('family_members')
     .select('id, user_id, role')
     .eq('id', memberId)
@@ -53,7 +46,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const isSelf = targetMembership.user_id === user.id
+  const isSelf = targetMembership.user_id === auth.userId
   const isAdmin = requesterMembership.role === 'admin'
 
   if (!isSelf && !isAdmin) {
@@ -63,7 +56,7 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await auth.supabase
     .from('family_members')
     .delete()
     .eq('id', memberId)

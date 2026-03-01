@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 
 export interface FamilyMemberRow {
@@ -8,7 +8,7 @@ export interface FamilyMemberRow {
 }
 
 export interface FamilyAccessContext {
-  supabase: Awaited<ReturnType<typeof createClient>>
+  supabase: import('@supabase/supabase-js').SupabaseClient
   viewerId: string
   familyId: string
   members: FamilyMemberRow[]
@@ -26,26 +26,17 @@ export async function requireFamilyAccess(
     }
   }
 
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return {
-      response: NextResponse.json(
-        { error: { code: 'unauthorized', message: 'Authentication required.' } },
-        { status: 401 }
-      ),
-    }
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) {
+    return { response: auth }
   }
+  const { supabase, userId: viewerId } = auth
 
   const { data: viewerMembership } = await supabase
     .from('family_members')
     .select('id')
     .eq('family_id', familyId)
-    .eq('user_id', user.id)
+    .eq('user_id', viewerId)
     .not('accepted_at', 'is', null)
     .maybeSingle()
 
@@ -83,7 +74,7 @@ export async function requireFamilyAccess(
   return {
     ctx: {
       supabase,
-      viewerId: user.id,
+      viewerId,
       familyId,
       members,
     },

@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { createUserScopedClient } from '@/lib/supabase/user-scoped'
+import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { sendInviteAcceptedEmail } from '@/lib/email/collaborator-invite'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
@@ -30,18 +29,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     )
   }
 
-  // Require session auth (cookie-based — user must be logged in)
-  const supabaseUser = await createClient()
-  const { data: { user }, error: authError } = await supabaseUser.auth.getUser()
+  const auth = await requireSessionAuth()
+  if (isSessionAuthError(auth)) return auth
 
-  if (authError || !user) {
-    return NextResponse.json(
-      { error: { code: 'unauthorized', message: 'You must be signed in to accept an invite.' } },
-      { status: 401 }
-    )
-  }
-
-  const supabase = await createUserScopedClient(user.id)
+  const supabase = auth.supabase
 
   // Lookup the invite
   const { data: invite, error: lookupError } = await supabase
@@ -74,13 +65,15 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // Verify email matches (case-insensitive)
-  const userEmail = user.email?.toLowerCase() ?? ''
+  // Get user email for invite verification
+  const { data: { user: authUser } } = await auth.supabase.auth.getUser()
+  const userEmail = authUser?.email?.toLowerCase() ?? ''
   if (userEmail !== invite.invited_email.toLowerCase()) {
     return NextResponse.json(
       {
         error: {
           code: 'forbidden',
-          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${user.email}.`,
+          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${userEmail || 'a different account'}.`,
         },
       },
       { status: 403 }
@@ -91,7 +84,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { data: updated, error: updateError } = await supabase
     .from('trip_collaborators')
     .update({
-      user_id: user.id,
+      user_id: auth.userId,
       accepted_at: new Date().toISOString(),
       invite_token: null,   // consume the token
     })
@@ -111,10 +104,10 @@ export async function POST(request: NextRequest, { params }: Params) {
   const { data: accepterProfile } = await supabase
     .from('profiles')
     .select('full_name, email')
-    .eq('id', user.id)
+    .eq('id', auth.userId)
     .single()
 
-  const accepterName = accepterProfile?.full_name || user.email || 'Your collaborator'
+  const accepterName = accepterProfile?.full_name || userEmail || 'Your collaborator'
 
   // Notify the trip owner (non-blocking)
   const { data: ownerProfile } = await supabase
@@ -147,7 +140,7 @@ export async function POST(request: NextRequest, { params }: Params) {
           user_id: invite.invited_by,
           type: 'invite_accepted',
           trip_id: invite.trip_id,
-          actor_id: user.id,
+          actor_id: auth.userId,
           data: {
             trip_title: tripData?.title || tripLabel,
             actor_name: accepterName,
