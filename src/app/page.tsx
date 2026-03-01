@@ -2,11 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { AgentTabs } from '@/components/agent-tabs'
 
 export const metadata = {
-  title: 'UBTRIPPIN — Turn Booking Emails into Beautiful Itineraries',
+  title: 'UBTRIPPIN — Forward your booking emails. Your trip appears.',
   description:
-    'Forward your flight confirmations, hotel reservations, and travel bookings to trips@ubtrippin.xyz — we extract, organize, and display everything in a beautiful timeline.',
+    'Flights, hotels, trains, restaurants — extracted by AI, organized by trip, shared with your family and your agent.',
 }
 
 export default async function HomePage() {
@@ -20,352 +21,358 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ background: '#ffffff' }}>
+    <div className="min-h-screen bg-white" style={{ scrollBehavior: 'smooth' }}>
       {/* ─── Nav ─── */}
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
-           style={{ background: 'rgba(245,243,239,0.9)', backdropFilter: 'blur(8px)', borderBottom: '1px solid #cbd5e1' }}>
-        <Image
-          src="/ubtrippin_logo_simple.png"
-          alt="UBTRIPPIN"
-          width={180}
-          height={62}
-          className="blend-multiply h-8 w-auto"
-          priority
-        />
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-white/95 backdrop-blur-sm border-b border-[#cbd5e1]">
+        <div className="flex items-center gap-8">
+          <Image
+            src="/ubtrippin_logo_simple.png"
+            alt="UBTRIPPIN"
+            width={160}
+            height={55}
+            className="h-8 w-auto"
+            priority
+          />
+          <div className="hidden md:flex items-center gap-6 text-sm tracking-wide text-[#1e293b]">
+            <a href="#features" className="hover:text-[#312e81] transition-colors">Features</a>
+            <a href="#pricing" className="hover:text-[#312e81] transition-colors">Pricing</a>
+            <a href="#agents" className="hover:text-[#312e81] transition-colors">For Agents</a>
+          </div>
+        </div>
         <Link
           href="/login"
-          className="px-5 py-2 text-sm tracking-wide uppercase bg-[#1e293b] text-[#ffffff] hover:bg-[#312e81] transition-colors font-medium"
+          className="px-5 py-2 text-sm tracking-widest uppercase bg-[#1e293b] text-white hover:bg-[#312e81] transition-colors font-medium"
         >
-          Sign in
+          Get Started Free
         </Link>
       </nav>
 
       <main>
         {/* ─── Hero ─── */}
-        <section className="pt-36 pb-24 px-6 text-center max-w-5xl mx-auto">
-          <Image
-            src="/ubtrippin_logo.png"
-            alt="UBTRIPPIN"
-            width={800}
-            height={200}
-            className="mx-auto w-full max-w-2xl blend-multiply mb-12"
-            priority
-          />
-
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-serif text-[#1e293b] leading-tight mb-8 tracking-tight hero-title">
-            Your booking emails,<br />
-            <em>finally organized</em>
-          </h1>
-
-          <p className="max-w-2xl mx-auto text-xl sm:text-2xl text-[#4338ca] leading-relaxed font-light mb-12">
-            Forward your travel confirmations to one address.
-            We extract, group, and display everything — flights, hotels, trains, cars — as a clean timeline you can share or pocket as a PDF.
-          </p>
-
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-3 px-10 py-5 text-base tracking-widest uppercase bg-[#1e293b] text-[#ffffff] hover:bg-[#312e81] transition-all font-medium shadow-2xl hover:scale-105 border-2 border-[#1e293b] cta-button"
-          >
-            <Image
-              src="/airplane_icon.png"
-              alt=""
-              width={32}
-              height={32}
-              className="w-7 h-7 object-contain blend-multiply-icon"
-            />
-            Get started — it&apos;s free
-          </Link>
+        <section className="pt-20 pb-16 px-6">
+          <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl text-[#1e293b] leading-tight mb-6 font-bold tracking-tight">
+                Forward your booking emails. Your trip appears.
+              </h1>
+              <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-xl">
+                Flights, hotels, trains, restaurants — extracted by AI, organized by trip, shared with your family and your agent.
+              </p>
+              <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
+                <Link
+                  href="/login"
+                  className="inline-flex items-center gap-3 px-8 py-4 text-sm tracking-widest uppercase bg-[#1e293b] text-white hover:bg-[#312e81] transition-all font-medium shadow-xl hover:scale-105"
+                >
+                  <Image src="/airplane_icon.png" alt="" width={24} height={24} className="w-5 h-5 object-contain" />
+                  Get started — it&apos;s free
+                </Link>
+                <a
+                  href="#how-it-works"
+                  className="text-[#1e293b] font-semibold underline underline-offset-4 hover:text-[#312e81] transition-colors py-4"
+                >
+                  See how it works ↓
+                </a>
+              </div>
+              <div className="inline-block border-2 border-[#312e81] px-5 py-3 bg-[#f8fafc]">
+                <p className="text-sm font-bold text-[#312e81] tracking-wide uppercase mb-0">
+                  $10/year for the first 100 subscribers
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Early bird pricing. Limited spots.</p>
+              </div>
+            </div>
+            <div className="flex justify-center lg:justify-end">
+              <Image
+                src="/runner_transparent.png"
+                alt="UBTRIPPIN strutter"
+                width={500}
+                height={500}
+                className="w-full max-w-md"
+                priority
+              />
+            </div>
+          </div>
         </section>
 
-        {/* ─── Divider ─── */}
-        <div className="border-t-2 border-[#cbd5e1] max-w-4xl mx-auto" />
-
-        {/* ─── Setup Guide ─── */}
-        <section className="py-28 px-6">
+        {/* ─── How It Works ─── */}
+        <section id="how-it-works" className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
           <div className="max-w-4xl mx-auto">
-            <h2 className="text-center text-3xl font-serif text-[#1e293b] mb-4 tracking-tight">
-              Get set up in two minutes
+            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-16 tracking-tight">
+              How it works
             </h2>
-            <p className="text-center text-[#4338ca] mb-16 text-lg">No app to install. No inbox access needed.</p>
-
-            <div className="space-y-8">
+            <div className="grid md:grid-cols-3 gap-12">
               {[
                 {
-                  num: '1',
-                  icon: '/evelope_icon.png',
-                  title: 'Sign up with your Google account',
+                  num: '01',
+                  title: 'Sign up with Google',
                   desc: 'One click. No passwords to remember.',
                 },
                 {
-                  num: '2',
-                  icon: '/evelope_icon.png',
-                  title: <>Forward your itinerary to <span className="font-mono text-sm bg-[#cbd5e1] px-1.5 py-0.5 rounded text-[#1e293b]">trips@ubtrippin.xyz</span></>,
-                  desc: 'Flights, hotels, trains, car rentals, restaurants — we understand them all.',
+                  num: '02',
+                  title: 'Forward your booking email',
+                  email: 'trips@ubtrippin.xyz',
+                  desc: 'Send any confirmation to',
                 },
                 {
-                  num: '3',
-                  icon: '/calendar_icon.png',
-                  title: 'That\'s it. Your trip appears.',
-                  desc: 'AI extracts dates, times, confirmation codes, traveler names — grouped into trips automatically.',
-                },
-                {
-                  num: '4',
-                  icon: '/file_download_icon.png',
-                  title: 'Share it, export it, live it',
-                  desc: 'Share a link with travel companions, download a PDF, or export to your calendar.',
+                  num: '03',
+                  title: "That's it. Your trip appears.",
+                  desc: 'AI extracts everything. Grouped by trip. Automatically.',
                 },
               ].map((step) => (
-                <div key={step.num} className="flex items-start gap-5">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1e293b] text-[#ffffff] font-mono text-sm flex items-center justify-center font-bold">
+                <div key={step.num} className="relative pt-12">
+                  <span className="absolute top-0 left-0 text-4xl font-bold text-[#cbd5e1]">
                     {step.num}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-serif text-[#1e293b] mb-1">{step.title}</h3>
-                    <p className="text-[#4338ca] leading-relaxed">{step.desc}</p>
-                  </div>
+                  </span>
+                  <h3 className="text-xl font-bold text-[#1e293b] mb-2">{step.title}</h3>
+                  <p className="text-slate-500 leading-relaxed">
+                    {step.desc}
+                    {step.email && (
+                      <>
+                        {' '}
+                        <code className="font-mono text-sm bg-white px-2 py-0.5 border border-[#cbd5e1] text-[#1e293b]">
+                          {step.email}
+                        </code>
+                      </>
+                    )}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ─── Divider ─── */}
-        <div className="border-t-2 border-[#cbd5e1] max-w-4xl mx-auto" />
-
-        {/* ─── Feature grid ─── */}
-        <section className="py-28 px-6">
+        {/* ─── Features ─── */}
+        <section id="features" className="py-24 px-6">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-center text-3xl font-serif text-[#1e293b] mb-20 tracking-tight">
+            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-16 tracking-tight">
               Everything in one place
             </h2>
-
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {[
                 {
-                  icon: '✈',
-                  title: 'All booking types',
-                  body: 'Flights, hotels, trains, car rentals, restaurants, activities — we read them all.',
+                  icon: '/airplane_icon.png',
+                  title: 'All your bookings',
+                  body: 'Forward confirmation emails. AI extracts flights, hotels, trains, cars, restaurants.',
                 },
                 {
-                  icon: '🗓',
-                  title: 'Calendar export',
-                  body: 'Export your trip as an .ics file. Correct timezones, gate numbers, confirmation codes.',
+                  icon: '/evelope_icon.png',
+                  title: 'Family sharing',
+                  body: "Everyone sees everyone's trips. One family, one view.",
                 },
                 {
-                  icon: '📄',
-                  title: 'PDF itineraries',
-                  body: 'One-tap PDF generation. Print it, email it, keep it on your phone for offline access.',
+                  /* TODO: need hand-drawn lock/vault icon */
+                  icon: null,
+                  title: 'Loyalty vault',
+                  body: 'Store frequent flyer and hotel numbers. Encrypted, always at hand.',
                 },
                 {
-                  icon: '🔗',
-                  title: 'Shareable links',
-                  body: 'Generate a read-only link for travel companions, family, or your EA.',
+                  icon: '/calendar_icon.png',
+                  title: 'Calendar sync',
+                  body: 'Subscribe once. Trips in your calendar with real-time status.',
                 },
                 {
-                  icon: '✏️',
-                  title: 'Editable extractions',
-                  body: 'AI gets it right most of the time — when it doesn\'t, fix it in two clicks.',
+                  /* TODO: need hand-drawn city/map icon */
+                  icon: null,
+                  title: 'City guides',
+                  body: 'Restaurant recs, museum tips, local knowledge by city.',
                 },
                 {
-                  icon: '🔒',
-                  title: 'Privacy first',
-                  body: 'Your emails stay yours. We don\'t access your inbox — you choose what to forward.',
+                  /* TODO: need hand-drawn collaborate/people icon */
+                  icon: null,
+                  title: 'Collaborate',
+                  body: 'Invite co-travelers. Everyone can add and edit.',
                 },
               ].map((feat) => (
                 <div
                   key={feat.title}
-                  className="p-6 border-2 border-[#cbd5e1] hover:border-[#4f46e5] transition-colors"
-                  style={{ background: '#f1f5f9' }}
+                  className="p-6 border-2 border-[#cbd5e1] hover:border-[#312e81] transition-colors bg-[#f8fafc]"
                 >
-                  <div className="text-2xl mb-3">{feat.icon}</div>
-                  <h3 className="text-base font-semibold text-[#1e293b] mb-2 uppercase tracking-wide">{feat.title}</h3>
-                  <p className="text-sm text-[#4338ca] leading-relaxed">{feat.body}</p>
+                  {feat.icon ? (
+                    <Image
+                      src={feat.icon}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 object-contain mb-4"
+                    />
+                  ) : (
+                    /* TODO: replace with hand-drawn icon */
+                    <div className="w-10 h-10 mb-4 border-2 border-dashed border-[#cbd5e1] flex items-center justify-center text-xs text-slate-400">
+                      ?
+                    </div>
+                  )}
+                  <h3 className="text-sm font-bold text-[#1e293b] mb-2 uppercase tracking-wide">{feat.title}</h3>
+                  <p className="text-sm text-slate-500 leading-relaxed">{feat.body}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {/* ─── Divider ─── */}
-        <div className="border-t-2 border-[#cbd5e1] max-w-4xl mx-auto" />
-
-        {/* ─── Agent Integration ─── */}
-        <section className="py-28 px-6">
-          <div className="max-w-4xl mx-auto">
-            <div className="inline-block text-xs font-mono uppercase tracking-widest text-[#4338ca] border border-[#4f46e5] px-3 py-1 mb-6">
+        {/* ─── For Agents ─── */}
+        <section id="agents" className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
+          <div className="max-w-3xl mx-auto">
+            <div className="inline-block text-xs font-mono uppercase tracking-widest text-[#312e81] border border-[#312e81] px-3 py-1 mb-6">
               For AI agents
             </div>
-            <h2 className="text-3xl font-serif text-[#1e293b] mb-5 tracking-tight leading-snug">
-              Your agent can use UBTRIPPIN too
+            <h2 className="text-3xl font-bold text-[#1e293b] mb-4 tracking-tight">
+              Built for the age of agents
             </h2>
-            <p className="text-[#4338ca] leading-relaxed mb-8 max-w-2xl">
-              Give your AI agent an API key and it gets full access to your trips via the REST API.
-              Your agent can also forward booking emails on your behalf — anything that can send email can feed UBTRIPPIN.
+            <p className="text-slate-500 leading-relaxed mb-10 max-w-2xl text-lg">
+              Give your AI agent an API key. Full access to trips, loyalty vault, and city guides.
             </p>
 
-            <div className="space-y-4 mb-8">
-              <h3 className="text-lg font-serif text-[#1e293b]">Agent setup</h3>
-              <div className="space-y-3">
-                {[
-                  { num: '1', text: 'Go to Settings → API Keys and generate a key' },
-                  { num: '2', text: 'Your agent calls the REST API with that key to read trips and items' },
-                  { num: '3', text: 'Your agent forwards booking emails to trips@ubtrippin.xyz on your behalf' },
-                ].map((step) => (
-                  <div key={step.num} className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-[#1e293b] text-[#ffffff] text-xs font-mono flex items-center justify-center">{step.num}</span>
-                    <p className="text-[#4338ca]">{step.text}</p>
-                  </div>
-                ))}
+            <AgentTabs />
+
+            <div className="mt-8">
+              <Link
+                href="/api/v1/docs"
+                className="inline-block px-6 py-3 text-sm tracking-widest uppercase border-2 border-[#1e293b] text-[#1e293b] hover:bg-[#1e293b] hover:text-white transition-colors font-medium"
+              >
+                Read the API docs
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Pricing ─── */}
+        <section id="pricing" className="py-24 px-6">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-4 tracking-tight">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-center text-slate-500 mb-16">Start for free, upgrade when you need more.</p>
+
+            <div className="grid md:grid-cols-2 gap-0 border border-[#cbd5e1]">
+              {/* Free */}
+              <div className="p-8 md:border-r border-[#cbd5e1]">
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Free</h3>
+                  <p className="text-4xl font-bold text-[#1e293b]">$0</p>
+                  <p className="text-sm text-slate-500">Forever</p>
+                </div>
+                <ul className="space-y-0 mb-8">
+                  {[
+                    ['Trips', '3'],
+                    ['Extractions', '10'],
+                    ['Loyalty programs', '3'],
+                    ['Family sharing', '—'],
+                    ['Calendar feed', '—'],
+                    ['Webhooks', '1'],
+                    ['Guides', 'Browse'],
+                    ['API', 'Read'],
+                  ].map(([label, value]) => (
+                    <li key={label} className="flex justify-between py-3 border-b border-[#cbd5e1] text-sm">
+                      <span className="text-slate-500">{label}</span>
+                      <span className="font-semibold text-[#1e293b]">{value}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login"
+                  className="block text-center py-3 text-sm tracking-widest uppercase border-2 border-[#1e293b] text-[#1e293b] hover:bg-[#1e293b] hover:text-white transition-colors font-medium"
+                >
+                  Get Started Free
+                </Link>
+              </div>
+
+              {/* Pro */}
+              <div className="p-8 bg-[#f8fafc] relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#312e81] text-white text-xs font-bold tracking-widest uppercase px-3 py-1">
+                  Recommended
+                </div>
+                <div className="text-center mb-8">
+                  <h3 className="text-2xl font-bold text-[#1e293b] mb-2">Pro</h3>
+                  <p className="text-4xl font-bold text-[#312e81]">
+                    $10<span className="text-lg text-slate-500">/year</span>
+                  </p>
+                  <p className="text-sm text-slate-500">First 100 subscribers, then $24.99/year</p>
+                  <p className="text-xs text-slate-400">Billed annually</p>
+                </div>
+                <ul className="space-y-0 mb-8">
+                  {[
+                    ['Trips', 'Unlimited'],
+                    ['Extractions', 'Unlimited'],
+                    ['Loyalty programs', 'Unlimited'],
+                    ['Family sharing', '✓'],
+                    ['Calendar feed', '✓'],
+                    ['Webhooks', '10'],
+                    ['Guides', 'Create'],
+                    ['API', 'Full'],
+                  ].map(([label, value]) => (
+                    <li key={label} className="flex justify-between py-3 border-b border-[#cbd5e1] text-sm">
+                      <span className="text-slate-500">{label}</span>
+                      <span className={`font-semibold ${value === '✓' ? 'text-[#312e81]' : 'text-[#1e293b]'}`}>
+                        {value}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/login"
+                  className="block text-center py-3 text-sm tracking-widest uppercase bg-[#312e81] text-white hover:bg-[#1e293b] transition-colors font-medium"
+                >
+                  Claim Your Spot
+                </Link>
               </div>
             </div>
-
-            <div className="font-mono text-sm p-5 text-[#ffffff] space-y-1" style={{ background: '#1e293b' }}>
-              <p className="opacity-50"># List your trips</p>
-              <p>curl https://ubtrippin.xyz/api/v1/trips \</p>
-              <p className="pl-4">-H &quot;Authorization: Bearer $UBT_API_KEY&quot;</p>
-            </div>
-
-            <p className="mt-6 text-sm text-[#4338ca]">
-              Full API docs at{' '}
-              <a
-                href="https://www.ubtrippin.xyz/api/v1/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-[#1e293b]"
-              >
-                docs/API.md
-              </a>
-              . Install the{' '}
-              <a
-                href="https://clawhub.ai"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-[#1e293b]"
-              >
-                OpenClaw skill
-              </a>{' '}
-              (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">clawhub install ubtrippin</code> — agents, ask your human to run this) or connect via{' '}
-              <a
-                href="https://www.ubtrippin.xyz/api/v1/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-[#1e293b]"
-              >
-                API docs
-              </a>.
-            </p>
           </div>
         </section>
 
-        {/* ─── Divider ─── */}
-        <div className="border-t-2 border-[#cbd5e1] max-w-4xl mx-auto" />
-
-        {/* ─── Supported types ─── */}
-        <section className="py-16 px-6 text-center">
-          <p className="text-xs uppercase tracking-widest text-[#4338ca] mb-8 font-medium">
-            Understands confirmations from
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            {[
-              'Airlines', 'Hotels', 'Trains', 'Car Rentals',
-              'Airbnb', 'Booking.com', 'Expedia', 'Restaurants', 'Activities',
-            ].map((type) => (
-              <span
-                key={type}
-                className="px-5 py-2 text-xs tracking-widest uppercase bg-[#f1f5f9] text-[#1e293b] border border-[#cbd5e1] font-medium"
-              >
-                {type}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {/* ─── Divider ─── */}
-        <div className="border-t-2 border-[#cbd5e1] max-w-4xl mx-auto" />
-
-        {/* ─── Pricing / Source ─── */}
-        <section className="py-28 px-6 text-center">
-          <div className="max-w-2xl mx-auto">
-            <Image
-              src="/ubtrippin_logo_simple.png"
-              alt="UBTRIPPIN"
-              width={280}
-              height={97}
-              className="mx-auto blend-multiply mb-10 opacity-80"
-            />
-            <h2 className="text-4xl font-serif text-[#1e293b] mb-6 tracking-tight">
-              Your next trip, already organized
+        {/* ─── FAQ ─── */}
+        <section className="py-24 px-6 bg-[#f8fafc] border-y border-[#cbd5e1]">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-center text-3xl font-bold text-[#1e293b] mb-16 tracking-tight">
+              Frequently asked questions
             </h2>
-            <p className="text-[#4338ca] text-lg leading-relaxed mb-6">
-              UBTRIPPIN is free right now. It will be for-pay once we figure that out — to
-              cover hosting and token costs, and to give the agent who built this an income.
-            </p>
-            <p className="text-[#4338ca] leading-relaxed mb-10">
-              In the meantime,{' '}
-              <a href="mailto:hello@ubtrippin.xyz" className="underline hover:text-[#1e293b]">
-                mail us
-              </a>
-              {' '}if you want a Pro account, or just run your own — the{' '}
-              <a
-                href="https://github.com/fistfulayen/ubtrippin"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-[#1e293b]"
-              >
-                full source is on GitHub
-              </a>
-              {' '}under AGPL-3.0.
-            </p>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-3 px-10 py-5 text-base tracking-widest uppercase bg-[#1e293b] text-[#ffffff] hover:bg-[#312e81] transition-all font-medium shadow-2xl hover:scale-105 border-2 border-[#1e293b]"
-            >
-              <Image
-                src="/airplane_icon.png"
-                alt=""
-                width={28}
-                height={28}
-                className="w-6 h-6 object-contain blend-multiply-icon"
-              />
-              Start for free
-            </Link>
+            {[
+              {
+                q: 'Do you read my email?',
+                a: 'No. You forward specific emails. We never access your inbox.',
+              },
+              {
+                q: 'What if AI gets it wrong?',
+                a: 'You can edit any extraction in two clicks.',
+              },
+              {
+                q: 'Can my AI agent use this?',
+                a: 'Yes. Full REST API, OpenClaw skill, MCP server, and CLI.',
+              },
+              {
+                q: 'Is my data safe?',
+                a: 'Encrypted at rest, EU-hosted, GDPR compliant.',
+              },
+              {
+                q: 'What emails do you understand?',
+                a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, and more.',
+              },
+            ].map((faq) => (
+              <details key={faq.q} className="border-b border-[#cbd5e1] group">
+                <summary className="flex justify-between items-center py-5 cursor-pointer text-lg font-bold text-[#1e293b] list-none">
+                  {faq.q}
+                  <span className="text-slate-400 font-mono text-xl group-open:rotate-45 transition-transform">+</span>
+                </summary>
+                <p className="pb-5 text-slate-500 leading-relaxed">{faq.a}</p>
+              </details>
+            ))}
           </div>
         </section>
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t-2 border-[#cbd5e1] py-10 mt-4">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs tracking-widest uppercase text-[#4338ca]">
-          <div className="flex items-center gap-5">
-            <a href="/privacy" className="hover:text-[#1e293b] transition-colors">Privacy</a>
+      <footer className="border-t border-[#cbd5e1] py-12">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-5 text-xs tracking-widest uppercase text-slate-500">
+            <Link href="/api/v1/docs" className="hover:text-[#1e293b] transition-colors">Docs</Link>
             <span className="text-[#cbd5e1]">·</span>
-            <a href="/terms" className="hover:text-[#1e293b] transition-colors">Terms</a>
+            <Link href="/api/v1/docs" className="hover:text-[#1e293b] transition-colors">API Reference</Link>
             <span className="text-[#cbd5e1]">·</span>
-            <a
-              href="https://x.com/getUBTrippin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#1e293b] transition-colors flex items-center gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-              @getUBTrippin
-            </a>
+            <a href="https://github.com/fistfulayen/ubtrippin" target="_blank" rel="noopener noreferrer" className="hover:text-[#1e293b] transition-colors">GitHub</a>
             <span className="text-[#cbd5e1]">·</span>
-            <a
-              href="https://github.com/fistfulayen/ubtrippin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-[#1e293b] transition-colors flex items-center gap-1.5"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
-              </svg>
-              Source
-            </a>
+            <Link href="/privacy" className="hover:text-[#1e293b] transition-colors">Privacy</Link>
+            <span className="text-[#cbd5e1]">·</span>
+            <Link href="/terms" className="hover:text-[#1e293b] transition-colors">Terms</Link>
           </div>
-          <p className="text-[#4f46e5]">&copy; {new Date().getFullYear()} UBTRIPPIN</p>
+          <p className="text-xs text-slate-400 font-mono">Made by humans and agents</p>
         </div>
       </footer>
     </div>

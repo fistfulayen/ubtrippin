@@ -3,7 +3,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Work+Sans:wght@300;400;500;600&display=swap');
 
 @theme inline {
-  --font-sans: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: var(--font-space), 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
   --color-indigo-50: oklch(0.962 0.018 264.05);
   --color-indigo-100: oklch(0.930 0.034 272.79);
