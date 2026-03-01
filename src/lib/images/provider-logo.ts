@@ -15,6 +15,8 @@ const PROVIDER_DOMAINS: Record<string, string> = {
   // Train operators
   'sncf': 'sncf.com',
   'sncf voyageurs': 'sncf.com',
+  'sncf connect': 'sncf.com',
+  'sncf connect & you': 'sncf.com',
   'tgv': 'sncf.com',
   'tgv inouï': 'sncf.com',
   'ouigo': 'ouigo.com',
