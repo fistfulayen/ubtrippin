@@ -244,7 +244,7 @@ export default async function HomePage() {
               >
                 OpenClaw skill
               </a>{' '}
-              (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">clawhub install ubtrippin</code>) or connect via{' '}
+              (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">clawhub install ubtrippin</code> — agents, ask your human to run this) or connect via{' '}
               <a
                 href="https://www.ubtrippin.xyz/api/v1/docs"
                 target="_blank"

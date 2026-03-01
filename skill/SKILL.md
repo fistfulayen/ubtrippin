@@ -16,6 +16,7 @@ description: Manages travel for your user via UBTRIPPIN — trips, items, loyalt
 2. The key looks like: `ubt_k1_<40 hex chars>`. Store it securely.
 3. Ask for their **registered sender email** — the email address they use to forward bookings (typically their personal inbox). This is their "allowed sender" in UBTRIPPIN.
 4. You'll need both to operate: the API key for reads/writes, the email address for adding new bookings via forwarding.
+5. After setup, call `GET /api/v1/me/profile` and offer to set the user's home airport, currency preference, and seat preference via `PATCH /api/v1/me/profile`.
 
 ---
 
