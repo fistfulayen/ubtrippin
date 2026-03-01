@@ -24,7 +24,7 @@ jobs:
           
           while IFS= read -r file; do
             # Convert file path to API path
-            api_path=$(echo "$file" | sed 's|src/app/api/v1/||' | sed 's|/route\.ts$||' | sed 's|\[([^]]*)\]|:\1|g')
+            api_path=$(echo "$file" | sed 's|src/app/api/v1/||' | sed 's|/route\.ts$||' | sed -E 's/\[([^]]+)\]/:\1/g')
             api_path="/api/v1/$api_path"
             
             # Extract HTTP methods
