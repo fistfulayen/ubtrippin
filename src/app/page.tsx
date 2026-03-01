@@ -184,7 +184,7 @@ export default async function HomePage() {
               Everything in one place
             </h2>
             <p className="text-center text-slate-500 mb-16 max-w-2xl mx-auto">
-              We built the things we wished existed when we were on the road.
+              We got tired of digging through email for confirmation numbers, so we made UBTRIPPIN.
             </p>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {features.map((feat) => (
@@ -192,13 +192,13 @@ export default async function HomePage() {
                   key={feat.title}
                   className="p-6 border-2 border-[#cbd5e1] hover:border-[#312e81] transition-colors bg-[#f8fafc] rounded-lg"
                 >
-                  <div className="w-14 h-14 mb-4 rounded-lg bg-[#f5f0e8] flex items-center justify-center">
+                  <div className="w-20 h-20 mb-5 flex items-center justify-center">
                     <Image
                       src={feat.icon}
                       alt=""
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 object-contain"
+                      width={80}
+                      height={80}
+                      className="w-20 h-20 object-contain"
                     />
                   </div>
                   <h3 className="text-sm font-bold text-[#1e293b] mb-2 uppercase tracking-wide">{feat.title}</h3>
