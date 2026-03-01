@@ -235,7 +235,24 @@ export default async function HomePage() {
               >
                 docs/API.md
               </a>
-              . OpenClaw skill and MCP server coming soon.
+              . Install the{' '}
+              <a
+                href="https://clawhub.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-[#1e293b]"
+              >
+                OpenClaw skill
+              </a>{' '}
+              (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">clawhub install ubtrippin</code>) or connect via{' '}
+              <a
+                href="https://www.ubtrippin.xyz/api/v1/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-[#1e293b]"
+              >
+                API docs
+              </a>.
             </p>
           </div>
         </section>
