@@ -228,7 +228,7 @@ export default async function HomePage() {
             <p className="mt-6 text-sm text-[#4338ca]">
               Full API docs at{' '}
               <a
-                href="https://github.com/fistfulayen/ubtrippin/blob/main/docs/API.md"
+                href="https://www.ubtrippin.xyz/api/v1/docs"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-[#1e293b]"

@@ -4,6 +4,31 @@ const DOCS = `# UB Trippin API Reference (v1)
 
 Base URL: \`https://www.ubtrippin.xyz\`
 
+## Quick Start
+
+**For OpenClaw agents:**
+\`\`\`bash
+clawhub install ubtrippin
+\`\`\`
+This installs the full skill with all endpoints and agent workflows documented.
+
+**For MCP clients (Claude Desktop, Cursor):**
+\`\`\`json
+{
+  "mcpServers": {
+    "ubtrippin": {
+      "command": "npx",
+      "args": ["ubtrippin-mcp"],
+      "env": { "UBT_API_KEY": "ubt_k1_..." }
+    }
+  }
+}
+\`\`\`
+
+**For any agent with HTTP access:** Use the REST API below.
+
+---
+
 ## Authentication
 
 All endpoints (unless noted) require a Bearer token:

@@ -1,33 +1,31 @@
-# UBTRIPPIN Skill
+# UBTRIPPIN — OpenClaw Skill
 
-Gives your OpenClaw agent access to your [UBTRIPPIN](https://ubtrippin.xyz) travel tracker.
-
-## What it does
-
-- **List trips** — see all your upcoming and past travel
-- **Get itineraries** — full trip details with flights, hotels, trains, and more
-- **Add bookings** — forward confirmation emails to `trips@ubtrippin.xyz` to add them automatically
+Manage travel via UBTRIPPIN from any OpenClaw agent.
 
 ## Install
 
 ```bash
-npx clawhub install ubtrippin
+clawhub install ubtrippin
+```
+
+If you get a permission error, specify your workspace:
+
+```bash
+clawhub install ubtrippin --workdir ~/.openclaw/workspace
 ```
 
 ## Setup
 
-1. Go to **ubtrippin.xyz/settings** and generate an API key
-2. Give the key to your agent and tell it your registered sender email
-3. That's it — your agent can now read your trips and help you add new ones
+1. Your user generates an API key at [ubtrippin.xyz/settings](https://www.ubtrippin.xyz/settings)
+2. Store the key in your agent config or TOOLS.md
+3. Start using the API — see SKILL.md for all endpoints and workflows
 
-## API Key
+## API Docs
 
-Keys start with `ubt_k1_` and are valid until revoked. Manage them at ubtrippin.xyz/settings.
+Live reference: [ubtrippin.xyz/api/v1/docs](https://www.ubtrippin.xyz/api/v1/docs)
 
-## Rate Limits
+## Links
 
-100 requests/minute per API key.
-
-## Source
-
-Built by the UBTRIPPIN team. Issues? → ubtrippin.xyz
+- Website: [ubtrippin.xyz](https://www.ubtrippin.xyz)
+- GitHub: [github.com/fistfulayen/ubtrippin](https://github.com/fistfulayen/ubtrippin)
+- ClawHub: [clawhub.ai](https://clawhub.ai) → search "ubtrippin"

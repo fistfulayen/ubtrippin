@@ -1,8 +1,8 @@
 {
   "slug": "ubtrippin",
   "name": "UBTRIPPIN",
-  "version": "1.0.0",
-  "description": "Read and manage travel bookings via the UBTRIPPIN API. List trips, get itineraries with all items (flights, hotels, trains), and add bookings by forwarding confirmation emails.",
-  "tags": ["travel", "trips", "bookings", "itinerary", "flights", "hotels"],
-  "homepage": "https://ubtrippin.xyz"
+  "version": "2.0.0",
+  "description": "Manage travel via UBTRIPPIN — trips, items, loyalty vault, family sharing, city guides, notifications, webhooks, and more. 60+ API endpoints.",
+  "tags": ["travel", "trips", "bookings", "itinerary", "flights", "hotels", "loyalty"],
+  "homepage": "https://www.ubtrippin.xyz"
 }
