@@ -1,0 +1,29 @@
+name: API Surface Change Reminder
+
+on:
+  pull_request:
+    paths:
+      - 'src/app/api/v1/**'
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remind to update agent tooling
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: api-surface-reminder
+          message: |
+            ## 📡 API Surface Changed
+
+            This PR modifies files under `src/app/api/v1/`. Please ensure the following are updated:
+
+            - [ ] **skill/SKILL.md** — OpenClaw skill documentation
+            - [ ] **mcp/src/** — MCP tool definitions
+            - [ ] **src/app/api/v1/docs/route.ts** — API docs endpoint
+
+            Run the API Parity Check workflow for a detailed report.

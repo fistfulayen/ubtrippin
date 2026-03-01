@@ -1,0 +1,84 @@
+name: API Parity Check
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract API surface
+        id: extract
+        run: |
+          # Find all route files and extract HTTP methods + paths
+          REPORT=""
+          MISSING_SKILL=""
+          MISSING_MCP=""
+          
+          while IFS= read -r file; do
+            # Convert file path to API path
+            api_path=$(echo "$file" | sed 's|src/app/api/v1/||' | sed 's|/route\.ts$||' | sed -E 's/\[([^]]+)\]/:\1/g')
+            api_path="/api/v1/$api_path"
+            
+            # Extract HTTP methods
+            methods=$(grep -oP 'export async function (GET|POST|PUT|PATCH|DELETE)' "$file" | awk '{print $4}' | sort | tr '\n' ',' | sed 's/,$//')
+            
+            if [ -n "$methods" ]; then
+              REPORT="$REPORT\n$methods $api_path"
+              
+              # Check skill coverage
+              # Normalize path for matching: replace :param patterns with generic markers
+              skill_path=$(echo "$api_path" | sed 's|/:[^/]*||g')
+              if ! grep -q "$skill_path" skill/SKILL.md 2>/dev/null; then
+                MISSING_SKILL="$MISSING_SKILL\n- $methods $api_path"
+              fi
+              
+              # Check MCP coverage (best effort)
+              if [ -d "mcp/src" ]; then
+                if ! grep -rq "$(echo "$api_path" | sed 's|/:.*||')" mcp/src/ 2>/dev/null; then
+                  MISSING_MCP="$MISSING_MCP\n- $methods $api_path"
+                fi
+              fi
+            fi
+          done < <(find src/app/api/v1 -name 'route.ts' | sort)
+          
+          # Build comment body
+          COMMENT="## 🔍 API Parity Report\n\n"
+          
+          if [ -n "$MISSING_SKILL" ]; then
+            COMMENT="$COMMENT### ⚠️ Missing from skill/SKILL.md\n$MISSING_SKILL\n\n"
+          else
+            COMMENT="$COMMENT### ✅ skill/SKILL.md covers all endpoints\n\n"
+          fi
+          
+          if [ -n "$MISSING_MCP" ]; then
+            COMMENT="$COMMENT### ⚠️ Possibly missing from mcp/src/\n$MISSING_MCP\n\n"
+          else
+            COMMENT="$COMMENT### ✅ mcp/src/ appears to cover all endpoints\n\n"
+          fi
+          
+          COMMENT="$COMMENT<details><summary>Full API surface</summary>\n\n\`\`\`\n$(echo -e "$REPORT")\n\`\`\`\n</details>"
+          
+          # Save for PR comment
+          echo -e "$COMMENT" > /tmp/parity-report.md
+          
+          # Check if there are issues
+          if [ -n "$MISSING_SKILL" ] || [ -n "$MISSING_MCP" ]; then
+            echo "has_drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_drift=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.extract.outputs.has_drift == 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: api-parity
+          path: /tmp/parity-report.md
