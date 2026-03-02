@@ -37,6 +37,7 @@ export function ReparseButton({ emailId }: ReparseButtonProps) {
       size="sm"
       onClick={handleReparse}
       disabled={loading}
+      className="w-full justify-center sm:w-auto"
     >
       <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
       {loading ? 'Re-parsing...' : 'Re-parse email'}
