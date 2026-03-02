@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getStripe } from '@/lib/stripe'
+import { stripe } from '@/lib/stripe'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface ProfileRow {
@@ -39,7 +39,7 @@ export async function GET() {
   const origin = resolveOrigin()
 
   try {
-    const session = await getStripe().billingPortal.sessions.create({
+    const session = await stripe.billingPortal.sessions.create({
       customer: profile.stripe_customer_id,
       return_url: `${origin}/settings/billing`,
     })

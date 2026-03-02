@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
-import { getStripe } from '@/lib/stripe'
+import { stripe } from '@/lib/stripe'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface ProfileRow {
@@ -25,7 +25,7 @@ async function fetchCurrentSubscriptionPrice(
   }
 
   try {
-    const subscription = await getStripe().subscriptions.retrieve(stripeSubscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
     const price = subscription.items.data[0]?.price
 
     if (!price) {

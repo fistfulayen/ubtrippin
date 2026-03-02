@@ -4,7 +4,7 @@ import {
   mapStripeSubscriptionStatusToTier,
   unixSecondsToIso,
 } from '@/lib/billing'
-import { getStripe } from '@/lib/stripe'
+import { stripe } from '@/lib/stripe'
 import { createSecretClient } from '@/lib/supabase/service'
 
 export const runtime = 'nodejs'
@@ -241,7 +241,7 @@ function graceUntilFromEventCreated(eventCreated: number): string {
 
 async function getSubscriptionPeriodEnd(subscriptionId: string): Promise<string | null> {
   try {
-    const subscription = await getStripe().subscriptions.retrieve(subscriptionId)
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
     return unixSecondsToIso(subscription.items.data[0]?.current_period_end)
   } catch (error) {
     console.error('[stripe webhook] failed to fetch subscription for period end', { subscriptionId, error })
@@ -582,7 +582,7 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event
 
   try {
-    event = getStripe().webhooks.constructEvent(body, sig, webhookSecret)
+    event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
     console.error('[stripe webhook] signature verification failed', err)
     return NextResponse.json(
