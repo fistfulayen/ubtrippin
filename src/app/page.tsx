@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AgentTabs } from '@/components/agent-tabs'
+import { PublicNav } from '@/components/public-nav'
+import { PublicFooter } from '@/components/public-footer'
 
 export const metadata = {
   title: 'UBTRIPPIN — Forward your booking emails. Your trip appears.',
@@ -56,30 +58,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-white scroll-smooth">
       {/* ─── Nav ─── */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-white/95 backdrop-blur-sm border-b border-[#cbd5e1]">
-        <div className="flex items-center gap-8">
-          <Image
-            src="/ubtrippin_logo_simple.png"
-            alt="UBTRIPPIN"
-            width={160}
-            height={55}
-            className="h-8 w-auto"
-            priority
-          />
-          <div className="hidden md:flex items-center gap-6 text-sm tracking-wide text-[#1e293b]">
-            <a href="#features" className="hover:text-[#312e81] transition-colors">Features</a>
-            <a href="#pricing" className="hover:text-[#312e81] transition-colors">Pricing</a>
-            <a href="#agents" className="hover:text-[#312e81] transition-colors">For Agents</a>
-            <Link href="/dispatches" className="hover:text-[#312e81] transition-colors">Story</Link>
-          </div>
-        </div>
-        <Link
-          href="/login"
-          className="px-5 py-2 text-sm tracking-widest uppercase bg-[#1e293b] text-white hover:bg-[#312e81] transition-colors font-medium"
-        >
-          Get Started Free
-        </Link>
-      </nav>
+      <PublicNav />
 
       <main>
         {/* ─── Hero ─── */}
@@ -394,22 +373,7 @@ export default async function HomePage() {
       </main>
 
       {/* ─── Footer ─── */}
-      <footer className="border-t border-[#cbd5e1] py-12">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-5 text-xs tracking-widest uppercase text-slate-500">
-            <Link href="/api/v1/docs" className="hover:text-[#1e293b] transition-colors">Docs</Link>
-            <span className="text-[#cbd5e1]">·</span>
-            <Link href="/api/v1/docs" className="hover:text-[#1e293b] transition-colors">API Reference</Link>
-            <span className="text-[#cbd5e1]">·</span>
-            <a href="https://github.com/fistfulayen/ubtrippin" target="_blank" rel="noopener noreferrer" className="hover:text-[#1e293b] transition-colors">GitHub</a>
-            <span className="text-[#cbd5e1]">·</span>
-            <Link href="/privacy" className="hover:text-[#1e293b] transition-colors">Privacy</Link>
-            <span className="text-[#cbd5e1]">·</span>
-            <Link href="/terms" className="hover:text-[#1e293b] transition-colors">Terms</Link>
-          </div>
-          <p className="text-xs text-slate-400 font-mono">Made by humans and agents</p>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   )
 }

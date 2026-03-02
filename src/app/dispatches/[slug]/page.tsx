@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { getAllDispatches, getDispatchBySlug, markdownToHtml } from '@/lib/dispatches'
 import { formatDispatchDate } from '@/lib/format-date'
 import { dispatchProseClasses } from '@/lib/dispatch-styles'
+import { PublicNav } from '@/components/public-nav'
+import { PublicFooter } from '@/components/public-footer'
 
 interface DispatchPageProps {
   params: Promise<{ slug: string }>
@@ -42,18 +44,7 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
 
   return (
     <>
-      <nav className="border-b border-slate-200 bg-white px-6 sm:px-8">
-        <div className="mx-auto flex max-w-[65ch] items-center justify-between py-4">
-          <Link href="/" className="text-lg font-semibold tracking-tight text-slate-900 hover:text-[#312e81] transition-colors">
-            UBTRIPPIN
-          </Link>
-          <div className="flex items-center gap-6 text-sm text-slate-600">
-            <Link href="/" className="hover:text-[#312e81] transition-colors">Home</Link>
-            <Link href="/dispatches" className="font-medium text-[#312e81]">Story</Link>
-            <Link href="/login" className="hover:text-[#312e81] transition-colors">Log in</Link>
-          </div>
-        </div>
-      </nav>
+      <PublicNav />
       <main className="min-h-screen bg-white px-6 py-16 sm:px-8">
         <article className="mx-auto w-full max-w-[65ch]">
           <Link
@@ -79,16 +70,7 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
           />
         </article>
       </main>
-      <footer className="border-t border-slate-200 bg-white px-6 sm:px-8">
-        <div className="mx-auto flex max-w-[65ch] items-center justify-between py-6 text-sm text-slate-500">
-          <span>© {new Date().getFullYear()} UBTRIPPIN</span>
-          <div className="flex gap-6">
-            <Link href="/privacy" className="hover:text-slate-700 transition-colors">Privacy</Link>
-            <Link href="/terms" className="hover:text-slate-700 transition-colors">Terms</Link>
-            <Link href="/dispatches/feed.xml" className="hover:text-slate-700 transition-colors">RSS</Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </>
   )
 }
