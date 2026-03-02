@@ -70,6 +70,7 @@ export default async function HomePage() {
             <a href="#features" className="hover:text-[#312e81] transition-colors">Features</a>
             <a href="#pricing" className="hover:text-[#312e81] transition-colors">Pricing</a>
             <a href="#agents" className="hover:text-[#312e81] transition-colors">For Agents</a>
+            <Link href="/dispatches" className="hover:text-[#312e81] transition-colors">Story</Link>
           </div>
         </div>
         <Link
