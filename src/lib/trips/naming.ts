@@ -26,6 +26,16 @@ export async function generateTripName(
 ): Promise<string> {
   if (items.length === 0) return existingTitle || 'Untitled Trip'
 
+  // If all items are tickets, use the event name directly — no AI needed
+  const allTickets = items.every((item) => item.kind === 'ticket')
+  if (allTickets && items.length > 0) {
+    const details = (items[0] as Record<string, unknown>).details_json as Record<string, unknown> | undefined
+    const eventName = details?.event_name as string | undefined
+    if (eventName) return eventName
+    // Fall back to summary which often contains the event name
+    if (items[0].summary) return items[0].summary
+  }
+
   // Build context from items
   const itemSummaries = items.map((item) => {
     const parts: string[] = []

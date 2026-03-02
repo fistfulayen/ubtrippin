@@ -427,24 +427,35 @@ export async function POST(request: NextRequest) {
 
             // Fetch and set cover image for the new trip
             const location = primaryLocation || item.end_location || item.start_location
-            console.log('Fetching cover image for location:', location)
-            if (location) {
-              // Clean location for better Unsplash results - remove airport codes
-              const cleanLocation = location
-                .replace(/\s*\([A-Z]{3}\)\s*/g, ' ') // Remove (SFO) style codes
-                .replace(/^[A-Z]{3}\s*[-–]\s*/, '') // Remove "SFO - " prefix
-                .trim()
+            // Determine cover image search query
+            // For event/ticket-driven trips, search for the event, not the city
+            const allTickets = extractionResult.items.every((i) => i.kind === 'ticket')
+            let coverSearchQuery: string | null = null
 
-              console.log('Cleaned location:', cleanLocation)
-              if (cleanLocation) {
-                const coverImageUrl = await getDestinationImageUrl(cleanLocation, smartTitle)
-                console.log('Cover image URL:', coverImageUrl)
-                if (coverImageUrl) {
-                  await supabase
-                    .from('trips')
-                    .update({ cover_image_url: coverImageUrl })
-                    .eq('id', newTrip.id)
-                }
+            if (allTickets && extractionResult.items.length > 0) {
+              const ticketDetails = extractionResult.items[0].details as Record<string, unknown> | undefined
+              const performer = ticketDetails?.performer as string | undefined
+              const eventName = ticketDetails?.event_name as string | undefined
+              // Search for performer/event — much better image than a city
+              coverSearchQuery = performer || eventName || smartTitle
+              console.log('Ticket-driven trip, searching for event image:', coverSearchQuery)
+            } else if (location) {
+              // Regular trip — search by location
+              coverSearchQuery = location
+                .replace(/\s*\([A-Z]{3}\)\s*/g, ' ')
+                .replace(/^[A-Z]{3}\s*[-–]\s*/, '')
+                .trim()
+              console.log('Fetching cover image for location:', coverSearchQuery)
+            }
+
+            if (coverSearchQuery) {
+              const coverImageUrl = await getDestinationImageUrl(coverSearchQuery, smartTitle)
+              console.log('Cover image URL:', coverImageUrl)
+              if (coverImageUrl) {
+                await supabase
+                  .from('trips')
+                  .update({ cover_image_url: coverImageUrl })
+                  .eq('id', newTrip.id)
               }
             }
 
