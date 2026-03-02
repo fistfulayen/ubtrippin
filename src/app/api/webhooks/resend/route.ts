@@ -698,22 +698,30 @@ async function findMatchingFamilyTrip(
     const token = normalizeLocationForMatch(normalizedCity || rawLocation)
     if (token) destinationTokens.add(token)
   }
-  if (destinationTokens.size === 0) return null
 
-  let best: { trip: TripCandidate; shared: number; startDistance: number } | null = null
+  let best: { trip: TripCandidate; score: number; startDistance: number } | null = null
 
   for (const trip of familyTrips) {
     if (!rangesOverlapWithTolerance(emailStartDate, emailEndDate, trip.start_date, trip.end_date)) {
       continue
     }
 
-    const tripLocationToken = normalizeLocationForMatch(trip.primary_location)
-    if (!tripLocationToken || !destinationTokens.has(tripLocationToken)) {
-      continue
-    }
-
     const sharedTravelers = countSharedTravelers(emailTravelers, trip.travelers || [])
     if (sharedTravelers <= 0) continue
+
+    // Location match is a bonus signal, not a hard requirement.
+    // A hotel in rural Japan should still match a "Tokyo" trip if dates
+    // overlap and travelers match — same logic as own-trip assignment.
+    let locationBonus = 0
+    if (destinationTokens.size > 0) {
+      const tripLocationToken = normalizeLocationForMatch(trip.primary_location)
+      if (tripLocationToken && destinationTokens.has(tripLocationToken)) {
+        locationBonus = 1
+      }
+    }
+
+    // Score: shared travelers + location bonus (location breaks ties)
+    const score = sharedTravelers + locationBonus
 
     const startDistance =
       emailStartDate && trip.start_date
@@ -722,12 +730,12 @@ async function findMatchingFamilyTrip(
 
     if (
       !best ||
-      sharedTravelers > best.shared ||
-      (sharedTravelers === best.shared && startDistance < best.startDistance)
+      score > best.score ||
+      (score === best.score && startDistance < best.startDistance)
     ) {
       best = {
         trip,
-        shared: sharedTravelers,
+        score,
         startDistance,
       }
     }
