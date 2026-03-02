@@ -53,6 +53,9 @@ _curl() {
 
 # v1 API calls — requires UBT_API_KEY
 _require_api_key() {
+  if [ -z "$UBT_API_KEY" ] && [ -f "$HOME/.ubt/config" ]; then
+    UBT_API_KEY=$(grep "^UBT_API_KEY=" "$HOME/.ubt/config" | cut -d= -f2-)
+  fi
   if [ -z "$UBT_API_KEY" ]; then
     echo "Error: UBT_API_KEY is required for this command." >&2
     echo "Get yours at ubtrippin.xyz/settings and set UBT_API_KEY in ~/.ubt/config" >&2
@@ -80,8 +83,106 @@ _api_with_status() {
   rm -f "${body_file}"
 }
 
+_python3c() {
+  local code="${1:?Python code required}"
+  shift
+  python3 -c "
+import sys
+code = sys.argv[1]
+args = sys.argv[2:]
+sys.argv = ['-c', *args]
+try:
+    exec(code, {'__name__': '__main__'})
+except Exception as e:
+    print(f'Error: {e}', file=sys.stderr)
+    sys.exit(1)
+" "$code" "$@"
+}
+
 _urlencode() {
-  printf "%s" "$1" | python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read(), safe=str()))"
+  printf "%s" "$1" | _python3c "import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read(), safe=str()))"
+}
+
+_is_uuid() {
+  local value="${1:-}"
+  [[ "$value" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]
+}
+
+_resolve_id() {
+  local table="${1:?table required}"
+  local id_prefix="${2:?id required}"
+  local type_name="${3:-id}"
+
+  if _is_uuid "$id_prefix"; then
+    echo "$id_prefix"
+    return 0
+  fi
+
+  if [ "${#id_prefix}" -lt 4 ]; then
+    echo "Error: ${type_name} prefix must be at least 4 characters." >&2
+    exit 1
+  fi
+
+  local response ids count
+  response=$(_curl "${API}/${table}?id=like.$(_urlencode "${id_prefix}")*&select=id")
+  ids=$(echo "$response" | _python3c "
+import json, sys
+rows = json.load(sys.stdin)
+if isinstance(rows, dict):
+    print('')
+    sys.exit(0)
+for row in rows:
+    if row.get('id'):
+        print(row['id'])
+")
+  count=$(echo "$ids" | awk 'NF {c++} END {print c+0}')
+
+  if [ "$count" -eq 1 ]; then
+    echo "$ids" | awk 'NF {print; exit}'
+    return 0
+  fi
+
+  if [ "$count" -eq 0 ]; then
+    echo "Error: No ${type_name} found matching '${id_prefix}'" >&2
+    exit 1
+  fi
+
+  echo "Error: Ambiguous prefix '${id_prefix}' — matches ${count} ${type_name}s. Use a longer prefix." >&2
+  exit 1
+}
+
+_resolve_trip_id() {
+  _resolve_id "trips" "$1" "trip"
+}
+
+_resolve_item_id() {
+  _resolve_id "trip_items" "$1" "item"
+}
+
+_resolve_guide_id() {
+  _resolve_id "city_guides" "$1" "guide"
+}
+
+_parse_quiet_flag() {
+  UBT_QUIET=false
+  if [ "${1:-}" = "--quiet" ]; then
+    UBT_QUIET=true
+    shift
+  fi
+  UBT_ARGS=("$@")
+}
+
+_mutation_output() {
+  local action="${1:?action required}"
+  local uuid="${2:-}"
+  if [ -z "$uuid" ]; then
+    return 0
+  fi
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    echo "$uuid"
+  else
+    echo "${action}: ${uuid}"
+  fi
 }
 
 _confirm_delete() {
@@ -103,7 +204,7 @@ _json() {
 }
 
 _format_trips() {
-  python3 -c "
+  _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if not data:
@@ -116,12 +217,12 @@ for t in data:
         if t.get('end_date') and t['end_date'] != t['start_date']:
             dates += ' → ' + t['end_date']
     loc = t.get('primary_location') or ''
-    print(f\"  {t['id'][:8]}  {t.get('title','(unnamed)'):<30} {dates:<25} {loc}\")
+    print(f\"  {t['id']}  {t.get('title','(unnamed)'):<30} {dates:<25} {loc}\")
 "
 }
 
 _format_items() {
-  python3 -c "
+  _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if not data:
@@ -148,7 +249,7 @@ for item in data:
     if end_loc and end_loc != start_loc:
         loc_str += ' → ' + end_loc
     
-    print(f\"  {item['id'][:8]}  {kind:<10} {provider:<20} {date}  {time_str:<15} {loc_str}\")
+    print(f\"  {item['id']}  {kind:<10} {provider:<20} {date}  {time_str:<15} {loc_str}\")
     if summary:
         print(f\"           {summary}\")
 "
@@ -172,8 +273,47 @@ cmd_trips_list() {
   fi
 }
 
+cmd_trips_search() {
+  local query_text="${1:?Usage: ubt trips search <query>}"
+  local result
+  result=$(_curl "${API}/trips?select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=200")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _python3c "
+import json, sys
+q = sys.argv[1].lower()
+rows = json.load(sys.stdin)
+matches = []
+for row in rows:
+    title = (row.get('title') or '').lower()
+    location = (row.get('primary_location') or '').lower()
+    if q in title or q in location:
+        matches.append(row)
+print(json.dumps(matches))
+" "$query_text" | _json
+    return
+  fi
+
+  local filtered
+  filtered=$(echo "$result" | _python3c "
+import json, sys
+q = sys.argv[1].lower()
+rows = json.load(sys.stdin)
+matches = []
+for row in rows:
+    title = (row.get('title') or '').lower()
+    location = (row.get('primary_location') or '').lower()
+    if q in title or q in location:
+        matches.append(row)
+print(json.dumps(matches))
+" "$query_text")
+  echo "Trips:"
+  echo "$filtered" | _format_trips
+}
+
 cmd_trips_show() {
   local trip_id="$1"
+  trip_id=$(_resolve_trip_id "$trip_id")
   local trip_id_enc
   trip_id_enc=$(_urlencode "$trip_id")
   
@@ -181,7 +321,7 @@ cmd_trips_show() {
   local trip=$(_curl "${API}/trips?id=eq.${trip_id_enc}&select=*")
   
   # Also try partial match
-  if [ "$(echo "$trip" | python3 -c 'import json,sys;print(len(json.load(sys.stdin)))' 2>/dev/null)" = "0" ]; then
+  if [ "$(echo "$trip" | _python3c 'import json,sys;print(len(json.load(sys.stdin)))' 2>/dev/null)" = "0" ]; then
     trip=$(_curl "${API}/trips?id=like.${trip_id_enc}*&select=*")
   fi
   
@@ -189,7 +329,7 @@ cmd_trips_show() {
   local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id_enc}&select=*&order=start_date,start_ts")
   
   if [ "${FORMAT:-pretty}" = "json" ]; then
-    python3 -c "
+    _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 trip = payload.get('trip', [])
@@ -199,7 +339,7 @@ print(json.dumps({'trip': trip[0] if trip else None, 'items': items}, indent=2))
 {"trip": ${trip}, "items": ${items}}
 EOF
   else
-    echo "$trip" | python3 -c "
+    echo "$trip" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if not data:
@@ -222,6 +362,7 @@ print()
 
 cmd_items_list() {
   local trip_id="$1"
+  trip_id=$(_resolve_trip_id "$trip_id")
   local trip_id_enc
   trip_id_enc=$(_urlencode "$trip_id")
   local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id_enc}&select=*&order=start_date,start_ts")
@@ -235,8 +376,21 @@ cmd_items_list() {
 
 cmd_tables() {
   # List all tables via RPC or information_schema
-  _curl "${API}/rpc/get_tables" -X POST -d '{}' 2>/dev/null | _json || \
-  echo "Use 'supabase db' commands for schema inspection."
+  local result
+  result=$(_curl "${API}/rpc/get_tables" -X POST -d '{}' 2>/dev/null || true)
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    if [ -n "$result" ]; then
+      echo "$result" | _json
+    else
+      echo "[]"
+    fi
+    return
+  fi
+  if [ -n "$result" ]; then
+    echo "$result" | _json
+  else
+    echo "Use 'supabase db' commands for schema inspection."
+  fi
 }
 
 cmd_health() {
@@ -249,7 +403,13 @@ cmd_health() {
 }
 
 cmd_users() {
-  _curl "${API}/profiles?select=id,email,full_name,created_at&order=created_at" | python3 -c "
+  local result
+  result=$(_curl "${API}/profiles?select=id,email,full_name,created_at&order=created_at")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if isinstance(data, dict) and 'message' in data:
@@ -264,27 +424,57 @@ for u in data:
 }
 
 cmd_trips_merge() {
-  local target_id="${1:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
-  local source_id="${2:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local target_id="${1:?Usage: ubt trips merge [--quiet] <target_trip_id> <source_trip_id>}"
+  local source_id="${2:?Usage: ubt trips merge [--quiet] <target_trip_id> <source_trip_id>}"
+  target_id=$(_resolve_trip_id "$target_id")
+  source_id=$(_resolve_trip_id "$source_id")
   local target_id_enc
   target_id_enc=$(_urlencode "$target_id")
-  echo "Merging source trip ${source_id:0:8} → target ${target_id:0:8}..."
-  _api -X POST "${API_V1}/trips/${target_id_enc}/merge" \
-    -d "{\"source_trip_id\": \"${source_id}\"}" | _json
+  local result
+  result=$(_api -X POST "${API_V1}/trips/${target_id_enc}/merge" \
+    -d "{\"source_trip_id\": \"${source_id}\"}")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  local updated_id
+  updated_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id') or sys.argv[1])" "$target_id")
+  _mutation_output "Updated" "$updated_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 }
 
 cmd_items_move() {
-  local item_id="${1:?Usage: ubt items move <item_id> <target_trip_id>}"
-  local trip_id="${2:?Usage: ubt items move <item_id> <target_trip_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local item_id="${1:?Usage: ubt items move [--quiet] <item_id> <target_trip_id>}"
+  local trip_id="${2:?Usage: ubt items move [--quiet] <item_id> <target_trip_id>}"
+  item_id=$(_resolve_item_id "$item_id")
+  trip_id=$(_resolve_trip_id "$trip_id")
   local item_id_enc
   item_id_enc=$(_urlencode "$item_id")
-  echo "Moving item ${item_id:0:8} → trip ${trip_id:0:8}..."
-  _api -X PATCH "${API_V1}/items/${item_id_enc}" \
-    -d "{\"trip_id\": \"${trip_id}\"}" | _json
+  local result
+  result=$(_api -X PATCH "${API_V1}/items/${item_id_enc}" \
+    -d "{\"trip_id\": \"${trip_id}\"}")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  local updated_id
+  updated_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id') or sys.argv[1])" "$item_id")
+  _mutation_output "Updated" "$updated_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 }
 
 cmd_trips_create() {
-  local title="${1:?Usage: ubt trips create <title> [--start YYYY-MM-DD] [--end YYYY-MM-DD]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local title="${1:?Usage: ubt trips create [--quiet] <title> [--start YYYY-MM-DD] [--end YYYY-MM-DD]}"
   shift
 
   local start_date=""
@@ -316,7 +506,7 @@ cmd_trips_create() {
   done
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 title, start_date, end_date = sys.argv[1:]
 payload = {'title': title}
@@ -334,8 +524,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local created_id
+  created_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Created" "$created_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -354,7 +550,10 @@ if dates:
 }
 
 cmd_trips_update() {
-  local trip_id="${1:?Usage: ubt trips update <trip_id> [--title X] [--notes X] [--start X] [--end X]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt trips update [--quiet] <trip_id> [--title X] [--notes X] [--start X] [--end X]}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   shift
 
   local title=""
@@ -402,7 +601,7 @@ cmd_trips_update() {
   fi
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 title, notes, start_date, end_date, has_title, has_notes, has_start, has_end = sys.argv[1:]
 payload = {}
@@ -424,8 +623,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local updated_id
+  updated_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Updated" "$updated_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -439,7 +644,10 @@ print(f\"  title: {t.get('title')}\")
 }
 
 cmd_trips_rename() {
-  local trip_id="${1:?Usage: ubt trips rename <trip_id> <new_title>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt trips rename [--quiet] <trip_id> <new_title>}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   shift
   local new_title="$*"
   if [ -z "$new_title" ]; then
@@ -448,7 +656,7 @@ cmd_trips_rename() {
   fi
 
   local body
-  body=$(python3 -c "import json,sys; print(json.dumps({'title': sys.argv[1]}))" "$new_title")
+  body=$(_python3c "import json,sys; print(json.dumps({'title': sys.argv[1]}))" "$new_title")
 
   local result
   result=$(_api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/rename" -d "$body")
@@ -457,8 +665,12 @@ cmd_trips_rename() {
     echo "$result" | _json
     return
   fi
+  _mutation_output "Updated" "$trip_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -472,7 +684,10 @@ print(f\"  renamed: {d.get('renamed')}\")
 }
 
 cmd_trips_delete() {
-  local trip_id="${1:?Usage: ubt trips delete <trip_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt trips delete [--quiet] <trip_id>}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   if ! _confirm_delete "trip ${trip_id}"; then
     echo "Canceled."
     return
@@ -491,7 +706,7 @@ cmd_trips_delete() {
         echo "{}"
       fi
     else
-      echo "Deleted trip ${trip_id:0:8}."
+      _mutation_output "Deleted" "$trip_id"
     fi
     return
   fi
@@ -504,7 +719,7 @@ cmd_trips_delete() {
     fi
   else
     if [ -n "$body" ]; then
-      echo "$body" | python3 -c "
+      echo "$body" | _python3c "
 import json, sys
 try:
     payload = json.load(sys.stdin)
@@ -525,6 +740,7 @@ else:
 
 cmd_trips_status() {
   local trip_id="${1:?Usage: ubt trips status <trip_id>}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   local result
   result=$(_api "${API_V1}/trips/$(_urlencode "${trip_id}")/status")
 
@@ -533,7 +749,7 @@ cmd_trips_status() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -559,6 +775,7 @@ for r in rows:
 
 cmd_items_show() {
   local item_id="${1:?Usage: ubt items show <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
   local result
   result=$(_api "${API_V1}/items/$(_urlencode "${item_id}")")
 
@@ -567,7 +784,7 @@ cmd_items_show() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -587,7 +804,10 @@ if i.get('start_location') or i.get('end_location'):
 }
 
 cmd_items_add() {
-  local trip_id="${1:?Usage: ubt items add <trip_id> --kind <kind> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-location X] [--end-location X] [--details-json '{...}']}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt items add [--quiet] <trip_id> --kind <kind> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-date Y-M-D] [--end-date Y-M-D] [--start-location X] [--end-location X] [--details-json '{...}']}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   shift
 
   local kind=""
@@ -595,6 +815,8 @@ cmd_items_add() {
   local provider=""
   local start_ts=""
   local end_ts=""
+  local start_date=""
+  local end_date=""
   local start_location=""
   local end_location=""
   local details_json=""
@@ -619,6 +841,14 @@ cmd_items_add() {
         ;;
       --end-ts)
         end_ts="${2:-}"
+        shift 2
+        ;;
+      --start-date)
+        start_date="${2:-}"
+        shift 2
+        ;;
+      --end-date)
+        end_date="${2:-}"
         shift 2
         ;;
       --start-location)
@@ -646,8 +876,23 @@ cmd_items_add() {
     exit 1
   fi
 
+  if [ -n "$start_date" ] && [ -z "$start_ts" ]; then
+    if [ "${kind,,}" = "hotel" ]; then
+      start_ts="${start_date}T15:00:00Z"
+    else
+      start_ts="${start_date}T00:00:00Z"
+    fi
+  fi
+  if [ -n "$end_date" ] && [ -z "$end_ts" ]; then
+    if [ "${kind,,}" = "hotel" ]; then
+      end_ts="${end_date}T11:00:00Z"
+    else
+      end_ts="${end_date}T00:00:00Z"
+    fi
+  fi
+
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 kind, summary, provider, start_ts, end_ts, start_location, end_location, details_json = sys.argv[1:]
 payload = {'kind': kind, 'summary': summary}
@@ -684,8 +929,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local created_id
+  created_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Created" "$created_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -701,7 +952,10 @@ print(f\"  summary: {i.get('summary')}\")
 }
 
 cmd_items_update() {
-  local item_id="${1:?Usage: ubt items update <item_id> [--summary X] [--start-location X] [--end-location X] [--status X]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local item_id="${1:?Usage: ubt items update [--quiet] <item_id> [--summary X] [--start-location X] [--end-location X] [--status X]}"
+  item_id=$(_resolve_item_id "$item_id")
   shift
 
   local summary=""
@@ -749,7 +1003,7 @@ cmd_items_update() {
   fi
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 summary, start_location, end_location, status, has_summary, has_start_location, has_end_location, has_status = sys.argv[1:]
 payload = {}
@@ -771,8 +1025,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local updated_id
+  updated_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Updated" "$updated_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -787,7 +1047,10 @@ print(f\"  status:  {i.get('status') or '-'}\")
 }
 
 cmd_items_delete() {
-  local item_id="${1:?Usage: ubt items delete <item_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local item_id="${1:?Usage: ubt items delete [--quiet] <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
   if ! _confirm_delete "item ${item_id}"; then
     echo "Canceled."
     return
@@ -806,7 +1069,7 @@ cmd_items_delete() {
         echo "{}"
       fi
     else
-      echo "Deleted item ${item_id:0:8}."
+      _mutation_output "Deleted" "$item_id"
     fi
     return
   fi
@@ -819,7 +1082,7 @@ cmd_items_delete() {
     fi
   else
     if [ -n "$body" ]; then
-      echo "$body" | python3 -c "
+      echo "$body" | _python3c "
 import json, sys
 try:
     payload = json.load(sys.stdin)
@@ -840,6 +1103,7 @@ else:
 
 cmd_items_status() {
   local item_id="${1:?Usage: ubt items status <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
   local result
   result=$(_api "${API_V1}/items/$(_urlencode "${item_id}")/status")
 
@@ -848,7 +1112,7 @@ cmd_items_status() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -871,6 +1135,7 @@ if last_checked:
 
 cmd_items_refresh() {
   local item_id="${1:?Usage: ubt items refresh <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
   local result
   result=$(_api -X POST "${API_V1}/items/$(_urlencode "${item_id}")/status/refresh")
 
@@ -879,7 +1144,7 @@ cmd_items_refresh() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -909,7 +1174,7 @@ cmd_guides_list() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -929,7 +1194,9 @@ for g in guides:
 }
 
 cmd_guides_create() {
-  local city="${1:?Usage: ubt guides create <city> [--country X] [--country-code XX]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local city="${1:?Usage: ubt guides create [--quiet] <city> [--country X] [--country-code XX]}"
   shift
 
   local country=""
@@ -953,7 +1220,7 @@ cmd_guides_create() {
   done
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 city, country, code = sys.argv[1:]
 payload = {'city': city}
@@ -971,8 +1238,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local created_id
+  created_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Created" "$created_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -991,6 +1264,7 @@ print(f\"  city: {place}\")
 
 cmd_guides_show() {
   local guide_id="${1:?Usage: ubt guides show <guide_id>}"
+  guide_id=$(_resolve_guide_id "$guide_id")
   local result
   result=$(_api "${API_V1}/guides/$(_urlencode "${guide_id}")")
 
@@ -999,7 +1273,7 @@ cmd_guides_show() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1027,7 +1301,10 @@ for e in entries:
 }
 
 cmd_guides_delete() {
-  local guide_id="${1:?Usage: ubt guides delete <guide_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local guide_id="${1:?Usage: ubt guides delete [--quiet] <guide_id>}"
+  guide_id=$(_resolve_guide_id "$guide_id")
   if ! _confirm_delete "guide ${guide_id}"; then
     echo "Canceled."
     return
@@ -1046,7 +1323,7 @@ cmd_guides_delete() {
         echo "{}"
       fi
     else
-      echo "Deleted guide ${guide_id:0:8}."
+      _mutation_output "Deleted" "$guide_id"
     fi
     return
   fi
@@ -1059,7 +1336,7 @@ cmd_guides_delete() {
     fi
   else
     if [ -n "$body" ]; then
-      echo "$body" | python3 -c "
+      echo "$body" | _python3c "
 import json, sys
 try:
     payload = json.load(sys.stdin)
@@ -1079,7 +1356,10 @@ else:
 }
 
 cmd_guides_entry_add() {
-  local guide_id="${1:?Usage: ubt guides entry add <guide_id> --name <name> --category <cat> [--description X] [--url X] [--tags tag1,tag2] [--status visited|to_try]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local guide_id="${1:?Usage: ubt guides entry add [--quiet] <guide_id> --name <name> --category <cat> [--description X] [--url X] [--tags tag1,tag2] [--status visited|to_try]}"
+  guide_id=$(_resolve_guide_id "$guide_id")
   shift
 
   local name=""
@@ -1133,7 +1413,7 @@ cmd_guides_entry_add() {
   fi
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 name, category, description, website_url, tags_csv, status = sys.argv[1:]
 payload = {'name': name, 'category': category, 'status': status}
@@ -1153,8 +1433,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local created_id
+  created_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Created" "$created_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1170,7 +1456,10 @@ print(f\"  status:   {e.get('status')}\")
 }
 
 cmd_guides_entry_update() {
-  local guide_id="${1:?Usage: ubt guides entry update <guide_id> <entry_id> [--name X] [--category X] [--description X]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local guide_id="${1:?Usage: ubt guides entry update [--quiet] <guide_id> <entry_id> [--name X] [--category X] [--description X]}"
+  guide_id=$(_resolve_guide_id "$guide_id")
   local entry_id="${2:?Usage: ubt guides entry update <guide_id> <entry_id> [--name X] [--category X] [--description X]}"
   shift 2
 
@@ -1212,7 +1501,7 @@ cmd_guides_entry_update() {
   fi
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 name, category, description, has_name, has_category, has_description = sys.argv[1:]
 payload = {}
@@ -1232,8 +1521,14 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
+  local updated_id
+  updated_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Updated" "$updated_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1248,7 +1543,10 @@ print(f\"  category: {e.get('category')}\")
 }
 
 cmd_guides_entry_delete() {
-  local guide_id="${1:?Usage: ubt guides entry delete <guide_id> <entry_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local guide_id="${1:?Usage: ubt guides entry delete [--quiet] <guide_id> <entry_id>}"
+  guide_id=$(_resolve_guide_id "$guide_id")
   local entry_id="${2:?Usage: ubt guides entry delete <guide_id> <entry_id>}"
   if ! _confirm_delete "guide entry ${entry_id}"; then
     echo "Canceled."
@@ -1268,7 +1566,7 @@ cmd_guides_entry_delete() {
         echo "{}"
       fi
     else
-      echo "Deleted guide entry ${entry_id:0:8}."
+      _mutation_output "Deleted" "$entry_id"
     fi
     return
   fi
@@ -1281,7 +1579,7 @@ cmd_guides_entry_delete() {
     fi
   else
     if [ -n "$body" ]; then
-      echo "$body" | python3 -c "
+      echo "$body" | _python3c "
 import json, sys
 try:
     payload = json.load(sys.stdin)
@@ -1346,7 +1644,7 @@ cmd_guides_nearby() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1399,7 +1697,7 @@ cmd_trains_status() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if isinstance(payload, dict) and 'error' in payload:
@@ -1426,7 +1724,7 @@ cmd_billing_show() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1457,7 +1755,7 @@ cmd_billing_portal() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1481,7 +1779,7 @@ cmd_activation_status() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1499,7 +1797,13 @@ print(f\"  nudge_3_sent_at: {payload.get('nudge_3_sent_at')}\")
 }
 
 cmd_calendar_get() {
-  _api "${API_V1}/calendar/token" | python3 -c "
+  local result
+  result=$(_api "${API_V1}/calendar/token")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 d = data.get('data', {})
@@ -1515,8 +1819,14 @@ print('Token: ' + d.get('token', 'N/A')[:8] + '...')
 }
 
 cmd_calendar_regen() {
+  local result
+  result=$(_api -X POST "${API_V1}/calendar/token")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
   echo "Regenerating calendar token (this will invalidate the old URL)..."
-  _api -X POST "${API_V1}/calendar/token" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 d = data.get('data', {})
@@ -1526,7 +1836,13 @@ print(f\"  {d.get('feed_url', 'N/A')}\")
 }
 
 cmd_senders_list() {
-  _api "${API_V1}/settings/senders" | python3 -c "
+  local result
+  result=$(_api "${API_V1}/settings/senders")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 senders = data.get('data', [])
@@ -1551,7 +1867,13 @@ cmd_senders_add() {
   else
     body="{\"email\": \"${email}\"}"
   fi
-  _api -X POST "${API_V1}/settings/senders" -d "$body" | python3 -c "
+  local result
+  result=$(_api -X POST "${API_V1}/settings/senders" -d "$body")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -1564,16 +1886,23 @@ print(f'Added: {d.get(\"email\")} (id: {d.get(\"id\", \"\")[:8]}...)')
 
 cmd_senders_remove() {
   local sender_id="${1:?Usage: ubt senders remove <sender_id>}"
-  echo "Removing sender ${sender_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
     -X DELETE "${API_V1}/settings/senders/$(_urlencode "${sender_id}")" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
-  if [ "$status" = "204" ]; then
-    echo "Removed."
+  if [ "$status" = "204" ] || [ "$status" = "200" ]; then
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{}"
+    else
+      echo "Deleted: ${sender_id}"
+    fi
   else
-    echo "Failed (HTTP ${status})"
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{\"error\":{\"message\":\"Request failed (HTTP ${status})\"}}"
+    else
+      echo "Failed (HTTP ${status})"
+    fi
     exit 1
   fi
 }
@@ -1587,7 +1916,7 @@ cmd_webhooks_list() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1640,12 +1969,12 @@ cmd_webhooks_add() {
   done
 
   if [ -z "$secret" ]; then
-    secret=$(python3 -c "import secrets; print(secrets.token_hex(16))")
+    secret=$(_python3c "import secrets; print(secrets.token_hex(16))")
     echo "Generated secret: $secret"
   fi
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 url, events_csv, secret, description = sys.argv[1:]
 payload = {'url': url, 'secret': secret}
@@ -1664,7 +1993,7 @@ print(json.dumps(payload))
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1688,7 +2017,7 @@ cmd_webhooks_show() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1710,16 +2039,23 @@ print(f\"  updated_at:   {w.get('updated_at')}\")
 
 cmd_webhooks_delete() {
   local webhook_id="${1:?Usage: ubt webhooks delete <id>}"
-  echo "Deleting webhook ${webhook_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
     -X DELETE "${API_V1}/webhooks/$(_urlencode "${webhook_id}")" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
-  if [ "$status" = "204" ]; then
-    echo "Deleted."
+  if [ "$status" = "204" ] || [ "$status" = "200" ]; then
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{}"
+    else
+      echo "Deleted: ${webhook_id}"
+    fi
   else
-    echo "Failed (HTTP ${status})"
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{\"error\":{\"message\":\"Request failed (HTTP ${status})\"}}"
+    else
+      echo "Failed (HTTP ${status})"
+    fi
     exit 1
   fi
 }
@@ -1732,7 +2068,7 @@ cmd_webhooks_test() {
     echo "$result" | _json
     return
   fi
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1752,7 +2088,7 @@ cmd_webhooks_deliveries() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -1773,7 +2109,13 @@ for d in deliveries:
 
 cmd_image_search() {
   local query="${1:?Usage: ubt image search <query>}"
-  _api "${API_V1}/images/search?q=$(_urlencode "${query}")" | python3 -c "
+  local result
+  result=$(_api "${API_V1}/images/search?q=$(_urlencode "${query}")")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 images = data.get('data', [])
@@ -1799,7 +2141,14 @@ cmd_rls_check() {
 
 cmd_collab_list() {
   local trip_id="${1:?Usage: ubt collab list <trip_id>}"
-  _api "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators" | python3 -c "
+  trip_id=$(_resolve_trip_id "$trip_id")
+  local result
+  result=$(_api "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -1821,12 +2170,26 @@ for c in collabs:
 }
 
 cmd_collab_invite() {
-  local trip_id="${1:?Usage: ubt collab invite <trip_id> <email> [role]}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt collab invite [--quiet] <trip_id> <email> [role]}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   local email="${2:?Usage: ubt collab invite <trip_id> <email> [role]}"
   local role="${3:-editor}"
-  echo "Inviting ${email} to trip ${trip_id:0:8} as ${role}..."
-  _api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators" \
-    -d "{\"email\": \"${email}\", \"role\": \"${role}\"}" | python3 -c "
+  local result
+  result=$(_api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators" \
+    -d "{\"email\": \"${email}\", \"role\": \"${role}\"}")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  local created_id
+  created_id=$(echo "$result" | _python3c "import json,sys; d=json.load(sys.stdin); print((d.get('data') or {}).get('id',''))")
+  _mutation_output "Created" "$created_id"
+  if [ "${UBT_QUIET:-false}" = "true" ]; then
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -1839,18 +2202,28 @@ print('Invite email sent.')
 }
 
 cmd_collab_remove() {
-  local trip_id="${1:?Usage: ubt collab remove <trip_id> <collaborator_id>}"
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt collab remove [--quiet] <trip_id> <collaborator_id>}"
+  trip_id=$(_resolve_trip_id "$trip_id")
   local collab_id="${2:?Usage: ubt collab remove <trip_id> <collaborator_id>}"
-  echo "Removing collaborator ${collab_id:0:8} from trip ${trip_id:0:8}..."
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
     -X DELETE "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators/$(_urlencode "${collab_id}")" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
   if [ "$status" = "204" ] || [ "$status" = "200" ]; then
-    echo "Removed."
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{}"
+    else
+      _mutation_output "Deleted" "$collab_id"
+    fi
   else
-    echo "Failed (HTTP ${status})"
+    if [ "${FORMAT:-pretty}" = "json" ]; then
+      echo "{\"error\":{\"message\":\"Request failed (HTTP ${status})\"}}"
+    else
+      echo "Failed (HTTP ${status})"
+    fi
     exit 1
   fi
 }
@@ -1861,7 +2234,13 @@ cmd_notifications_list() {
   if [ "$unread_flag" = "--unread" ]; then
     qs="?unread=true"
   fi
-  _api "${API_V1}/notifications${qs}" | python3 -c "
+  local result
+  result=$(_api "${API_V1}/notifications${qs}")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -1888,7 +2267,13 @@ for n in notifications:
 
 cmd_notifications_read() {
   local notification_id="${1:?Usage: ubt notifications read <notification_id>}"
-  _api -X PATCH "${API_V1}/notifications/$(_urlencode "${notification_id}")" -d '{}' | python3 -c "
+  local result
+  result=$(_api -X PATCH "${API_V1}/notifications/$(_urlencode "${notification_id}")" -d '{}')
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -1905,7 +2290,7 @@ cmd_profile_show() {
   loyalty_json=$(_api "${API_V1}/me/loyalty")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
-    python3 -c "
+    _python3c "
 import json, sys
 profile = json.loads(sys.argv[1])
 loyalty = json.loads(sys.argv[2])
@@ -1914,7 +2299,7 @@ print(json.dumps({'profile': profile.get('data'), 'loyalty': loyalty.get('data',
     return
   fi
 
-  python3 -c "
+  _python3c "
 import json, sys
 profile_payload = json.loads(sys.argv[1])
 loyalty_payload = json.loads(sys.argv[2])
@@ -1978,7 +2363,7 @@ cmd_profile_set() {
   esac
 
   local body
-  body=$(python3 -c "import json,sys; print(json.dumps({sys.argv[1]: sys.argv[2]}))" "$api_field" "$value")
+  body=$(_python3c "import json,sys; print(json.dumps({sys.argv[1]: sys.argv[2]}))" "$api_field" "$value")
   local result
   result=$(_api -X PUT "${API_V1}/me/profile" -d "$body")
 
@@ -1987,7 +2372,7 @@ cmd_profile_set() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 data = json.load(sys.stdin)
 if 'error' in data:
@@ -2006,7 +2391,7 @@ cmd_profile_loyalty_list() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 programs = payload.get('data', [])
@@ -2032,7 +2417,7 @@ cmd_profile_loyalty_add() {
   read -r -p "Status tier (optional): " status_tier
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 traveler_name, provider_type, provider_name, provider_key, program_number, status_tier = sys.argv[1:]
 payload = {
@@ -2055,7 +2440,7 @@ print(json.dumps(payload))
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2070,7 +2455,7 @@ cmd_profile_loyalty_edit() {
   local program_id="${1:?Usage: ubt profile loyalty edit <id>}"
   local list_result current
   list_result=$(_api "${API_V1}/me/loyalty")
-  current=$(python3 -c "
+  current=$(_python3c "
 import json, sys
 payload = json.loads(sys.argv[1])
 target = sys.argv[2]
@@ -2086,7 +2471,7 @@ for p in programs:
     exit 1
   fi
 
-  python3 -c "
+  _python3c "
 import json, sys
 p = json.loads(sys.argv[1])
 print('Current values:')
@@ -2107,7 +2492,7 @@ print(f\"  notes: {p.get('notes') or ''}\")
   read -r -p "Notes (blank=keep, '-' to clear): " notes
 
   local body
-  body=$(python3 -c "
+  body=$(_python3c "
 import json, sys
 traveler_name, provider_name, program_number, status_tier, preferred, notes = sys.argv[1:]
 payload = {}
@@ -2141,7 +2526,7 @@ print(json.dumps(payload))
     echo "$result" | _json
     return
   fi
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2184,7 +2569,7 @@ cmd_profile_loyalty_lookup() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2226,7 +2611,7 @@ cmd_family_list() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2250,7 +2635,7 @@ cmd_family_create() {
   fi
 
   local body
-  body=$(python3 -c "import json,sys; print(json.dumps({'name': sys.argv[1]}))" "$name")
+  body=$(_python3c "import json,sys; print(json.dumps({'name': sys.argv[1]}))" "$name")
 
   local result
   result=$(_api -X POST "${API_V1}/families" -d "$body")
@@ -2260,7 +2645,7 @@ cmd_family_create() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2283,7 +2668,7 @@ cmd_family_show() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2315,7 +2700,7 @@ cmd_family_invite() {
   local family_id="${1:?Usage: ubt family invite <family_id> <email>}"
   local email="${2:?Usage: ubt family invite <family_id> <email>}"
   local body
-  body=$(python3 -c "import json,sys; print(json.dumps({'email': sys.argv[1]}))" "$email")
+  body=$(_python3c "import json,sys; print(json.dumps({'email': sys.argv[1]}))" "$email")
 
   local result
   result=$(_api -X POST "${API_V1}/families/$(_urlencode "${family_id}")/members" -d "$body")
@@ -2325,7 +2710,7 @@ cmd_family_invite() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2348,7 +2733,7 @@ cmd_family_remove() {
   family_result=$(_api "${API_V1}/families/$(_urlencode "${family_id}")")
 
   local member_id
-  member_id=$(python3 -c "
+  member_id=$(_python3c "
 import json, sys
 payload = json.load(sys.stdin)
 target = sys.argv[1]
@@ -2395,7 +2780,7 @@ cmd_family_leave() {
   family_json=$(_api "${API_V1}/families/$(_urlencode "${family_id}")")
 
   local member_id
-  member_id=$(python3 -c "
+  member_id=$(_python3c "
 import json, sys
 profile = json.loads(sys.argv[1])
 family = json.loads(sys.argv[2])
@@ -2447,7 +2832,7 @@ cmd_family_loyalty() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2477,7 +2862,7 @@ cmd_family_loyalty_lookup() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2514,7 +2899,7 @@ cmd_family_profiles() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2544,7 +2929,7 @@ cmd_family_trips() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2574,7 +2959,7 @@ cmd_family_guides() {
     return
   fi
 
-  echo "$result" | python3 -c "
+  echo "$result" | _python3c "
 import json, sys
 payload = json.load(sys.stdin)
 if 'error' in payload:
@@ -2600,6 +2985,29 @@ cmd_version() {
   echo "$UBT_VERSION"
 }
 
+cmd_whoami() {
+  local result
+  result=$(_api "${API_V1}/me/profile")
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+  echo "$result" | _python3c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error'].get('message', 'Failed to load profile')}\")
+    sys.exit(1)
+d = payload.get('data') or {}
+name = d.get('full_name') or 'N/A'
+email = d.get('email') or 'N/A'
+tier = d.get('subscription_tier') or d.get('tier') or 'N/A'
+print(f\"name:  {name}\")
+print(f\"email: {email}\")
+print(f\"tier:  {tier}\")
+"
+}
+
 cmd_login() {
   echo -n "Enter your UBT API key (from ubtrippin.xyz/settings): "
   read -r key
@@ -2619,7 +3027,7 @@ cmd_login() {
     exit 1
   fi
   local name
-  name=$(echo "$body" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('full_name','') or d.get('data',{}).get('email','user'))" 2>/dev/null || echo "user")
+  name=$(echo "$body" | _python3c "import json,sys; d=json.load(sys.stdin); print(d.get('data',{}).get('full_name','') or d.get('data',{}).get('email','user'))" 2>/dev/null || echo "user")
   mkdir -p "$HOME/.ubt"
   echo "UBT_API_KEY=${key}" > "$HOME/.ubt/config"
   echo "Logged in as ${name}. Config saved to ~/.ubt/config"
@@ -2662,10 +3070,12 @@ Usage: ubt <command> [args]
 
   version                               Print CLI version
   login                                 Authenticate with your API key
+  whoami                                Show current authenticated user
   selftest                              Test API connectivity
 
 Commands:
   trips list [user_id]                  List all trips (owned + shared)
+  trips search <query>                  Search trips by title/location
   trips show <trip_id>                  Show trip details + items
   trips create <title> [--start Y-M-D] [--end Y-M-D]  Create a trip *
   trips update <trip_id> [--title X] [--notes X] [--start X] [--end X]  Update a trip *
@@ -2675,7 +3085,7 @@ Commands:
   trips merge <target> <source>         Merge source trip into target (deletes source) *
   items list <trip_id>                  List items in a trip
   items show <item_id>                  Show item details *
-  items add <trip_id> --kind <k> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-location X] [--end-location X] [--details-json '{...}']  Add item *
+  items add <trip_id> --kind <k> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-date Y-M-D] [--end-date Y-M-D] [--start-location X] [--end-location X] [--details-json '{...}']  Add item *
   items update <item_id> [--summary X] [--start-location X] [--end-location X] [--status X]  Update item *
   items delete <item_id>                Delete an item *
   items status <item_id>                Show item live status *
@@ -2742,6 +3152,7 @@ Options:
 Examples:
   ubt trips list
   ubt trips show 58bd2048-607c-4afc-a915-2edb6a9f6c54
+  ubt trips search paris
   ubt trips create "Paris Weekend" --start 2026-04-10 --end 2026-04-14
   ubt trips update <trip_id> --notes "Bring passports"
   ubt trips rename <trip_id> "NYC + Boston"
@@ -2787,13 +3198,14 @@ case "${1:-}" in
   trips)
     case "${2:-}" in
       list)  cmd_trips_list "${3:-}" ;;
+      search) cmd_trips_search "${3:?Usage: ubt trips search <query>}" ;;
       show)  cmd_trips_show "${3:?Usage: ubt trips show <trip_id>}" ;;
       create) shift 2; cmd_trips_create "$@" ;;
       update) shift 2; cmd_trips_update "$@" ;;
       rename) cmd_trips_rename "${3:?Usage: ubt trips rename <trip_id> <new_title>}" "${@:4}" ;;
-      delete) cmd_trips_delete "${3:?Usage: ubt trips delete <trip_id>}" ;;
+      delete) shift 2; cmd_trips_delete "$@" ;;
       status) cmd_trips_status "${3:?Usage: ubt trips status <trip_id>}" ;;
-      merge) cmd_trips_merge "${3:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}" "${4:?Usage: ubt trips merge <target_trip_id> <source_trip_id>}" ;;
+      merge) shift 2; cmd_trips_merge "$@" ;;
       *)     usage ;;
     esac
     ;;
@@ -2803,10 +3215,10 @@ case "${1:-}" in
       show) cmd_items_show "${3:?Usage: ubt items show <item_id>}" ;;
       add) shift 2; cmd_items_add "$@" ;;
       update) shift 2; cmd_items_update "$@" ;;
-      delete) cmd_items_delete "${3:?Usage: ubt items delete <item_id>}" ;;
+      delete) shift 2; cmd_items_delete "$@" ;;
       status) cmd_items_status "${3:?Usage: ubt items status <item_id>}" ;;
       refresh) cmd_items_refresh "${3:?Usage: ubt items refresh <item_id>}" ;;
-      move) cmd_items_move "${3:?Usage: ubt items move <item_id> <target_trip_id>}" "${4:?Usage: ubt items move <item_id> <target_trip_id>}" ;;
+      move) shift 2; cmd_items_move "$@" ;;
       *)    usage ;;
     esac
     ;;
@@ -2815,7 +3227,7 @@ case "${1:-}" in
       list) cmd_guides_list ;;
       create) shift 2; cmd_guides_create "$@" ;;
       show) cmd_guides_show "${3:?Usage: ubt guides show <guide_id>}" ;;
-      delete) cmd_guides_delete "${3:?Usage: ubt guides delete <guide_id>}" ;;
+      delete) shift 2; cmd_guides_delete "$@" ;;
       nearby) shift 2; cmd_guides_nearby "$@" ;;
       entry)
         case "${3:-}" in
@@ -2882,8 +3294,8 @@ case "${1:-}" in
   collab)
     case "${2:-}" in
       list)   cmd_collab_list "${3:?Usage: ubt collab list <trip_id>}" ;;
-      invite) cmd_collab_invite "${3:?Usage: ubt collab invite <trip_id> <email> [role]}" "${4:?Usage: ubt collab invite <trip_id> <email> [role]}" "${5:-}" ;;
-      remove) cmd_collab_remove "${3:?Usage: ubt collab remove <trip_id> <collaborator_id>}" "${4:?Usage: ubt collab remove <trip_id> <collaborator_id>}" ;;
+      invite) shift 2; cmd_collab_invite "$@" ;;
+      remove) shift 2; cmd_collab_remove "$@" ;;
       *)      usage ;;
     esac
     ;;
@@ -2940,6 +3352,7 @@ case "${1:-}" in
   rls-check) cmd_rls_check ;;
   version)  cmd_version ;;
   login)    cmd_login ;;
+  whoami)   cmd_whoami ;;
   selftest) cmd_selftest ;;
   -h|--help|help|"") usage ;;
   *) echo "Unknown command: $1"; usage; exit 1 ;;
