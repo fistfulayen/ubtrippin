@@ -12,9 +12,7 @@ export function getStripe(): Stripe {
   return _stripe
 }
 
-/** @deprecated Use getStripe() instead */
-export const stripe = new Proxy({} as Stripe, {
-  get(_target, prop) {
-    return (getStripe() as unknown as Record<string | symbol, unknown>)[prop]
-  },
-})
+/** Lazy-initialized Stripe client. Throws at call time, not import time. */
+export function stripe(): Stripe {
+  return getStripe()
+}

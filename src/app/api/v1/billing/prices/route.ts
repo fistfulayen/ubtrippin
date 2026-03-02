@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
 import { createClient } from '@/lib/supabase/server'
 
@@ -31,9 +31,9 @@ export async function GET() {
   // Fetch live price data from Stripe
   try {
     const [monthly, annual, earlyAdopter] = await Promise.all([
-      stripe.prices.retrieve(monthlyPriceId, { expand: ['product'] }),
-      stripe.prices.retrieve(annualPriceId, { expand: ['product'] }),
-      stripe.prices.retrieve(earlyAdopterPriceId, { expand: ['product'] }),
+      getStripe().prices.retrieve(monthlyPriceId, { expand: ['product'] }),
+      getStripe().prices.retrieve(annualPriceId, { expand: ['product'] }),
+      getStripe().prices.retrieve(earlyAdopterPriceId, { expand: ['product'] }),
     ])
 
     const spotsRemaining = getEarlyAdopterSpotsRemaining(proSubscriberCount)

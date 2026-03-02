@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
-import { stripe } from '@/lib/stripe'
+import { getStripe } from '@/lib/stripe'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 
 interface CheckoutBody {
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
   if (!customerId) {
     let customer
     try {
-      customer = await stripe.customers.create({
+      customer = await getStripe().customers.create({
         email: profile.email ?? undefined,
         name: profile.full_name ?? undefined,
         metadata: {
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
 
   let session
   try {
-    session = await stripe.checkout.sessions.create({
+    session = await getStripe().checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
     client_reference_id: auth.userId,
