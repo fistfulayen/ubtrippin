@@ -62,7 +62,7 @@ export function OnboardingCard() {
 
           <div className="flex justify-center py-2">
             <Image
-              src="/evelope_icon.png"
+              src="/envelope_icon.png"
               alt="Email envelope"
               width={80}
               height={80}
