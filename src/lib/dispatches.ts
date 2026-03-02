@@ -2,6 +2,11 @@ import fs from 'node:fs'
 import { cache } from 'react'
 import path from 'node:path'
 import matter from 'gray-matter'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import rehypeSanitize from 'rehype-sanitize'
+import rehypeStringify from 'rehype-stringify'
+import { unified } from 'unified'
 
 const dispatchesDirectory = path.join(process.cwd(), 'content/dispatches')
 
@@ -52,6 +57,16 @@ export const getAllDispatches = cache((): Dispatch[] => {
 
   return dispatches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 })
+
+export async function markdownToHtml(markdown: string): Promise<string> {
+  const file = await unified()
+    .use(remarkParse)
+    .use(remarkRehype)
+    .use(rehypeSanitize)
+    .use(rehypeStringify)
+    .process(markdown)
+  return String(file)
+}
 
 export function getDispatchBySlug(slug: string): Dispatch | null {
   if (!/^[a-z0-9-]+$/.test(slug)) return null

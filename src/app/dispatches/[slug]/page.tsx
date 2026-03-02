@@ -1,26 +1,11 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import remarkParse from 'remark-parse'
-import remarkRehype from 'remark-rehype'
-import rehypeSanitize from 'rehype-sanitize'
-import rehypeStringify from 'rehype-stringify'
-import { unified } from 'unified'
-import { getAllDispatches, getDispatchBySlug } from '@/lib/dispatches'
+import { getAllDispatches, getDispatchBySlug, markdownToHtml } from '@/lib/dispatches'
 import { formatDispatchDate } from '@/lib/format-date'
 
 interface DispatchPageProps {
   params: Promise<{ slug: string }>
-}
-
-async function markdownToHtml(markdown: string): Promise<string> {
-  const file = await unified()
-    .use(remarkParse)
-    .use(remarkRehype)
-    .use(rehypeSanitize)
-    .use(rehypeStringify)
-    .process(markdown)
-  return String(file)
 }
 
 export async function generateStaticParams() {
