@@ -237,10 +237,13 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                 )}
               </div>
 
-              {/* Provider/Summary */}
+              {/* Title: hotel name for hotels, provider/summary for others */}
               <h4 className="mt-1 font-semibold text-gray-900">
-                {item.provider || item.summary || 'Untitled'}
+                {(item.kind === 'hotel' && details?.hotel_name as string) || item.summary || item.provider || 'Untitled'}
               </h4>
+              {item.kind === 'hotel' && details?.hotel_name && item.provider && (
+                <p className="text-xs text-gray-500">{item.provider}{item.confirmation_code ? ` · ${item.confirmation_code}` : ''}</p>
+              )}
 
               {loyalty && (
                 <div className="mt-1.5">
