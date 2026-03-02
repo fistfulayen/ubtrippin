@@ -94,11 +94,12 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
+  // RLS handles visibility: own programs + family members' programs
   const { data, error } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
-    .eq('user_id', auth.userId)
     .order('preferred', { ascending: false })
+    .order('user_id', { ascending: true })
     .order('created_at', { ascending: true })
 
   if (error) {
