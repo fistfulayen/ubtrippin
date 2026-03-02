@@ -144,6 +144,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
   const [moving, setMoving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [moveTarget, setMoveTarget] = useState<string>('')
+  const [newTripName, setNewTripName] = useState<string>('')
 
   const [logoError, setLogoError] = useState(false)
   const Icon = kindIcons[item.kind] || Calendar
@@ -167,14 +168,43 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
   }
 
   const handleMove = async () => {
-    if (!moveTarget) return
+    if (!moveTarget && moveTarget !== '__new__') return
     setMoving(true)
+
+    let targetTripId = moveTarget
+
+    // Create a new trip if requested
+    if (moveTarget === '__new__') {
+      const title = newTripName.trim() || 'Untitled Trip'
+      const supabaseForCreate = createClient()
+      const { data: { user } } = await supabaseForCreate.auth.getUser()
+      if (!user) {
+        setMoving(false)
+        return
+      }
+      const { data: newTrip, error: createError } = await supabaseForCreate
+        .from('trips')
+        .insert({
+          user_id: user.id,
+          title,
+          start_date: item.start_date ?? null,
+          end_date: item.end_date ?? null,
+        })
+        .select('id')
+        .single()
+      if (createError || !newTrip) {
+        setMoving(false)
+        return
+      }
+      targetTripId = newTrip.id
+    }
+
     const supabase = createClient()
-    await supabase.from('trip_items').update({ trip_id: moveTarget }).eq('id', item.id)
+    await supabase.from('trip_items').update({ trip_id: targetTripId }).eq('id', item.id)
     setMoveOpen(false)
     // Regenerate names on both source and target trips (fire-and-forget)
     fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
-    fetch(`/api/v1/trips/${moveTarget}/rename`, { method: 'POST' }).catch(() => {})
+    fetch(`/api/v1/trips/${targetTripId}/rename`, { method: 'POST' }).catch(() => {})
     router.refresh()
   }
 
@@ -347,18 +377,16 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
 
               {menuOpen && (
                 <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border bg-white py-1 shadow-lg">
-                  {otherTrips.length > 0 && (
-                    <button
-                      onClick={() => {
-                        setMenuOpen(false)
-                        setMoveOpen(true)
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <ArrowRight className="h-4 w-4" />
-                      Move to...
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setMoveOpen(true)
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    Move to...
+                  </button>
                   <button
                     onClick={() => {
                       setMenuOpen(false)
@@ -435,28 +463,38 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
           <DialogHeader>
             <DialogTitle>Move Item</DialogTitle>
             <DialogDescription>
-              Move this item to a different trip.
+              Move this item to a different trip or create a new one.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="space-y-3 py-4">
             <Select
               value={moveTarget}
               onChange={(e) => setMoveTarget(e.target.value)}
             >
               <option value="">Select a trip...</option>
+              <option value="__new__">+ New trip</option>
               {otherTrips.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}
                 </option>
               ))}
             </Select>
+            {moveTarget === '__new__' && (
+              <input
+                type="text"
+                value={newTripName}
+                onChange={(e) => setNewTripName(e.target.value)}
+                placeholder="Trip name (optional — we'll auto-name it)"
+                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[#4f46e5] focus:outline-none focus:ring-1 focus:ring-[#4f46e5]"
+              />
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMoveOpen(false)} disabled={moving}>
               Cancel
             </Button>
             <Button onClick={handleMove} disabled={!moveTarget || moving}>
-              {moving ? 'Moving...' : 'Move Item'}
+              {moving ? 'Moving...' : moveTarget === '__new__' ? 'Create & Move' : 'Move Item'}
             </Button>
           </DialogFooter>
         </DialogContent>
