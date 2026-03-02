@@ -45,6 +45,7 @@ import {
   TrainDetailsView,
   TrainStatusBadge,
   CarDetailsView,
+  TicketDetailsView,
   GenericDetailsView,
 } from './item-details'
 import { ItemStatusBadge } from './item-status-badge'
@@ -96,6 +97,7 @@ const kindIcons: Record<string, typeof Plane> = {
   car: Car,
   restaurant: Utensils,
   activity: Ticket,
+  ticket: Ticket,
   other: Calendar,
 }
 
@@ -106,6 +108,7 @@ const kindLabels: Record<string, string> = {
   car: 'Car Rental',
   restaurant: 'Restaurant',
   activity: 'Activity',
+  ticket: 'Ticket',
   other: 'Other',
 }
 
@@ -215,6 +218,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                   item.kind === 'car' && 'bg-[#f1f5f9] text-[#4f46e5]',
                   item.kind === 'restaurant' && 'bg-red-100 text-red-600',
                   item.kind === 'activity' && 'bg-pink-100 text-pink-600',
+                  item.kind === 'ticket' && 'bg-amber-100 text-amber-600',
                   item.kind === 'other' && 'bg-gray-100 text-gray-600'
                 )}
               >
@@ -237,13 +241,21 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                 )}
               </div>
 
-              {/* Title: hotel name for hotels, provider/summary for others */}
+              {/* Title: hotel name for hotels, event name for tickets, provider/summary for others */}
               <h4 className="mt-1 font-semibold text-gray-900">
                 {(item.kind === 'hotel' && typeof details?.hotel_name === 'string' && details.hotel_name)
+                  || (item.kind === 'ticket' && typeof details?.event_name === 'string' && details.event_name)
                   || item.summary || item.provider || 'Untitled'}
               </h4>
               {item.kind === 'hotel' && typeof details?.hotel_name === 'string' && details.hotel_name && item.provider && (
                 <p className="text-xs text-gray-500">{item.provider}{item.confirmation_code ? ` · ${item.confirmation_code}` : ''}</p>
+              )}
+              {item.kind === 'ticket' && typeof details?.venue === 'string' && details.venue && (
+                <p className="text-xs text-gray-500">
+                  {details.venue as string}
+                  {typeof details?.performer === 'string' && details.performer ? ` · ${details.performer}` : ''}
+                  {item.confirmation_code ? ` · ${item.confirmation_code}` : ''}
+                </p>
               )}
 
               {loyalty && (
@@ -396,7 +408,10 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                   {item.kind === 'car' && (
                     <CarDetailsView details={details as CarRentalDetails} />
                   )}
-                  {!['flight', 'hotel', 'train', 'car'].includes(item.kind) && (
+                  {item.kind === 'ticket' && (
+                    <TicketDetailsView details={details as Record<string, unknown>} />
+                  )}
+                  {!['flight', 'hotel', 'train', 'car', 'ticket'].includes(item.kind) && (
                     <GenericDetailsView details={details} />
                   )}
                 </div>

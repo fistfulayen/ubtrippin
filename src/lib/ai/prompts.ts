@@ -9,15 +9,16 @@ Rules:
 6. For car rentals: extract pickup/dropoff locations and times, rental company, vehicle type
 7. For restaurants: extract reservation time, restaurant name, party size
 8. For activities: extract activity name, date/time, location, provider
-9. Set confidence score 0.0-1.0 based on how clearly the data is presented:
+9. For tickets/events: extract event name, venue name, venue address, date/time, section/seat/row, ticket count, ticket type (GA/Reserved/VIP), performer/show name, door time if different from event time. Common providers: Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, venue direct sales, StubHub, Viagogo.
+10. Set confidence score 0.0-1.0 based on how clearly the data is presented:
    - 1.0: All data clearly visible and unambiguous
    - 0.8-0.9: Most data clear, some minor uncertainties
    - 0.6-0.7: Several fields ambiguous or missing
    - Below 0.6: Significant uncertainty or incomplete data
-10. If data is ambiguous or confidence < 0.65, set needs_review to true
-11. Extract the status: "confirmed", "cancelled", "changed", "pending", or "unknown"
-12. Parse dates in ISO 8601 format (YYYY-MM-DD) and timestamps as ISO 8601 with timezone
-13. If a date in the source omits the year, infer the NEXT occurrence on or after today (never default to a past year). Example when today is 2026-02-28: "March 15" => 2026-03-15, "January 10" => 2027-01-10.
+11. If data is ambiguous or confidence < 0.65, set needs_review to true
+12. Extract the status: "confirmed", "cancelled", "changed", "pending", or "unknown"
+13. Parse dates in ISO 8601 format (YYYY-MM-DD) and timestamps as ISO 8601 with timezone
+14. If a date in the source omits the year, infer the NEXT occurrence on or after today (never default to a past year). Example when today is 2026-02-28: "March 15" => 2026-03-15, "January 10" => 2027-01-10.
 
 Return ONLY valid JSON matching this schema. Do not include any other text or explanation.`
 
@@ -31,7 +32,7 @@ Return JSON in this exact format:
   "overall_confidence": number,
   "items": [
     {
-      "kind": "flight" | "hotel" | "train" | "car" | "restaurant" | "activity" | "other",
+      "kind": "flight" | "hotel" | "train" | "car" | "restaurant" | "activity" | "ticket" | "other",
       "provider": "string - airline, hotel chain, etc.",
       "confirmation_code": "string or null",
       "traveler_names": ["array of traveler names"],
@@ -81,7 +82,22 @@ Return JSON in this exact format:
         "rental_company": "string",
         "pickup_location": "string",
         "dropoff_location": "string",
-        "vehicle_type": "string or null"
+        "vehicle_type": "string or null",
+
+        // For tickets/events:
+        "event_name": "string",
+        "venue": "string",
+        "venue_address": "string or null",
+        "event_time": "HH:MM",
+        "door_time": "HH:MM or null",
+        "section": "string or null",
+        "seat": "string or null",
+        "row": "string or null",
+        "ticket_count": number,
+        "ticket_type": "string or null - GA, Reserved, VIP, etc.",
+        "performer": "string or null",
+        "event_category": "concert | theater | sports | museum | festival | other",
+        "has_pdf_ticket": boolean
       }
     }
   ]

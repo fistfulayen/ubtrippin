@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type TripItemKind = 'flight' | 'hotel' | 'train' | 'car' | 'restaurant' | 'activity' | 'other'
+export type TripItemKind = 'flight' | 'hotel' | 'train' | 'car' | 'restaurant' | 'activity' | 'ticket' | 'other'
 export type TripItemStatus = 'confirmed' | 'cancelled' | 'changed' | 'pending' | 'unknown'
 export type EmailParseStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'unassigned'
 

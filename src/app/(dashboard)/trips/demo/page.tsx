@@ -9,6 +9,7 @@ const KIND_LABELS: Record<string, string> = {
   train: '🚆 Train',
   restaurant: '🍽️ Restaurant',
   activity: '🎯 Activity',
+  ticket: '🎫 Ticket',
   rental_car: '🚗 Rental Car',
   ferry: '⛴️ Ferry',
   bus: '🚌 Bus',

@@ -65,6 +65,7 @@ const kindColors: Record<TripItemKind, string> = {
   car: 'bg-[#f1f5f9] text-[#4f46e5]',
   restaurant: 'bg-rose-100 text-rose-800',
   activity: 'bg-purple-100 text-purple-800',
+  ticket: 'bg-amber-100 text-amber-800',
   other: 'bg-gray-100 text-gray-800',
 }
 

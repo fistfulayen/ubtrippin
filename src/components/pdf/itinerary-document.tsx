@@ -205,6 +205,7 @@ const kindLabels: Record<string, string> = {
   car: 'CAR RENTAL',
   restaurant: 'RESTAURANT',
   activity: 'ACTIVITY',
+  ticket: 'TICKET',
   other: 'OTHER',
 }
 
