@@ -155,6 +155,7 @@ function normalizeExtractionResult(
     'car',
     'restaurant',
     'activity',
+    'ticket',
     'other',
   ]
 
