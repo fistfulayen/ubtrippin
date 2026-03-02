@@ -6,7 +6,7 @@ const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' 'unsafe-eval';
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://images.unsplash.com https://pics.avs.io https://*.supabase.co https://lh3.googleusercontent.com https://www.google.com https://t0.gstatic.com https://t1.gstatic.com https://t2.gstatic.com https://t3.gstatic.com;
+  img-src 'self' blob: data: https:;
   font-src 'self';
   connect-src 'self' https://*.supabase.co https://api.unsplash.com;
   frame-ancestors 'none';
@@ -36,19 +36,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker deployment
-  output: 'standalone',
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'images.unsplash.com' },
-      { protocol: 'https', hostname: 'pics.avs.io' },
-      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
-      { protocol: 'https', hostname: 'cqijgtijuselspyzpphf.supabase.co' },
-      { protocol: 'https', hostname: 'www.google.com' },
-      { protocol: 'https', hostname: 't0.gstatic.com' },
-      { protocol: 'https', hostname: 't1.gstatic.com' },
-      { protocol: 'https', hostname: 't2.gstatic.com' },
-      { protocol: 'https', hostname: 't3.gstatic.com' },
+      // Allow any HTTPS image — cover images come from Brave search (any domain)
+      { protocol: 'https', hostname: '**' },
     ],
   },
   // SECURITY: Apply security headers to all routes
