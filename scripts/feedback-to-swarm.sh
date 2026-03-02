@@ -22,7 +22,7 @@ LAST_CHECKED=$(python3 -c "import json; print(json.load(open('$STATE_FILE'))['la
 
 # Query new feedback since last check via API
 NEW_FEEDBACK=$(curl -s -H "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
-  "${SUPABASE_URL}/rest/v1/feedback?created_at=gt.${LAST_CHECKED}&order=created_at.asc&select=id,title,description,category,status,created_at,user_id" \
+  "${SUPABASE_URL}/rest/v1/feedback?created_at=gt.${LAST_CHECKED}&order=created_at.asc&select=id,title,body,type,status,created_at,user_id" \
   -H "apikey: ${SUPABASE_SECRET_KEY}" \
   -H "Content-Type: application/json" 2>/dev/null || echo "[]")
 
@@ -38,7 +38,7 @@ echo "$NEW_FEEDBACK" | python3 -c "
 import json, sys
 items = json.load(sys.stdin)
 for item in items:
-    print(f\"  [{item['category']}] {item['title']} (id: {item['id'][:8]}...)\")
+    print(f\"  [{item['type']}] {item['title']} (id: {item['id'][:8]}...)\")
 "
 
 # Output for the cron agent to process
