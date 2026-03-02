@@ -34,10 +34,16 @@ function parseDispatchFile(fileName: string): Dispatch {
     throw new Error(`Invalid dispatch frontmatter in ${fileName}`)
   }
 
+  // gray-matter auto-parses YAML dates into Date objects; normalise to string
+  const rawDate = frontmatter.date as unknown
+  const dateStr = rawDate instanceof Date
+    ? rawDate.toISOString().split('T')[0]
+    : String(rawDate)
+
   return {
     slug,
     title: frontmatter.title,
-    date: frontmatter.date,
+    date: dateStr,
     summary: frontmatter.summary,
     author: frontmatter.author,
     content,
