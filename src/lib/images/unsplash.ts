@@ -132,7 +132,7 @@ function buildSearchQuery(cityName: string): string {
  * Uses destination-aware queries for distinctive, aspirational images.
  * Returns null if no image is found or on error.
  */
-export async function getDestinationImageUrl(location: string): Promise<string | null> {
+export async function getDestinationImageUrl(location: string, tripTitle?: string): Promise<string | null> {
   if (!UNSPLASH_ACCESS_KEY) {
     console.warn('UNSPLASH_ACCESS_KEY not configured')
     return null
@@ -171,6 +171,39 @@ export async function getDestinationImageUrl(location: string): Promise<string |
 
     if (data.results.length === 0) {
       console.log('No Unsplash results for:', searchQuery)
+
+      // Fallback: use trip title as search query (AI-generated titles
+      // often contain country/region info, e.g. "Japan Onsen Hot Springs Getaway")
+      if (tripTitle) {
+        const titleQuery = tripTitle
+          .replace(/trip to /i, '')
+          .replace(/\s*-\s*\w{3}\s+\d{4}$/i, '') // Remove " - Apr 2026" suffix
+          .trim()
+        console.log('Trying fallback with trip title:', titleQuery)
+        const fallbackParams = new URLSearchParams({
+          query: `${titleQuery} travel`,
+          orientation: 'landscape',
+          per_page: '5',
+        })
+        const fallbackResponse = await fetch(
+          `https://api.unsplash.com/search/photos?${fallbackParams}`,
+          {
+            headers: {
+              Authorization: `Client-ID ${UNSPLASH_ACCESS_KEY}`,
+            },
+            next: { revalidate: 86400 },
+          }
+        )
+        if (fallbackResponse.ok) {
+          const fallbackData: UnsplashSearchResult = await fallbackResponse.json()
+          if (fallbackData.results.length > 0) {
+            const selected = fallbackData.results[0]
+            console.log('Fallback image from title:', selected.alt_description || selected.description || 'no description')
+            return selected.urls.regular
+          }
+        }
+      }
+      console.log('No Unsplash results for location or title:', cityName, tripTitle)
       return null
     }
 
