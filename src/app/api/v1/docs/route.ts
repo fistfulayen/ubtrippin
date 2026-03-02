@@ -105,7 +105,7 @@ Authorization: Bearer ubt_k1_abc123...
 
 | Field | Type | Notes |
 |-------|------|-------|
-| kind | string | \`flight\`, \`hotel\`, \`car_rental\`, \`train\`, \`activity\`, \`restaurant\`, \`other\` |
+| kind | string | \`flight\`, \`hotel\`, \`car_rental\`, \`train\`, \`activity\`, \`restaurant\`, \`ticket\`, \`other\` |
 | start_date | string | YYYY-MM-DD (required) |
 | end_date | string | YYYY-MM-DD |
 | start_ts | string | ISO 8601 with timezone, e.g. \`2026-04-01T08:30:00+01:00\` |

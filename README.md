@@ -21,7 +21,7 @@ Email arrives (booking confirmation, itinerary, hotel receipt)
     ↓
 AI extraction (Claude Sonnet 4 via Vercel AI Gateway)
     ↓
-Structured trip data (flights, hotels, trains, restaurants, activities)
+Structured trip data (flights, hotels, trains, restaurants, activities, concert/event tickets)
     ↓
 Stored in Supabase (your data, your trips, private by default)
     ↓
@@ -49,7 +49,7 @@ So we built for that. The web UI exists (it's quite nice, actually), but it's th
 
 **Step 2:** Forward any booking confirmation to `trips@ubtrippin.xyz`
 
-That's it. Within a minute, your trip appears in your dashboard — flights, hotels, trains, cars, restaurants, activities, all extracted and organized. Confirmation codes and booking references are stored privately and never exposed via the API or share links.
+That's it. Within a minute, your trip appears in your dashboard — flights, hotels, trains, cars, restaurants, activities, concert and event tickets, all extracted and organized. Confirmation codes and booking references are stored privately and never exposed via the API or share links.
 
 **Step 3 (optional):** Share your trip, export it as a PDF, or sync it to your calendar.
 

@@ -26,7 +26,7 @@ export default async function HomePage() {
     {
       icon: '/airplane_icon.png',
       title: 'All your bookings',
-      body: 'Stop digging through email for that confirmation number. Forward your booking emails and everything appears — flights, hotels, trains, restaurants.',
+      body: 'Stop digging through email for that confirmation number. Forward your booking emails and everything appears — flights, hotels, trains, concerts, events, restaurants.',
     },
     {
       icon: '/family_icon.png',
@@ -70,7 +70,7 @@ export default async function HomePage() {
               </h1>
               <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-xl">
                 We got tired of digging through email for confirmation numbers, so we made this thing.
-                Forward a booking email, and everything gets organized — flights, hotels, trains, restaurants.
+                Forward a booking email, and everything gets organized — flights, hotels, trains, concerts, events, restaurants.
                 Share it with your family. Remember your favorite places. That&apos;s it.
               </p>
               <div className="flex flex-col sm:flex-row items-start gap-4 mb-8">
@@ -353,7 +353,7 @@ export default async function HomePage() {
               },
               {
                 q: 'What emails do you understand?',
-                a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, and more. If we miss one, tell us.',
+                a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, concerts and event tickets (Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, and more). If we miss one, tell us.',
               },
               {
                 q: 'Is this open source?',

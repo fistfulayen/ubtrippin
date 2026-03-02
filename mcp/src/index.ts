@@ -562,7 +562,7 @@ server.registerTool(
     title: 'Add Item to Trip',
     description: `Add a single travel item to a trip. The API is strict — all parsing and field extraction is your responsibility. Required: kind + start_date.
 
-Valid kinds: flight, hotel, car_rental, train, activity, restaurant, other
+Valid kinds: flight, hotel, car_rental, train, activity, restaurant, ticket, other
 
 Example (flight):
   add_item({
@@ -577,10 +577,35 @@ Example (flight):
     end_location: "New York JFK Terminal 4",
     traveler_names: ["Ian Rogers"],
     details_json: { flight_number: "DL 263", cabin_class: "Premium Economy" }
+  })
+
+Example (ticket/event):
+  add_item({
+    trip_id: "...",
+    kind: "ticket",
+    summary: "David Byrne at Théâtre du Châtelet",
+    start_date: "2026-05-15",
+    start_ts: "2026-05-15T20:00:00Z",
+    start_location: "Paris",
+    provider: "Ticketmaster",
+    details_json: {
+      event_name: "David Byrne: American Utopia",
+      venue: "Théâtre du Châtelet",
+      venue_address: "1 Place du Châtelet, 75001 Paris",
+      performer: "David Byrne",
+      event_time: "20:00",
+      door_time: "19:00",
+      section: "Orchestre",
+      seat: "12",
+      row: "G",
+      ticket_count: 2,
+      ticket_type: "Reserved",
+      event_category: "concert"
+    }
   })`,
     inputSchema: {
       trip_id: z.string().uuid().describe('UUID of the trip'),
-      kind: z.enum(['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'other']).describe('Item type (required)'),
+      kind: z.enum(['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'ticket', 'other']).describe('Item type (required)'),
       start_date: z.string().describe('Start date YYYY-MM-DD (required)'),
       end_date: z.string().optional().describe('End date YYYY-MM-DD'),
       provider: z.string().optional().describe('Airline, hotel, car company, etc.'),

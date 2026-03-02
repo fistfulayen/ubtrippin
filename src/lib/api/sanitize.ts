@@ -178,7 +178,7 @@ export function sanitizeTripInput(
 
 // ---------------------------------------------------------------------------
 
-const VALID_ITEM_KINDS = ['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'other'] as const
+const VALID_ITEM_KINDS = ['flight', 'hotel', 'car_rental', 'train', 'activity', 'restaurant', 'ticket', 'other'] as const
 type ItemKind = (typeof VALID_ITEM_KINDS)[number]
 
 const DETAILS_JSON_MAX_BYTES = 10 * 1024 // 10KB
