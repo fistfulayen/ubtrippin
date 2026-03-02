@@ -124,16 +124,34 @@ _resolve_id() {
   fi
 
   local response ids count
-  response=$(_curl "${API}/${table}?id=like.$(_urlencode "${id_prefix}")*&select=id" -H "Authorization: Bearer ${UBT_API_KEY}")
+  # Use authenticated API endpoint — map table names to API routes
+  local api_route=""
+  case "$table" in
+    trips) api_route="${API_V1}/trips" ;;
+    trip_items) api_route="${API_V1}/trips" ;;  # items resolved from trips list
+    city_guides) api_route="${API_V1}/guides" ;;
+    *) echo "Error: Unknown table '${table}' for ID resolution" >&2; exit 1 ;;
+  esac
+  response=$(_api "${api_route}")
   ids=$(echo "$response" | _python3c "
 import json, sys
-rows = json.load(sys.stdin)
-if isinstance(rows, dict):
+prefix = '${id_prefix}'
+data = json.load(sys.stdin)
+# Handle {data: [...]} wrapper or plain array
+if isinstance(data, dict):
+    rows = data.get('data', data.get('trips', data.get('guides', [])))
+elif isinstance(data, list):
+    rows = data
+else:
+    print('')
+    sys.exit(0)
+if not isinstance(rows, list):
     print('')
     sys.exit(0)
 for row in rows:
-    if row.get('id'):
-        print(row['id'])
+    rid = row.get('id', '')
+    if rid.startswith(prefix):
+        print(rid)
 ")
   count=$(echo "$ids" | awk 'NF {c++} END {print c+0}')
 
