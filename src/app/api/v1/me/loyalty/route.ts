@@ -98,8 +98,8 @@ export async function GET() {
   const { data, error } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
-    .order('preferred', { ascending: false })
     .order('user_id', { ascending: true })
+    .order('preferred', { ascending: false })
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -119,6 +119,13 @@ export async function GET() {
   const output = rows.map((row) =>
     withPlaintext(row, allianceMap.get(row.provider_key) ?? null)
   )
+
+  // Current user's programs first, then family members'
+  output.sort((a, b) => {
+    const aOwn = a.user_id === auth.userId ? 0 : 1
+    const bOwn = b.user_id === auth.userId ? 0 : 1
+    return aOwn - bOwn
+  })
 
   return NextResponse.json({ data: output, meta: { count: output.length } })
 }
