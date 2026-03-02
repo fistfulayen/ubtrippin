@@ -300,6 +300,21 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                 {(() => {
                   const det = item.details_json as Record<string, unknown> | null
+
+                  // For tickets: show event time (show start), with door time as secondary
+                  if (item.kind === 'ticket' && det) {
+                    const eventTime = det.event_time as string | undefined
+                    const doorTime = det.door_time as string | undefined
+                    if (!eventTime && !doorTime && !item.start_ts) return null
+                    return (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {eventTime || doorTime || (item.start_ts ? new Date(item.start_ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '')}
+                        {eventTime && doorTime && ` (doors ${doorTime})`}
+                      </span>
+                    )
+                  }
+
                   if (!item.start_ts && !det?.departure_local_time && !det?.check_in_time) return null
                   const [start, end] = getLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
                   return (
