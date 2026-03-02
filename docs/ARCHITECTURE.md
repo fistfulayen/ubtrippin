@@ -46,12 +46,25 @@ The app has two layout contexts. Every new page must fit into one of them.
 
 ### Public page requirements
 
-Every public page MUST include:
-1. **Navigation header** — at minimum: UBTRIPPIN logo (links to `/`), key nav links
-2. **Footer** — at minimum: © year, Privacy, Terms links
-3. **Consistent styling** — use the site's color palette (`slate-*`, accent `#312e81`)
+Every public page MUST use the shared components:
+1. **`<PublicNav />`** — `src/components/public-nav.tsx` — UBTRIPPIN logo, Features, Pricing, Agents, Story, "Get Started Free" button. Identical to homepage nav.
+2. **`<PublicFooter />`** — `src/components/public-footer.tsx` — Docs, API Reference, GitHub, Privacy, Terms, "Made by humans and agents". Identical to homepage footer.
+3. **Never build inline nav/footer** — always use these shared components so all public pages match.
 
-Use the dispatches pages as the reference pattern for public content pages.
+```tsx
+import { PublicNav } from '@/components/public-nav'
+import { PublicFooter } from '@/components/public-footer'
+
+export default function MyPublicPage() {
+  return (
+    <>
+      <PublicNav />
+      <main>...</main>
+      <PublicFooter />
+    </>
+  )
+}
+```
 
 ## Component Patterns
 
