@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { DashboardNav } from '@/components/dashboard-nav'
 import { UpgradeBanner } from '@/components/billing/upgrade-banner'
 
@@ -33,6 +34,17 @@ export default async function DashboardLayout({
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>
+      <footer className="mx-auto w-full max-w-7xl px-4 pb-6 text-xs text-gray-500 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3 border-t border-gray-200 pt-4">
+          <Link href="/privacy" className="hover:text-gray-700 transition-colors">
+            Privacy Policy
+          </Link>
+          <span aria-hidden="true">•</span>
+          <Link href="/terms" className="hover:text-gray-700 transition-colors">
+            Terms of Service
+          </Link>
+        </div>
+      </footer>
     </div>
   )
 }
