@@ -44,9 +44,32 @@ The app has two layout contexts. Every new page must fit into one of them.
 - `/invite/[token]`, `/invite/family/[token]`
 - `/share/[token]`, `/guide/[token]`
 
+### 3. Hybrid (public + dashboard) — auth-adaptive layout
+
+**For:** Pages that are public but should feel like the product when logged in. Example: `/dispatches`.
+
+- Create a `layout.tsx` in the route folder
+- Check auth with `createClient().auth.getUser()`
+- Logged in → render `DashboardNav` + `UpgradeBanner` + dashboard footer (same as `(dashboard)/layout.tsx`)
+- Logged out → render `PublicNav` + `PublicFooter` (same as homepage)
+- Page components stay layout-agnostic — they just render content
+
+See `src/app/dispatches/layout.tsx` as the reference implementation.
+
+```tsx
+// Simplified pattern:
+const { data: { user } } = await supabase.auth.getUser()
+
+if (user) {
+  // Dashboard chrome: DashboardNav + UpgradeBanner + children + dashboard footer
+} else {
+  // Public chrome: PublicNav + children + PublicFooter
+}
+```
+
 ### Public page requirements
 
-Every public page MUST use the shared components:
+Every public page (or the logged-out branch of a hybrid layout) MUST use the shared components:
 1. **`<PublicNav />`** — `src/components/public-nav.tsx` — UBTRIPPIN logo, Features, Pricing, Agents, Story, "Get Started Free" button. Identical to homepage nav.
 2. **`<PublicFooter />`** — `src/components/public-footer.tsx` — Docs, API Reference, GitHub, Privacy, Terms, "Made by humans and agents". Identical to homepage footer.
 3. **Never build inline nav/footer** — always use these shared components so all public pages match.
