@@ -54,7 +54,7 @@ _curl() {
 # v1 API calls — requires UBT_API_KEY
 _require_api_key() {
   if [ -z "$UBT_API_KEY" ] && [ -f "$HOME/.ubt/config" ]; then
-    UBT_API_KEY=$(grep "^UBT_API_KEY=" "$HOME/.ubt/config" | cut -d= -f2-)
+    UBT_API_KEY=$(grep "^UBT_API_KEY=" "$HOME/.ubt/config" | head -n1 | cut -d= -f2-)
   fi
   if [ -z "$UBT_API_KEY" ]; then
     echo "Error: UBT_API_KEY is required for this command." >&2
@@ -124,7 +124,7 @@ _resolve_id() {
   fi
 
   local response ids count
-  response=$(_curl "${API}/${table}?id=like.$(_urlencode "${id_prefix}")*&select=id")
+  response=$(_curl "${API}/${table}?id=like.$(_urlencode "${id_prefix}")*&select=id" -H "Authorization: Bearer ${UBT_API_KEY}")
   ids=$(echo "$response" | _python3c "
 import json, sys
 rows = json.load(sys.stdin)
@@ -276,13 +276,14 @@ cmd_trips_list() {
 cmd_trips_search() {
   local query_text="${1:?Usage: ubt trips search <query>}"
   local result
-  result=$(_curl "${API}/trips?select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=200")
+  result=$(_api "${API_V1}/trips")
 
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _python3c "
 import json, sys
 q = sys.argv[1].lower()
-rows = json.load(sys.stdin)
+raw = json.load(sys.stdin)
+rows = raw.get('data', raw) if isinstance(raw, dict) else raw
 matches = []
 for row in rows:
     title = (row.get('title') or '').lower()
@@ -298,7 +299,8 @@ print(json.dumps(matches))
   filtered=$(echo "$result" | _python3c "
 import json, sys
 q = sys.argv[1].lower()
-rows = json.load(sys.stdin)
+raw = json.load(sys.stdin)
+rows = raw.get('data', raw) if isinstance(raw, dict) else raw
 matches = []
 for row in rows:
     title = (row.get('title') or '').lower()
@@ -1863,9 +1865,9 @@ cmd_senders_add() {
   local label="${2:-}"
   local body
   if [ -n "$label" ]; then
-    body="{\"email\": \"${email}\", \"label\": \"${label}\"}"
+    body=$(_python3c "import json,sys; print(json.dumps({'email': sys.argv[1], 'label': sys.argv[2]}))" "$email" "$label")
   else
-    body="{\"email\": \"${email}\"}"
+    body=$(_python3c "import json,sys; print(json.dumps({'email': sys.argv[1]}))" "$email")
   fi
   local result
   result=$(_api -X POST "${API_V1}/settings/senders" -d "$body")
@@ -2177,8 +2179,9 @@ cmd_collab_invite() {
   local email="${2:?Usage: ubt collab invite <trip_id> <email> [role]}"
   local role="${3:-editor}"
   local result
-  result=$(_api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators" \
-    -d "{\"email\": \"${email}\", \"role\": \"${role}\"}")
+  local body
+  body=$(_python3c "import json,sys; print(json.dumps({'email': sys.argv[1], 'role': sys.argv[2]}))" "$email" "$role")
+  result=$(_api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/collaborators" -d "$body")
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
     return
