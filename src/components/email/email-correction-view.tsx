@@ -82,18 +82,18 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-gray-900">
             {email.subject || '(no subject)'}
           </h1>
-          <div className="mt-1 flex items-center gap-3 text-sm text-gray-600">
-            <span>From: {email.from_email}</span>
-            <span>•</span>
+          <div className="mt-1 flex flex-col gap-1 text-sm text-gray-600 sm:flex-row sm:items-center sm:gap-3">
+            <span className="break-all">From: {email.from_email}</span>
+            <span className="hidden sm:inline">•</span>
             <span>{formatDateTime(email.received_at)}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-start">
           {saveSuccess && (
             <span className="text-sm text-green-600">Saved!</span>
           )}
@@ -115,26 +115,28 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
 
       {/* Actions */}
       {email.parse_status !== 'processing' && (
-        <ReparseButton emailId={email.id} />
+        <div className="w-full sm:w-auto">
+          <ReparseButton emailId={email.id} />
+        </div>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Email content */}
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
               Email Content
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             {email.body_text ? (
-              <div className="max-h-96 overflow-y-auto rounded-lg bg-gray-50 p-4 text-sm font-mono whitespace-pre-wrap">
+              <div className="max-h-96 overflow-x-auto overflow-y-auto rounded-lg bg-gray-50 p-3 text-sm font-mono whitespace-pre-wrap break-words sm:p-4">
                 {email.body_text}
               </div>
             ) : email.body_html ? (
               <div
-                className="max-h-96 overflow-y-auto rounded-lg bg-gray-50 p-4 text-sm prose prose-sm"
+                className="prose prose-sm max-h-96 overflow-x-auto overflow-y-auto rounded-lg bg-gray-50 p-3 text-sm break-words sm:p-4"
                 dangerouslySetInnerHTML={{ __html: sanitizeHtml(email.body_html) }}
               />
             ) : (
@@ -150,18 +152,18 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
 
         {/* Extracted data - Editable */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex flex-wrap items-center gap-2">
               <FileText className="h-5 w-5" />
               Extracted Data
               {email.extracted_json?.overall_confidence !== undefined && (
-                <span className="ml-auto text-sm font-normal text-gray-500">
+                <span className="text-sm font-normal text-gray-500 sm:ml-auto">
                   {Math.round(email.extracted_json.overall_confidence * 100)}% confidence
                 </span>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
             {email.parse_error && (
               <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 <p>{email.parse_error}</p>
@@ -192,14 +194,14 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
       {/* Auth results */}
       {email.auth_results && (
         <Card>
-          <CardHeader>
+          <CardHeader className="p-4 sm:p-6">
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
               Email Authentication
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="flex gap-4 text-sm">
+          <CardContent className="p-4 pt-0 sm:p-6 sm:pt-0">
+            <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <span className="text-gray-500">SPF:</span>
                 <Badge variant={email.auth_results.spf === 'pass' ? 'success' : 'secondary'}>

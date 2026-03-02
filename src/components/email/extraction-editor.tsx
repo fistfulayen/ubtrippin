@@ -105,9 +105,9 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
     <div className="space-y-4">
       {items.map((item, index) => (
         <Card key={index} className="relative">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+          <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <span className="font-medium">Item {index + 1}</span>
                 {item.confidence < 0.65 && (
                   <span className="text-xs text-[#4f46e5] bg-[#ffffff] px-2 py-0.5 rounded">
@@ -125,9 +125,9 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
             {/* Row 1: Kind and Status */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Type</label>
                 <Select
@@ -157,7 +157,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             </div>
 
             {/* Row 2: Provider and Confirmation */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Provider</label>
                 <Input
@@ -178,7 +178,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             </div>
 
             {/* Row 3: Dates */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Start Date</label>
                 <Input
@@ -198,7 +198,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             </div>
 
             {/* Row 4: Times */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">Departure Time</label>
                 <Input
@@ -218,7 +218,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             </div>
 
             {/* Row 5: Locations */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label className="text-xs text-gray-500 mb-1 block">
                   {item.kind === 'flight' ? 'Departure' : 'Location'}
@@ -253,7 +253,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
 
             {/* Kind-specific details */}
             {item.kind === 'flight' && (
-              <div className="grid grid-cols-3 gap-3 pt-2 border-t">
+              <div className="grid grid-cols-1 gap-3 border-t pt-2 sm:grid-cols-3">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Flight Number</label>
                   <Input
@@ -283,7 +283,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             )}
 
             {item.kind === 'hotel' && (
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+              <div className="grid grid-cols-1 gap-3 border-t pt-2 sm:grid-cols-2">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Room Type</label>
                   <Input
@@ -304,7 +304,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
             )}
 
             {item.kind === 'train' && (
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+              <div className="grid grid-cols-1 gap-3 border-t pt-2 sm:grid-cols-2">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 block">Train Number</label>
                   <Input
@@ -345,8 +345,8 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
       </Button>
 
       {/* Save section */}
-      <div className="flex items-center justify-between pt-4 border-t">
-        <label className="flex items-center gap-2 text-sm">
+      <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <label className="flex items-start gap-2 text-sm sm:items-center">
           <input
             type="checkbox"
             checked={createExample}
@@ -356,7 +356,7 @@ export function ExtractionEditor({ items, onChange, onSave, isSaving }: Extracti
           <Sparkles className="h-4 w-4 text-[#4f46e5]" />
           Save as learning example
         </label>
-        <Button onClick={() => onSave(createExample)} disabled={isSaving}>
+        <Button onClick={() => onSave(createExample)} disabled={isSaving} className="w-full sm:w-auto">
           <Save className="h-4 w-4 mr-2" />
           {isSaving ? 'Saving...' : 'Save Corrections'}
         </Button>

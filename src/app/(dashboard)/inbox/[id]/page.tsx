@@ -23,7 +23,7 @@ export default async function EmailDetailPage({ params }: EmailDetailPageProps) 
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="mx-auto max-w-4xl min-w-0 space-y-4 sm:space-y-6">
       {/* Back link */}
       <Link
         href="/inbox"
