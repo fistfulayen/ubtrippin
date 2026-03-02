@@ -23,8 +23,8 @@ export async function GET() {
       return `
     <item>
       <title>${escapeXml(dispatch.title)}</title>
-      <link>${link}</link>
-      <guid>${link}</guid>
+      <link>${escapeXml(link)}</link>
+      <guid>${escapeXml(link)}</guid>
       <pubDate>${pubDate}</pubDate>
       <description>${escapeXml(dispatch.summary)}</description>
     </item>`

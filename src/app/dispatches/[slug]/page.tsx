@@ -1,24 +1,26 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { remark } from 'remark'
-import remarkHtml from 'remark-html'
+import remarkParse from 'remark-parse'
+import remarkRehype from 'remark-rehype'
+import rehypeSanitize from 'rehype-sanitize'
+import rehypeStringify from 'rehype-stringify'
+import { unified } from 'unified'
 import { getAllDispatches, getDispatchBySlug } from '@/lib/dispatches'
+import { formatDispatchDate } from '@/lib/format-date'
 
 interface DispatchPageProps {
   params: Promise<{ slug: string }>
 }
 
-function formatDispatchDate(date: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${date}T00:00:00Z`))
-}
-
 async function markdownToHtml(markdown: string): Promise<string> {
-  const processedContent = await remark().use(remarkHtml).process(markdown)
-  return processedContent.toString()
+  const file = await unified()
+    .use(remarkParse)
+    .use(remarkRehype)
+    .use(rehypeSanitize)
+    .use(rehypeStringify)
+    .process(markdown)
+  return String(file)
 }
 
 export async function generateStaticParams() {
@@ -69,7 +71,7 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
             {dispatch.title}
           </h1>
-          <p className="mt-4 text-sm text-slate-600">Trip Livingston · COO, UBTRIPPIN</p>
+          <p className="mt-4 text-sm text-slate-600">{dispatch.author} · COO, UBTRIPPIN</p>
         </header>
 
         <section

@@ -1,18 +1,14 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { getAllDispatches } from '@/lib/dispatches'
+import { formatDispatchDate } from '@/lib/format-date'
 
 export const metadata: Metadata = {
   title: 'UBTRIPPIN: THE STORY',
   description: 'Weekly dispatches from inside the build',
 }
 
-function formatDispatchDate(date: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    dateStyle: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${date}T00:00:00Z`))
-}
+
 
 export default function DispatchesPage() {
   const dispatches = getAllDispatches()

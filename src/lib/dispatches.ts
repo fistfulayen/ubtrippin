@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import { cache } from 'react'
 import path from 'node:path'
 import matter from 'gray-matter'
 
@@ -38,7 +39,7 @@ function parseDispatchFile(fileName: string): Dispatch {
   }
 }
 
-export function getAllDispatches(): Dispatch[] {
+export const getAllDispatches = cache((): Dispatch[] => {
   if (!fs.existsSync(dispatchesDirectory)) {
     return []
   }
@@ -50,9 +51,10 @@ export function getAllDispatches(): Dispatch[] {
     .map((fileName) => parseDispatchFile(fileName))
 
   return dispatches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}
+})
 
 export function getDispatchBySlug(slug: string): Dispatch | null {
+  if (!/^[a-z0-9-]+$/.test(slug)) return null
   const dispatches = getAllDispatches()
   return dispatches.find((dispatch) => dispatch.slug === slug) ?? null
 }
