@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import { getAllDispatches } from '@/lib/dispatches'
+import { getAllDispatches, markdownToHtml } from '@/lib/dispatches'
 import { formatDispatchDate } from '@/lib/format-date'
-import { markdownToHtml } from '@/lib/dispatches'
+import { dispatchProseClasses } from '@/lib/dispatch-styles'
 
 export const metadata: Metadata = {
   title: 'UBTRIPPIN: THE STORY',
@@ -60,7 +60,7 @@ export default async function DispatchesPage({
               </header>
 
               <div
-                className="text-lg leading-8 text-slate-800 [&_a]:text-[#312e81] [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_h1]:mt-8 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:my-2 [&_ol]:my-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-5 [&_ul]:my-6 [&_ul]:list-disc [&_ul]:pl-6"
+                className={dispatchProseClasses}
                 dangerouslySetInnerHTML={{ __html: htmlMap[dispatch.slug] }}
               />
 

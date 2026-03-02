@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getAllDispatches, getDispatchBySlug, markdownToHtml } from '@/lib/dispatches'
 import { formatDispatchDate } from '@/lib/format-date'
+import { dispatchProseClasses } from '@/lib/dispatch-styles'
 
 interface DispatchPageProps {
   params: Promise<{ slug: string }>
@@ -60,7 +61,7 @@ export default async function DispatchPage({ params }: DispatchPageProps) {
         </header>
 
         <section
-          className="mt-10 text-lg leading-8 text-slate-800 [&_a]:text-[#312e81] [&_a]:underline [&_a]:underline-offset-4 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-4 [&_blockquote]:italic [&_h1]:mt-8 [&_h1]:text-3xl [&_h1]:font-semibold [&_h2]:mt-8 [&_h2]:text-2xl [&_h2]:font-semibold [&_h3]:mt-6 [&_h3]:text-xl [&_h3]:font-semibold [&_li]:my-2 [&_ol]:my-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_p]:my-5 [&_ul]:my-6 [&_ul]:list-disc [&_ul]:pl-6"
+          className={`mt-10 ${dispatchProseClasses}`}
           dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
       </article>

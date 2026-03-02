@@ -3,10 +3,25 @@ import { cache } from 'react'
 import path from 'node:path'
 import matter from 'gray-matter'
 import remarkParse from 'remark-parse'
+import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
-import rehypeSanitize from 'rehype-sanitize'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeStringify from 'rehype-stringify'
 import { unified } from 'unified'
+
+// Allow table elements through the sanitizer
+const sanitizeSchema = {
+  ...defaultSchema,
+  tagNames: [
+    ...(defaultSchema.tagNames ?? []),
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  ],
+  attributes: {
+    ...defaultSchema.attributes,
+    th: [...(defaultSchema.attributes?.th ?? []), 'align'],
+    td: [...(defaultSchema.attributes?.td ?? []), 'align'],
+  },
+}
 
 const dispatchesDirectory = path.join(process.cwd(), 'content/dispatches')
 
@@ -70,8 +85,9 @@ export const getAllDispatches = cache((): Dispatch[] => {
 export async function markdownToHtml(markdown: string): Promise<string> {
   const file = await unified()
     .use(remarkParse)
+    .use(remarkGfm)
     .use(remarkRehype)
-    .use(rehypeSanitize)
+    .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeStringify)
     .process(markdown)
   return String(file)
