@@ -15,6 +15,13 @@ interface UnsplashResult {
   user: { name: string }
 }
 
+interface ImageResult {
+  url: string
+  thumbnailUrl: string
+  title: string
+  source: string
+}
+
 interface CoverImagePickerProps {
   tripId: string
   currentImageUrl: string | null
@@ -62,7 +69,9 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
   const [tab, setTab] = useState<'upload' | 'search'>('search')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<UnsplashResult[]>([])
+  const [braveResults, setBraveResults] = useState<ImageResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchSource, setSearchSource] = useState<'unsplash' | 'web'>('web')
   const [uploading, setUploading] = useState(false)
 
   // Crop state
@@ -98,10 +107,22 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
     if (!searchQuery.trim()) return
     setSearching(true)
     try {
-      const res = await fetch(`/api/unsplash/search?q=${encodeURIComponent(searchQuery)}`)
-      if (res.ok) {
-        const data = await res.json()
-        setSearchResults(data.results || [])
+      if (searchSource === 'web') {
+        // Brave Image Search — better for performers, events, specific things
+        const res = await fetch(`/api/v1/images/search?q=${encodeURIComponent(searchQuery)}&count=8`)
+        if (res.ok) {
+          const data = await res.json()
+          setBraveResults(data.data || [])
+          setSearchResults([])
+        }
+      } else {
+        // Unsplash — better for destinations and scenic photos
+        const res = await fetch(`/api/unsplash/search?q=${encodeURIComponent(searchQuery)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setSearchResults(data.results || [])
+          setBraveResults([])
+        }
       }
     } catch (err) {
       console.error('Search failed:', err)
@@ -247,9 +268,33 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
             <div className="p-4">
               {tab === 'search' ? (
                 <div className="space-y-4">
+                  {/* Source toggle */}
+                  <div className="flex rounded-lg bg-gray-100 p-0.5">
+                    <button
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        searchSource === 'web'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      onClick={() => setSearchSource('web')}
+                    >
+                      🌐 Web Images
+                    </button>
+                    <button
+                      className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        searchSource === 'unsplash'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      onClick={() => setSearchSource('unsplash')}
+                    >
+                      📷 Unsplash
+                    </button>
+                  </div>
+
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Search for a destination photo..."
+                      placeholder={searchSource === 'web' ? 'Search for any image...' : 'Search for a destination photo...'}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -259,6 +304,33 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                     </Button>
                   </div>
 
+                  {/* Brave web image results */}
+                  {braveResults.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                      {braveResults.map((result, i) => (
+                        <button
+                          key={i}
+                          className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#4f46e5] transition-all"
+                          onClick={() => handleSelectUnsplash(result.url)}
+                          disabled={uploading}
+                        >
+                          <Image
+                            src={result.thumbnailUrl}
+                            alt={result.title || 'Photo'}
+                            fill
+                            className="object-cover"
+                            sizes="200px"
+                            unoptimized
+                          />
+                          <div className="absolute bottom-0 inset-x-0 bg-black/50 px-2 py-1">
+                            <span className="text-xs text-white truncate block">{result.source}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Unsplash results */}
                   {searchResults.length > 0 && (
                     <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                       {searchResults.map((result, i) => (
@@ -284,9 +356,11 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                     </div>
                   )}
 
-                  {searchResults.length === 0 && !searching && (
+                  {searchResults.length === 0 && braveResults.length === 0 && !searching && (
                     <p className="text-center text-sm text-gray-500 py-8">
-                      Search Unsplash for the perfect cover photo
+                      {searchSource === 'web'
+                        ? 'Search the web for the perfect cover image'
+                        : 'Search Unsplash for the perfect cover photo'}
                     </p>
                   )}
                 </div>

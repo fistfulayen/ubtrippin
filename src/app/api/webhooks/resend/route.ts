@@ -11,6 +11,7 @@ import {
   collectTravelerNames,
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
+import { searchBraveImages } from '@/lib/images/brave-image-search'
 import { locationToCityAsync } from '@/lib/images/airport-cities'
 import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
 import { sanitizeHtml } from '@/lib/utils'
@@ -440,9 +441,20 @@ export async function POST(request: NextRequest) {
               const eventDetails = extractionResult.items[0].details as Record<string, unknown> | undefined
               const performer = eventDetails?.performer as string | undefined
               const eventName = eventDetails?.event_name as string | undefined
-              // Search for performer/event — much better image than a city
-              coverSearchQuery = performer || eventName || smartTitle
-              console.log('Event-driven trip, searching for event image:', coverSearchQuery)
+              // Use Brave Image Search for events — much better for performers/events than Unsplash
+              const eventQuery = performer || eventName || smartTitle
+              console.log('Event-driven trip, searching Brave for event image:', eventQuery)
+              const braveImage = await searchBraveImages(eventQuery)
+              if (braveImage) {
+                await supabase
+                  .from('trips')
+                  .update({ cover_image_url: braveImage })
+                  .eq('id', newTrip.id)
+                coverSearchQuery = null // Skip Unsplash
+              } else {
+                coverSearchQuery = eventQuery // Fall back to Unsplash
+              }
+              console.log('Event-driven trip, searching for event image:', eventQuery)
             } else if (location) {
               // Regular trip — search by location
               coverSearchQuery = location
