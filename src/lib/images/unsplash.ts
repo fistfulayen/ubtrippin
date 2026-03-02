@@ -179,6 +179,7 @@ export async function getDestinationImageUrl(location: string, tripTitle?: strin
           .replace(/trip to /i, '')
           .replace(/\s*-\s*\w{3}\s+\d{4}$/i, '') // Remove " - Apr 2026" suffix
           .trim()
+          .slice(0, 100) // Cap length — don't leak long AI titles to third-party API
         console.log('Trying fallback with trip title:', titleQuery)
         const fallbackParams = new URLSearchParams({
           query: `${titleQuery} travel`,
