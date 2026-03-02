@@ -40,13 +40,16 @@ function parseDispatchFile(fileName: string): Dispatch {
     ? rawDate.toISOString().split('T')[0]
     : String(rawDate)
 
+  // Strip leading H1 from content — the title is rendered from frontmatter
+  const cleanContent = content.replace(/^\s*#\s+.+\n+/, '')
+
   return {
     slug,
     title: frontmatter.title,
     date: dateStr,
     summary: frontmatter.summary,
     author: frontmatter.author,
-    content,
+    content: cleanContent,
   }
 }
 
