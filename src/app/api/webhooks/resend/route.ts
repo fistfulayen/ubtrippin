@@ -429,16 +429,20 @@ export async function POST(request: NextRequest) {
             const location = primaryLocation || item.end_location || item.start_location
             // Determine cover image search query
             // For event/ticket-driven trips, search for the event, not the city
-            const allTickets = extractionResult.items.every((i) => i.kind === 'ticket')
+            // Check if this is an event-driven trip (tickets, activities, or items with event details)
+            const isEventTrip = extractionResult.items.every((i) => 
+              i.kind === 'ticket' || i.kind === 'activity' || 
+              (i.details as Record<string, unknown> | undefined)?.event_name != null
+            )
             let coverSearchQuery: string | null = null
 
-            if (allTickets && extractionResult.items.length > 0) {
-              const ticketDetails = extractionResult.items[0].details as Record<string, unknown> | undefined
-              const performer = ticketDetails?.performer as string | undefined
-              const eventName = ticketDetails?.event_name as string | undefined
+            if (isEventTrip && extractionResult.items.length > 0) {
+              const eventDetails = extractionResult.items[0].details as Record<string, unknown> | undefined
+              const performer = eventDetails?.performer as string | undefined
+              const eventName = eventDetails?.event_name as string | undefined
               // Search for performer/event — much better image than a city
               coverSearchQuery = performer || eventName || smartTitle
-              console.log('Ticket-driven trip, searching for event image:', coverSearchQuery)
+              console.log('Event-driven trip, searching for event image:', coverSearchQuery)
             } else if (location) {
               // Regular trip — search by location
               coverSearchQuery = location

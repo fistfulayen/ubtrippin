@@ -27,12 +27,17 @@ export async function generateTripName(
   if (items.length === 0) return existingTitle || 'Untitled Trip'
 
   // If all items are tickets, use the event name directly — no AI needed
-  const allTickets = items.every((item) => item.kind === 'ticket')
-  if (allTickets && items.length > 0) {
-    const details = (items[0] as Record<string, unknown>).details_json as Record<string, unknown> | undefined
+  // For event/ticket-driven trips, use the event name directly
+  const allEvents = items.every((item) => item.kind === 'ticket' || item.kind === 'activity')
+  if (allEvents && items.length > 0) {
+    const raw = items[0] as Record<string, unknown>
+    // Handle both extraction results (details) and DB records (details_json)
+    const details = (raw.details ?? raw.details_json) as Record<string, unknown> | undefined
     const eventName = details?.event_name as string | undefined
+    const performer = details?.performer as string | undefined
+    // Prefer performer name for ticket-created trips (e.g. "Rodolphe Burger" not "Concert at venue")
+    if (performer) return performer
     if (eventName) return eventName
-    // Fall back to summary which often contains the event name
     if (items[0].summary) return items[0].summary
   }
 
