@@ -437,7 +437,7 @@ export async function POST(request: NextRequest) {
 
               console.log('Cleaned location:', cleanLocation)
               if (cleanLocation) {
-                const coverImageUrl = await getDestinationImageUrl(cleanLocation)
+                const coverImageUrl = await getDestinationImageUrl(cleanLocation, smartTitle)
                 console.log('Cover image URL:', coverImageUrl)
                 if (coverImageUrl) {
                   await supabase
