@@ -130,10 +130,14 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
     setSearching(false)
   }
 
-  const handleSelectUnsplash = async (url: string) => {
+  const handleSelectImage = async (url: string, source: 'unsplash' | 'external') => {
     setUploading(true)
     const formData = new FormData()
-    formData.append('unsplash_url', url)
+    if (source === 'unsplash') {
+      formData.append('unsplash_url', url)
+    } else {
+      formData.append('external_url', url)
+    }
 
     try {
       const res = await fetch(`/api/trips/${tripId}/cover-image`, {
@@ -143,6 +147,9 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
       if (res.ok) {
         router.refresh()
         onClose()
+      } else {
+        const data = await res.json().catch(() => ({}))
+        console.error('Failed to set image:', data.error || res.statusText)
       }
     } catch (err) {
       console.error('Failed to set image:', err)
@@ -311,7 +318,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                         <button
                           key={i}
                           className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#4f46e5] transition-all"
-                          onClick={() => handleSelectUnsplash(result.url)}
+                          onClick={() => handleSelectImage(result.url, 'external')}
                           disabled={uploading}
                         >
                           <Image
@@ -337,7 +344,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
                         <button
                           key={i}
                           className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#4f46e5] transition-all"
-                          onClick={() => handleSelectUnsplash(result.urls.regular)}
+                          onClick={() => handleSelectImage(result.urls.regular, 'unsplash')}
                           disabled={uploading}
                         >
                           <Image

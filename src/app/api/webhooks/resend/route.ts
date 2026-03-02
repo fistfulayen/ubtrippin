@@ -12,6 +12,7 @@ import {
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
 import { searchBraveImages } from '@/lib/images/brave-image-search'
+import { storeCoverImage } from '@/lib/images/store-cover-image'
 import { locationToCityAsync } from '@/lib/images/airport-cities'
 import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
 import { sanitizeHtml } from '@/lib/utils'
@@ -446,10 +447,14 @@ export async function POST(request: NextRequest) {
               console.log('Event-driven trip, searching Brave for event image:', eventQuery)
               const braveImage = await searchBraveImages(eventQuery)
               if (braveImage) {
-                await supabase
-                  .from('trips')
-                  .update({ cover_image_url: braveImage })
-                  .eq('id', newTrip.id)
+                // Download and store in Supabase Storage to avoid hotlink issues
+                const storedUrl = await storeCoverImage(braveImage, userId, newTrip.id)
+                if (storedUrl) {
+                  await supabase
+                    .from('trips')
+                    .update({ cover_image_url: storedUrl })
+                    .eq('id', newTrip.id)
+                }
                 coverSearchQuery = null // Skip Unsplash
               } else {
                 coverSearchQuery = eventQuery // Fall back to Unsplash

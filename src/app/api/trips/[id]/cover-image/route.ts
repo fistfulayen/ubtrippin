@@ -71,10 +71,62 @@ export async function POST(
   const formData = await request.formData()
   const file = formData.get('file') as File | null
   const unsplashUrl = formData.get('unsplash_url') as string | null
+  const externalUrl = formData.get('external_url') as string | null
 
   let coverImageUrl: string | null = null
 
-  if (unsplashUrl) {
+  if (externalUrl) {
+    // Download external image and upload to Supabase Storage
+    // This avoids hotlink issues and ensures images persist
+    try {
+      const parsed = new URL(externalUrl)
+      if (parsed.protocol !== 'https:') {
+        return NextResponse.json({ error: 'Only HTTPS URLs allowed' }, { status: 400 })
+      }
+
+      const imgRes = await fetch(externalUrl, {
+        headers: { 'User-Agent': 'UBTRIPPIN/1.0' },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (!imgRes.ok) {
+        return NextResponse.json({ error: 'Failed to fetch image' }, { status: 400 })
+      }
+
+      const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+      const mimeBase = contentType.split(';')[0].trim()
+      if (!ALLOWED_MIME_TYPES.has(mimeBase)) {
+        return NextResponse.json({ error: 'Invalid image type from URL' }, { status: 400 })
+      }
+
+      const buffer = await imgRes.arrayBuffer()
+      if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+        return NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
+      }
+
+      const ext = mimeBase === 'image/png' ? 'png' : mimeBase === 'image/webp' ? 'webp' : 'jpg'
+      const path = `${user.id}/${tripId}.${ext}`
+
+      const serviceClient = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
+      const { error: uploadErr } = await serviceClient.storage
+        .from('trip-images')
+        .upload(path, buffer, { upsert: true, contentType: mimeBase })
+
+      if (uploadErr) {
+        console.error('Storage upload error (external):', uploadErr)
+        return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+      }
+
+      const { data: { publicUrl } } = serviceClient.storage
+        .from('trip-images')
+        .getPublicUrl(path)
+
+      coverImageUrl = publicUrl
+    } catch (err) {
+      console.error('External image fetch failed:', err)
+      return NextResponse.json({ error: 'Failed to fetch external image' }, { status: 400 })
+    }
+
+  } else if (unsplashUrl) {
     // SECURITY: Validate that the URL is actually from Unsplash — don't allow arbitrary URLs
     if (!isAllowedUnsplashUrl(unsplashUrl)) {
       return NextResponse.json(
