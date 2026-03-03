@@ -1,12 +1,12 @@
 ---
 name: ubtrippin
 version: 2.0.0
-description: Manages travel for your user via UBTRIPPIN — trips, items, loyalty programs, family, city guides, notifications, and more. Use when the user asks about their trips, upcoming travel, flights, hotels, train bookings, loyalty numbers, family travel, or wants to manage their travel tracker. Requires a UBTRIPPIN API key from ubtrippin.xyz/settings.
+description: Manages travel for your user via UBTRIPPIN — trips, items, loyalty programs, family, city guides, events, concerts, notifications, and more. Use when the user asks about their trips, upcoming travel, flights, hotels, train bookings, concert tickets, event tickets, loyalty numbers, family travel, or wants to manage their travel tracker. Requires a UBTRIPPIN API key from ubtrippin.xyz/settings.
 ---
 
 # UBTRIPPIN Skill
 
-**UBTRIPPIN** is a personal travel tracker that parses booking confirmation emails and organises them into trips. As an agent, you can read and manage a user's trips, items, loyalty vault, family groups, city guides, and more via REST API.
+**UBTRIPPIN** is a personal travel tracker that parses booking confirmation emails and organises them into trips. It also handles event tickets — concerts, theater, sports, festivals — from providers like Ticketmaster, AXS, Eventbrite, and more. As an agent, you can read and manage a user's trips, items (flights, hotels, trains, tickets/events, etc.), loyalty vault, family groups, city guides, and more via REST API.
 
 ---
 
@@ -76,7 +76,7 @@ GET /api/v1/trips/:id
 
 Response includes full trip object with nested `items` array. Each item has: `id`, `trip_id`, `kind`, `provider`, `traveler_names`, `start_ts`, `end_ts`, `start_date`, `end_date`, `start_location`, `end_location`, `summary`, `details_json`, `status`, `confidence`, `needs_review`, timestamps.
 
-**Item kinds:** `flight`, `hotel`, `train`, `car`, `ferry`, `activity`, `other`
+**Item kinds:** `flight`, `hotel`, `train`, `car`, `ferry`, `activity`, `ticket`, `other`
 
 #### Create Trip
 ```
@@ -167,7 +167,7 @@ Content-Type: application/json
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `kind` | string | **Required.** One of: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `other` |
+| `kind` | string | **Required.** One of: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `ticket`, `other` |
 | `start_date` | string | **Required.** ISO date: `YYYY-MM-DD` |
 | `end_date` | string | ISO date. For hotels = checkout, flights = arrival date if different |
 | `start_ts` | string | ISO 8601 datetime with timezone: `2026-04-01T08:30:00Z` |
@@ -241,6 +241,52 @@ Content-Type: application/json
   "details_json": { "party_size": 2, "reservation_name": "Rogers" }
 }
 ```
+
+**Example — Ticket/Event (concert, sports, theater, festival, etc.):**
+```json
+{
+  "kind": "ticket",
+  "summary": "David Byrne at Théâtre du Châtelet",
+  "start_date": "2026-05-15",
+  "start_ts": "2026-05-15T20:00:00+02:00",
+  "start_location": "Paris",
+  "provider": "Ticketmaster",
+  "details_json": {
+    "event_name": "David Byrne: American Utopia",
+    "venue": "Théâtre du Châtelet",
+    "venue_address": "1 Place du Châtelet, 75001 Paris",
+    "performer": "David Byrne",
+    "event_time": "20:00",
+    "door_time": "19:00",
+    "section": "Orchestre",
+    "seat": "12",
+    "row": "G",
+    "ticket_count": 2,
+    "ticket_type": "Reserved",
+    "event_category": "concert"
+  }
+}
+```
+
+**Ticket detail fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| event_name | string | Name of the event/show |
+| venue | string | Venue name |
+| venue_address | string? | Full address |
+| event_time | HH:MM | Show start time |
+| door_time | HH:MM? | Door opening time |
+| section | string? | Seating section |
+| seat | string? | Seat number |
+| row | string? | Row identifier |
+| ticket_count | number | Number of tickets |
+| ticket_type | string? | GA, Reserved, VIP, etc. |
+| performer | string? | Artist/performer/team |
+| event_category | enum | concert, theater, sports, museum, festival, other |
+
+**Supported ticket providers:** Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, StubHub, Viagogo, venue direct sales. Forward the confirmation email to trips@ubtrippin.xyz and the ticket is extracted automatically.
+
+**Event-driven trips:** When a ticket email creates a new trip (no overlapping dates), the trip is named after the event/performer and the cover image is of the performer — not the city.
 
 #### Batch Add Items
 ```
@@ -756,7 +802,7 @@ The primary way to add bookings is **email forwarding**. When your user receives
 - Or instruct the user to do it manually from their inbox.
 - PDF attachments (e.g. eTickets) are supported — include them in the forward.
 
-**Works with:** flights, hotels, trains (Eurostar, SNCF, Thalys, etc.), rental cars, ferry bookings, and most major booking platforms (Booking.com, Expedia, Kayak, Trainline, etc.).
+**Works with:** flights, hotels, trains (Eurostar, SNCF, Thalys, etc.), rental cars, ferry bookings, concert/event tickets (Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, StubHub, Viagogo), and most major booking platforms (Booking.com, Expedia, Kayak, Trainline, etc.).
 
 ---
 

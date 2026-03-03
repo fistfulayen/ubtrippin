@@ -25,7 +25,7 @@ Content-Type: application/json
 
 { "kind": "flight", "start_date": "2026-04-01", "summary": "AF276 CDG→NRT", "provider": "Air France" }
 ```
-Kinds: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `other`
+Kinds: `flight`, `hotel`, `car_rental`, `train`, `activity`, `restaurant`, `ticket`, `other`
 Required: `kind` + `start_date`. Optional: `end_date`, `start_ts`, `end_ts`, `start_location`, `end_location`, `provider`, `confirmation_code`, `traveler_names`, `details_json`
 
 ## 4. Loyalty Lookup

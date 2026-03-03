@@ -1,6 +1,6 @@
 # ubtrippin-mcp
 
-MCP server for [UBTRIPPIN](https://ubtrippin.xyz) — gives any MCP-compatible AI client (Claude Desktop, Cursor, Windsurf, etc.) full access to your travel data: trips, items, city guides, loyalty vault, family sharing, and more.
+MCP server for [UBTRIPPIN](https://ubtrippin.xyz) — gives any MCP-compatible AI client (Claude Desktop, Cursor, Windsurf, etc.) full access to your travel data: trips, items (flights, hotels, trains, concert/event tickets, etc.), city guides, loyalty vault, family sharing, and more.
 
 ## Install
 

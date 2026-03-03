@@ -39,6 +39,8 @@ export function formatTime(date: string | Date | null | undefined): string {
     
     // Try to extract local time from ISO format with offset
     // e.g., "2026-03-15T22:30:00+01:00" → "22:30"
+    //        "2026-03-10T12:52:00-05:00" → "12:52"
+    // The time portion IS the local time when a proper offset is present
     const timeMatch = date.match(/T(\d{2}):(\d{2})/)
     if (timeMatch) {
       const hours = parseInt(timeMatch[1], 10)

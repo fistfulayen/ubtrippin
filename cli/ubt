@@ -3054,6 +3054,233 @@ cmd_login() {
   echo "Logged in as ${name}. Config saved to ~/.ubt/config"
 }
 
+# ─── Tickets/Events convenience commands ────────────────────────────
+# Sugar over items commands with kind=ticket
+
+cmd_tickets_list() {
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:-}"
+
+  if [ -n "$trip_id" ]; then
+    trip_id=$(_resolve_trip_id "$trip_id")
+    local resp
+    resp=$(_api "${API_V1}/trips/${trip_id}/items")
+    _python3c "
+import json, sys
+data = json.loads(sys.stdin.read())
+items = data.get('data') or data if isinstance(data, list) else data.get('data', [])
+tickets = [i for i in items if i.get('kind') == 'ticket']
+if not tickets:
+    print('No tickets found in this trip.')
+    sys.exit(0)
+print(f'Found {len(tickets)} ticket(s):')
+print()
+for t in tickets:
+    det = t.get('details_json') or {}
+    name = det.get('event_name') or t.get('summary') or 'Untitled'
+    venue = det.get('venue') or ''
+    performer = det.get('performer') or ''
+    date = t.get('start_date') or ''
+    event_time = det.get('event_time') or ''
+    tid = t['id'][:8]
+    parts = [f'  {tid}  {name}']
+    if performer and performer.lower() != name.lower():
+        parts.append(f'  ({performer})')
+    if venue:
+        parts.append(f'  @ {venue}')
+    if date:
+        parts.append(f'  {date}')
+    if event_time:
+        parts.append(f' {event_time}')
+    print(''.join(parts))
+" <<< "$resp"
+  else
+    # List across all trips — fetch trip list, then each trip's details
+    local trips_resp
+    trips_resp=$(_api "${API_V1}/trips")
+    # Extract trip IDs
+    local trip_ids
+    trip_ids=$(_python3c "
+import json, sys
+data = json.loads(sys.stdin.read())
+trips = data.get('data') or (data if isinstance(data, list) else [])
+for t in trips:
+    print(t['id'])
+" <<< "$trips_resp")
+
+    # Fetch each trip detail (includes items) and collect results
+    local all_json="["
+    local first=true
+    while IFS= read -r tid; do
+      [ -z "$tid" ] && continue
+      local trip_resp
+      trip_resp=$(_api "${API_V1}/trips/${tid}")
+      if [ "$first" = true ]; then
+        first=false
+      else
+        all_json+=","
+      fi
+      all_json+="$trip_resp"
+    done <<< "$trip_ids"
+    all_json+="]"
+
+    _python3c "
+import json, sys
+raw = json.loads(sys.stdin.read())
+found = 0
+for entry in raw:
+    trip_data = entry.get('data', entry)
+    title = trip_data.get('title', '?')
+    sdate = trip_data.get('start_date', '?')
+    items = trip_data.get('items') or []
+    tickets = [i for i in items if i.get('kind') == 'ticket']
+    if not tickets:
+        continue
+    if found > 0:
+        print()
+    print(f'🎫 {title} ({sdate})')
+    for t in tickets:
+        det = t.get('details_json') or {}
+        name = det.get('event_name') or t.get('summary') or 'Untitled'
+        venue = det.get('venue') or ''
+        performer = det.get('performer') or ''
+        date = t.get('start_date') or ''
+        event_time = det.get('event_time') or ''
+        item_id = t['id'][:8]
+        parts = [f'  {item_id}  {name}']
+        if performer and performer.lower() != name.lower():
+            parts.append(f'  ({performer})')
+        if venue:
+            parts.append(f'  @ {venue}')
+        if date:
+            parts.append(f'  {date}')
+        if event_time:
+            parts.append(f' {event_time}')
+        print(''.join(parts))
+    found += 1
+if found == 0:
+    print('No tickets found across any trips.')
+" <<< "$all_json"
+  fi
+}
+
+cmd_tickets_add() {
+  _parse_quiet_flag "$@"
+  set -- "${UBT_ARGS[@]}"
+  local trip_id="${1:?Usage: ubt tickets add <trip_id> --event <name> --date <YYYY-MM-DD> [--venue X] [--performer X] [--time HH:MM] [--doors HH:MM] [--section X] [--row X] [--seat X] [--tickets N] [--provider X]}"
+  trip_id=$(_resolve_trip_id "$trip_id")
+  shift
+
+  local event_name="" venue="" venue_address="" performer="" event_time="" door_time=""
+  local section="" row="" seat="" ticket_count="" ticket_type="" event_category=""
+  local start_date="" provider="" summary=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --event)     event_name="${2:-}"; shift 2 ;;
+      --venue)     venue="${2:-}"; shift 2 ;;
+      --venue-address) venue_address="${2:-}"; shift 2 ;;
+      --performer) performer="${2:-}"; shift 2 ;;
+      --time)      event_time="${2:-}"; shift 2 ;;
+      --doors)     door_time="${2:-}"; shift 2 ;;
+      --section)   section="${2:-}"; shift 2 ;;
+      --row)       row="${2:-}"; shift 2 ;;
+      --seat)      seat="${2:-}"; shift 2 ;;
+      --tickets)   ticket_count="${2:-}"; shift 2 ;;
+      --type)      ticket_type="${2:-}"; shift 2 ;;
+      --category)  event_category="${2:-}"; shift 2 ;;
+      --date)      start_date="${2:-}"; shift 2 ;;
+      --provider)  provider="${2:-}"; shift 2 ;;
+      --summary)   summary="${2:-}"; shift 2 ;;
+      *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+  done
+
+  if [ -z "$event_name" ] || [ -z "$start_date" ]; then
+    echo "Error: --event and --date are required." >&2
+    exit 1
+  fi
+
+  # Build summary if not provided
+  if [ -z "$summary" ]; then
+    if [ -n "$performer" ] && [ -n "$venue" ]; then
+      summary="${performer} at ${venue}"
+    elif [ -n "$performer" ]; then
+      summary="${performer}"
+    else
+      summary="${event_name}"
+    fi
+  fi
+
+  local body
+  body=$(_python3c "
+import json, sys
+args = dict(zip(sys.argv[1::2], sys.argv[2::2]))
+payload = {
+    'kind': 'ticket',
+    'summary': args.get('--summary', ''),
+    'start_date': args.get('--date', ''),
+}
+if args.get('--provider'):
+    payload['provider'] = args['--provider']
+
+# Build start_ts from date + event time
+date = args.get('--date', '')
+time = args.get('--time', '')
+if date and time:
+    payload['start_ts'] = f'{date}T{time}:00Z'
+elif date:
+    payload['start_ts'] = f'{date}T00:00:00Z'
+
+details = {}
+for key, field in [('--event', 'event_name'), ('--venue', 'venue'), ('--venue-address', 'venue_address'),
+                    ('--performer', 'performer'), ('--time', 'event_time'), ('--doors', 'door_time'),
+                    ('--section', 'section'), ('--row', 'row'), ('--seat', 'seat'),
+                    ('--type', 'ticket_type'), ('--category', 'event_category')]:
+    if args.get(key):
+        details[field] = args[key]
+if args.get('--tickets'):
+    try: details['ticket_count'] = int(args['--tickets'])
+    except: details['ticket_count'] = args['--tickets']
+
+if details:
+    payload['details_json'] = details
+print(json.dumps(payload))
+" "--summary" "$summary" "--date" "$start_date" "--provider" "$provider" \
+  "--event" "$event_name" "--venue" "$venue" "--venue-address" "$venue_address" \
+  "--performer" "$performer" "--time" "$event_time" "--doors" "$door_time" \
+  "--section" "$section" "--row" "$row" "--seat" "$seat" \
+  "--tickets" "$ticket_count" "--type" "$ticket_type" "--category" "$event_category")
+
+  local resp
+  resp=$(_api -X POST "${API_V1}/trips/$(_urlencode "${trip_id}")/items" -d "$body")
+  if [ "$UBT_QUIET" = "1" ]; then
+    _python3c "import json, sys; d=json.loads(sys.stdin.read()); print(d.get('data',{}).get('id',''))" <<< "$resp"
+  else
+    echo "✅ Ticket added"
+    _python3c "
+import json, sys
+d = json.loads(sys.stdin.read()).get('data', {})
+det = d.get('details_json', {})
+print(f\"  id:       {d.get('id', '?')}\")
+print(f\"  event:    {det.get('event_name', d.get('summary', '?'))}\")
+if det.get('performer'): print(f\"  artist:   {det['performer']}\")
+if det.get('venue'): print(f\"  venue:    {det['venue']}\")
+print(f\"  date:     {d.get('start_date', '?')}\")
+if det.get('event_time'): print(f\"  time:     {det['event_time']}\")
+if det.get('door_time'): print(f\"  doors:    {det['door_time']}\")
+if det.get('section') or det.get('row') or det.get('seat'):
+    seat_parts = []
+    if det.get('section'): seat_parts.append(f\"Sec {det['section']}\")
+    if det.get('row'): seat_parts.append(f\"Row {det['row']}\")
+    if det.get('seat'): seat_parts.append(f\"Seat {det['seat']}\")
+    print(f\"  seating:  {', '.join(seat_parts)}\")
+if det.get('ticket_count'): print(f\"  tickets:  {det['ticket_count']}\")
+" <<< "$resp"
+  fi
+}
+
 cmd_selftest() {
   if [ -z "$UBT_API_KEY" ]; then
     echo "FAIL: No API key configured. Run 'ubt login' or set UBT_API_KEY." >&2
@@ -3112,6 +3339,9 @@ Commands:
   items status <item_id>                Show item live status *
   items refresh <item_id>               Refresh item live status *
   items move <item_id> <trip_id>        Move item to another trip *
+  tickets list [trip_id]                List all tickets/events (alias: events)
+  tickets add <trip_id> --event <name> --date <Y-M-D> [--venue X] [--performer X] [--time HH:MM] [--doors HH:MM] [--section X] [--row X] [--seat X] [--tickets N] [--provider X]
+  tickets show <item_id>                Show ticket details
   guides list                           List city guides *
   guides create <city> [--country X] [--country-code XX]  Create guide *
   guides show <guide_id>                Show guide + entries *
@@ -3366,6 +3596,14 @@ case "${1:-}" in
         esac
         ;;
       *) usage ;;
+    esac
+    ;;
+  tickets|events)
+    case "${2:-}" in
+      list) shift 2; cmd_tickets_list "$@" ;;
+      add)  shift 2; cmd_tickets_add "$@" ;;
+      show) cmd_items_show "${3:?Usage: ubt tickets show <item_id>}" ;;
+      *)    echo "Usage: ubt tickets <list|add|show>"; exit 1 ;;
     esac
     ;;
   users)    cmd_users ;;
