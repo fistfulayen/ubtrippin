@@ -202,11 +202,13 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
     const supabase = createClient()
     await supabase.from('trip_items').update({ trip_id: targetTripId }).eq('id', item.id)
     setMoveOpen(false)
-    // Regenerate names on both source and target trips (fire-and-forget)
-    fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
-    fetch(`/api/v1/trips/${targetTripId}/rename`, { method: 'POST' }).catch(() => {})
-    // Auto-set cover image on target trip if it doesn't have one (fire-and-forget)
-    fetch(`/api/v1/trips/${targetTripId}/auto-cover`, { method: 'POST' }).catch(() => {})
+    // Regenerate name + auto-cover on target trip, then refresh
+    // Run in parallel but await both before refreshing so the user sees the result
+    await Promise.all([
+      fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {}),
+      fetch(`/api/v1/trips/${targetTripId}/rename`, { method: 'POST' }).catch(() => {}),
+      fetch(`/api/v1/trips/${targetTripId}/auto-cover`, { method: 'POST' }).catch(() => {}),
+    ])
     router.refresh()
   }
 
