@@ -198,8 +198,8 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="relative w-full max-w-lg rounded-xl bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4" onClick={onClose}>
+      <div className="relative w-full max-w-lg rounded-t-xl sm:rounded-xl bg-white shadow-xl max-h-[90vh] sm:max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b p-4">
           <h3 className="text-lg font-semibold">
@@ -272,7 +272,7 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
             </div>
 
             {/* Content */}
-            <div className="p-4">
+            <div className="p-4 overflow-y-auto overscroll-contain flex-1">
               {tab === 'search' ? (
                 <div className="space-y-4">
                   {/* Source toggle */}
@@ -313,11 +313,11 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
 
                   {/* Brave web image results */}
                   {braveResults.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2 max-h-[40vh] sm:max-h-64 overflow-y-auto overscroll-contain">
                       {braveResults.map((result, i) => (
                         <button
                           key={i}
-                          className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#4f46e5] transition-all"
+                          className="relative aspect-video overflow-hidden rounded-lg ring-0 hover:ring-2 hover:ring-[#4f46e5] active:ring-2 active:ring-[#4f46e5] transition-all touch-manipulation"
                           onClick={() => handleSelectImage(result.url, 'external')}
                           disabled={uploading}
                         >
@@ -339,11 +339,11 @@ export function CoverImagePicker({ tripId, currentImageUrl, onClose }: CoverImag
 
                   {/* Unsplash results */}
                   {searchResults.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2 max-h-[40vh] sm:max-h-64 overflow-y-auto overscroll-contain">
                       {searchResults.map((result, i) => (
                         <button
                           key={i}
-                          className="relative aspect-video overflow-hidden rounded-lg hover:ring-2 hover:ring-[#4f46e5] transition-all"
+                          className="relative aspect-video overflow-hidden rounded-lg ring-0 hover:ring-2 hover:ring-[#4f46e5] active:ring-2 active:ring-[#4f46e5] transition-all touch-manipulation"
                           onClick={() => handleSelectImage(result.urls.regular, 'unsplash')}
                           disabled={uploading}
                         >

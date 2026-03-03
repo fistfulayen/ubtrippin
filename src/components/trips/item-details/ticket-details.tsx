@@ -80,10 +80,8 @@ export function TicketDetailsView({ details, tripId, itemId }: TicketDetailsView
     setDownloadingPdf(true)
     setPdfError(false)
     try {
-      const res = await fetch(`/api/v1/trips/${tripId}/items/${itemId}/ticket-pdf`)
-      if (!res.ok) throw new Error('Failed to get download link')
-      const { url } = await res.json()
-      window.open(url, '_blank', 'noopener,noreferrer')
+      // Use redirect URL — works on mobile without popup blocker issues
+      window.location.href = `/api/v1/trips/${tripId}/items/${itemId}/ticket-pdf?redirect=1`
     } catch {
       setPdfError(true)
     } finally {

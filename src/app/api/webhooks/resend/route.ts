@@ -4,6 +4,7 @@ import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/ve
 import { getResendClient } from '@/lib/resend/client'
 import { extractTravelData, type ExtractedItem } from '@/lib/ai/extract-travel-data'
 import { extractTextFromPdf } from '@/lib/pdf/parse-attachment'
+import { classifyPdfs, selectTicketPdfIndex } from '@/lib/attachments/classify-pdf'
 import {
   assignToTrip,
   updateTripDates,
@@ -197,14 +198,27 @@ export async function POST(request: NextRequest) {
 
     try {
       // Extract text from PDF attachments using Resend attachments API
-      // Also buffer PDFs for storage (ticket-attachments bucket) after item creation
+      // Download and store ALL PDFs in email-attachments bucket for inbox access
       let attachmentText = ''
-      const pdfBuffers: ArrayBuffer[] = [] // stored in order for later upload
+      const pdfBuffers: ArrayBuffer[] = [] // indexed same as fullEmail.attachments (PDF-only)
+      const enrichedAttachments: Array<{
+        filename: string
+        content_type: string
+        storage_path: string | null
+        is_noise: boolean
+        is_ticket: boolean
+      }> = []
+
       if (fullEmail.attachments?.length) {
+        const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+        const storageClient = createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SECRET_KEY!
+        )
+
         for (const attachment of fullEmail.attachments) {
           if (attachment.content_type === 'application/pdf') {
             try {
-              // Fetch attachment content via Resend API
               const { data: attachmentData } = await resend.emails.receiving.attachments.get({
                 emailId: webhookData.email_id,
                 id: attachment.id,
@@ -219,14 +233,73 @@ export async function POST(request: NextRequest) {
                 if (text) {
                   attachmentText += `\n\n--- PDF: ${attachment.filename} ---\n${text}`
                 }
-                // Buffer for later storage
                 pdfBuffers.push(pdfBuffer)
+
+                // Store in email-attachments bucket (all PDFs, not just tickets)
+                const safeFilename = attachment.filename.replace(/^\//, '').replace(/[^a-zA-Z0-9._-]/g, '_')
+                const storagePath = `${userId}/${sourceEmail.id}/${safeFilename}`
+                const { error: uploadError } = await storageClient.storage
+                  .from('email-attachments')
+                  .upload(storagePath, pdfBuffer, {
+                    contentType: 'application/pdf',
+                    upsert: true,
+                  })
+                if (uploadError) {
+                  console.error('Failed to store attachment:', safeFilename, uploadError)
+                  enrichedAttachments.push({
+                    filename: attachment.filename,
+                    content_type: attachment.content_type,
+                    storage_path: null,
+                    is_noise: false,
+                    is_ticket: false,
+                  })
+                } else {
+                  enrichedAttachments.push({
+                    filename: attachment.filename,
+                    content_type: attachment.content_type,
+                    storage_path: storagePath,
+                    is_noise: false,
+                    is_ticket: false,
+                  })
+                }
               }
             } catch (pdfError) {
               console.error('Failed to extract PDF:', attachment.filename, pdfError)
+              enrichedAttachments.push({
+                filename: attachment.filename,
+                content_type: attachment.content_type,
+                storage_path: null,
+                is_noise: false,
+                is_ticket: false,
+              })
             }
+          } else {
+            // Non-PDF attachment — store metadata only
+            enrichedAttachments.push({
+              filename: attachment.filename,
+              content_type: attachment.content_type,
+              storage_path: null,
+              is_noise: false,
+              is_ticket: false,
+            })
           }
         }
+
+        // Classify PDFs (noise vs ticket) and update enriched metadata
+        const classified = classifyPdfs(enrichedAttachments)
+        for (const c of classified) {
+          const match = enrichedAttachments.find((a) => a.filename === c.filename)
+          if (match) {
+            match.is_noise = c.is_noise
+            match.is_ticket = c.is_ticket
+          }
+        }
+
+        // Update source_emails with enriched attachment metadata
+        await supabase
+          .from('source_emails')
+          .update({ attachments_json: enrichedAttachments })
+          .eq('id', sourceEmail.id)
       }
 
       // Count this extraction against the user's monthly limit
@@ -551,39 +624,25 @@ export async function POST(request: NextRequest) {
           rawEmailText: `${fullEmail.subject || ''}\n${fullEmail.text || ''}\n${attachmentText || ''}`,
         })
 
-        // Store PDF attachment if this is a ticket and we have a PDF buffer
-        if (item.kind === 'ticket' && pdfBuffers.length > 0) {
-          try {
-            const { createClient: createServiceClient } = await import('@supabase/supabase-js')
-            const serviceSupabase = createServiceClient(
-              process.env.NEXT_PUBLIC_SUPABASE_URL!,
-              process.env.SUPABASE_SECRET_KEY!
-            )
-            const pdfBuffer = pdfBuffers[0] // Use first PDF if multiple
-            const storagePath = `${confirmedTripOwnerId}/${tripItem.id}/ticket.pdf`
-            const { error: uploadError } = await serviceSupabase.storage
-              .from('ticket-attachments')
-              .upload(storagePath, pdfBuffer, {
-                contentType: 'application/pdf',
-                upsert: true,
+        // Link the best ticket PDF from email-attachments (already stored above)
+        if (item.kind === 'ticket' && enrichedAttachments.length > 0) {
+          const ticketIdx = selectTicketPdfIndex(enrichedAttachments)
+          const ticketAtt = ticketIdx >= 0 ? enrichedAttachments[ticketIdx] : null
+          if (ticketAtt?.storage_path) {
+            // Point ticket_pdf_path to the email-attachments bucket path
+            await supabase
+              .from('trip_items')
+              .update({
+                details_json: {
+                  ...((item.details as Record<string, unknown>) || {}),
+                  ticket_pdf_path: ticketAtt.storage_path,
+                  ticket_pdf_bucket: 'email-attachments',
+                },
               })
-            if (!uploadError) {
-              // Update details_json with storage path for later signed URL generation
-              await supabase
-                .from('trip_items')
-                .update({
-                  details_json: {
-                    ...((item.details as Record<string, unknown>) || {}),
-                    ticket_pdf_path: storagePath,
-                  },
-                })
-                .eq('id', tripItem.id)
-              console.log('Stored ticket PDF at:', storagePath)
-            } else {
-              console.error('Failed to upload ticket PDF:', uploadError)
-            }
-          } catch (pdfUploadError) {
-            console.error('Ticket PDF upload error:', pdfUploadError)
+              .eq('id', tripItem.id)
+            console.log('Linked ticket PDF:', ticketAtt.filename, '→', ticketAtt.storage_path)
+          } else {
+            console.log('No suitable ticket PDF found among', enrichedAttachments.length, 'attachments')
           }
         }
 

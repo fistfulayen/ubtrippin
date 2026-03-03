@@ -48,15 +48,24 @@ export async function GET(
     return NextResponse.json({ error: 'No PDF stored for this ticket' }, { status: 404 })
   }
 
+  // Determine which bucket (new items use email-attachments, old ones use ticket-attachments)
+  const bucket = (details?.ticket_pdf_bucket as string) || 'ticket-attachments'
+
   // Generate a 1-hour signed URL using service client
   const service = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
   const { data, error } = await service.storage
-    .from('ticket-attachments')
+    .from(bucket)
     .createSignedUrl(pdfPath, 3600) // 1 hour
 
   if (error || !data) {
     console.error('Failed to create signed URL:', error)
     return NextResponse.json({ error: 'Failed to generate download link' }, { status: 500 })
+  }
+
+  // If ?redirect=1, redirect directly (mobile-friendly, no popup blocker issues)
+  const url = new URL(_request.url)
+  if (url.searchParams.get('redirect') === '1') {
+    return NextResponse.redirect(data.signedUrl)
   }
 
   return NextResponse.json({ url: data.signedUrl })

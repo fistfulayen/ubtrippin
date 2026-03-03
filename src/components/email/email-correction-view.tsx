@@ -146,6 +146,7 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
             <AttachmentViewer
               attachmentText={email.attachment_text}
               attachments={email.attachments_json || []}
+              emailId={email.id}
             />
           </CardContent>
         </Card>
