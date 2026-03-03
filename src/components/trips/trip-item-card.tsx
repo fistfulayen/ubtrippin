@@ -205,6 +205,8 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
     // Regenerate names on both source and target trips (fire-and-forget)
     fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
     fetch(`/api/v1/trips/${targetTripId}/rename`, { method: 'POST' }).catch(() => {})
+    // Auto-set cover image on target trip if it doesn't have one (fire-and-forget)
+    fetch(`/api/v1/trips/${targetTripId}/auto-cover`, { method: 'POST' }).catch(() => {})
     router.refresh()
   }
 
