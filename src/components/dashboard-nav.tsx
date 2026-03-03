@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen, Award, MessageSquare, CircleHelp, FileText } from 'lucide-react'
+import { Plane, Inbox, Settings, LogOut, Menu, X, BookOpen, Award, MessageSquare, CircleHelp, FileText, Ticket } from 'lucide-react'
 import { useState } from 'react'
 import { UserAvatar } from '@/components/user-avatar'
 import { NotificationBell } from '@/components/notifications/notification-bell'
@@ -19,6 +19,7 @@ interface DashboardNavProps {
 
 const navItems = [
   { href: '/trips', label: 'Trips', icon: Plane },
+  { href: '/events', label: 'Events', icon: Ticket },
   { href: '/loyalty', label: 'Loyalty', icon: Award },
   { href: '/guides', label: 'Guides', icon: BookOpen },
   { href: '/inbox', label: 'Inbox', icon: Inbox },

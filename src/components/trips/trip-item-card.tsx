@@ -452,7 +452,11 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                     <CarDetailsView details={details as CarRentalDetails} />
                   )}
                   {item.kind === 'ticket' && (
-                    <TicketDetailsView details={details as Record<string, unknown>} />
+                    <TicketDetailsView
+                      details={details as Record<string, unknown>}
+                      tripId={item.trip_id ?? undefined}
+                      itemId={item.id}
+                    />
                   )}
                   {!['flight', 'hotel', 'train', 'car', 'ticket'].includes(item.kind) && (
                     <GenericDetailsView details={details} />

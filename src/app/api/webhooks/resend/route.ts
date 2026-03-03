@@ -197,7 +197,9 @@ export async function POST(request: NextRequest) {
 
     try {
       // Extract text from PDF attachments using Resend attachments API
+      // Also buffer PDFs for storage (ticket-attachments bucket) after item creation
       let attachmentText = ''
+      const pdfBuffers: ArrayBuffer[] = [] // stored in order for later upload
       if (fullEmail.attachments?.length) {
         for (const attachment of fullEmail.attachments) {
           if (attachment.content_type === 'application/pdf') {
@@ -208,14 +210,17 @@ export async function POST(request: NextRequest) {
                 id: attachment.id,
               })
               if (attachmentData?.download_url) {
-                // Download and extract PDF text
+                // Download PDF
                 const pdfResponse = await fetch(attachmentData.download_url)
                 const pdfBuffer = await pdfResponse.arrayBuffer()
+                // Extract text for AI
                 const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
                 const text = await extractTextFromPdf(pdfBase64)
                 if (text) {
                   attachmentText += `\n\n--- PDF: ${attachment.filename} ---\n${text}`
                 }
+                // Buffer for later storage
+                pdfBuffers.push(pdfBuffer)
               }
             } catch (pdfError) {
               console.error('Failed to extract PDF:', attachment.filename, pdfError)
@@ -545,6 +550,42 @@ export async function POST(request: NextRequest) {
           providerName: item.provider,
           rawEmailText: `${fullEmail.subject || ''}\n${fullEmail.text || ''}\n${attachmentText || ''}`,
         })
+
+        // Store PDF attachment if this is a ticket and we have a PDF buffer
+        if (item.kind === 'ticket' && pdfBuffers.length > 0) {
+          try {
+            const { createClient: createServiceClient } = await import('@supabase/supabase-js')
+            const serviceSupabase = createServiceClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.SUPABASE_SECRET_KEY!
+            )
+            const pdfBuffer = pdfBuffers[0] // Use first PDF if multiple
+            const storagePath = `${confirmedTripOwnerId}/${tripItem.id}/ticket.pdf`
+            const { error: uploadError } = await serviceSupabase.storage
+              .from('ticket-attachments')
+              .upload(storagePath, pdfBuffer, {
+                contentType: 'application/pdf',
+                upsert: true,
+              })
+            if (!uploadError) {
+              // Update details_json with storage path for later signed URL generation
+              await supabase
+                .from('trip_items')
+                .update({
+                  details_json: {
+                    ...((item.details as Record<string, unknown>) || {}),
+                    ticket_pdf_path: storagePath,
+                  },
+                })
+                .eq('id', tripItem.id)
+              console.log('Stored ticket PDF at:', storagePath)
+            } else {
+              console.error('Failed to upload ticket PDF:', uploadError)
+            }
+          } catch (pdfUploadError) {
+            console.error('Ticket PDF upload error:', pdfUploadError)
+          }
+        }
 
         createdItems.push({ tripId: confirmedTripId, itemId: tripItem.id })
       }

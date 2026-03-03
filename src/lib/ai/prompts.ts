@@ -9,7 +9,7 @@ Rules:
 6. For car rentals: extract pickup/dropoff locations and times, rental company, vehicle type
 7. For restaurants: extract reservation time, restaurant name, party size
 8. For activities: extract activity name, date/time, location, provider
-9. For tickets/events: ANY concert, theater, sporting event, museum, festival, or show ticket MUST be classified as kind "ticket" (not "activity" or "other"). Extract event name, venue name, venue address, date/time, section/seat/row, ticket count, ticket type (GA/Reserved/VIP), performer/show name, door time if different from event time. Common providers: Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, venue direct sales, StubHub, Viagogo. If the email mentions an order number or barcode for entry to an event, it is a ticket.
+9. For tickets/events: ANY concert, theater, sporting event, museum, festival, or show ticket MUST be classified as kind "ticket" (not "activity" or "other"). Extract event name, venue name, venue address, date/time, section/seat/row, ticket count, ticket type (GA/Reserved/VIP), performer/show name, door time if different from event time. Common providers: Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, venue direct sales, StubHub, Viagogo. If the email mentions an order number or barcode for entry to an event, it is a ticket. If the email contains an Apple Wallet link (typically wallet.apple.com or a .pkpass download), extract it as "apple_wallet_url". If the email contains a Google Wallet link (typically pay.google.com/gp/v/save or similar), extract it as "google_wallet_url".
 10. Set confidence score 0.0-1.0 based on how clearly the data is presented:
    - 1.0: All data clearly visible and unambiguous
    - 0.8-0.9: Most data clear, some minor uncertainties

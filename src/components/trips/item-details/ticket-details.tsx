@@ -1,4 +1,7 @@
-import { MapPin, Clock, Users, Armchair, Music } from 'lucide-react'
+'use client'
+
+import { useState } from 'react'
+import { MapPin, Clock, Users, Armchair, Music, Download, ExternalLink } from 'lucide-react'
 
 interface TicketDetails {
   event_name?: string
@@ -13,14 +16,42 @@ interface TicketDetails {
   ticket_type?: string
   performer?: string
   event_category?: string
+  ticket_pdf_path?: string
+  apple_wallet_url?: string
+  google_wallet_url?: string
   [key: string]: unknown
 }
 
 interface TicketDetailsViewProps {
   details: TicketDetails
+  tripId?: string
+  itemId?: string
 }
 
-export function TicketDetailsView({ details }: TicketDetailsViewProps) {
+// Map known ticket providers to their "manage tickets" base URLs
+const PROVIDER_URLS: Record<string, string> = {
+  ticketmaster: 'https://www.ticketmaster.com/my-tickets',
+  'ticketmaster.fr': 'https://www.ticketmaster.fr/my-account/tickets',
+  axs: 'https://www.axs.com/mytickets',
+  eventbrite: 'https://www.eventbrite.com/mytickets',
+  dice: 'https://dice.fm/my-tickets',
+  seetickets: 'https://www.seetickets.com/mytickets',
+  stubhub: 'https://www.stubhub.com/mytickets',
+  viagogo: 'https://www.viagogo.com/ww/Account/Purchases',
+  fnac: 'https://www.fnacspectacles.com/espace-client',
+  billetreduc: 'https://www.billetreduc.com/cgi-bin/evcontact.exe?act=accueil',
+}
+
+function getProviderUrl(provider?: string | null): string | null {
+  if (!provider) return null
+  const key = provider.toLowerCase().replace(/\s+/g, '')
+  for (const [k, url] of Object.entries(PROVIDER_URLS)) {
+    if (key.includes(k) || k.includes(key)) return url
+  }
+  return null
+}
+
+export function TicketDetailsView({ details, tripId, itemId }: TicketDetailsViewProps) {
   const {
     event_name,
     venue,
@@ -34,7 +65,31 @@ export function TicketDetailsView({ details }: TicketDetailsViewProps) {
     ticket_type,
     performer,
     event_category,
+    ticket_pdf_path,
+    apple_wallet_url,
+    google_wallet_url,
   } = details
+
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [pdfError, setPdfError] = useState(false)
+
+  const providerUrl = getProviderUrl(details.provider as string | undefined)
+
+  const handleDownloadPdf = async () => {
+    if (!tripId || !itemId) return
+    setDownloadingPdf(true)
+    setPdfError(false)
+    try {
+      const res = await fetch(`/api/v1/trips/${tripId}/items/${itemId}/ticket-pdf`)
+      if (!res.ok) throw new Error('Failed to get download link')
+      const { url } = await res.json()
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      setPdfError(true)
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-amber-50 to-gray-100 p-4">
@@ -141,6 +196,56 @@ export function TicketDetailsView({ details }: TicketDetailsViewProps) {
             <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium capitalize text-gray-700">
               {event_category}
             </span>
+          )}
+        </div>
+      )}
+
+      {/* Action buttons: PDF, Wallet links, Provider */}
+      {(ticket_pdf_path || apple_wallet_url || google_wallet_url || providerUrl) && (
+        <div className="mt-4 flex flex-wrap gap-2 border-t border-amber-100 pt-4">
+          {ticket_pdf_path && tripId && itemId && (
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="inline-flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {downloadingPdf ? 'Opening…' : 'View PDF ticket'}
+            </button>
+          )}
+          {pdfError && (
+            <span className="text-xs text-red-500">Failed to load PDF. Try again.</span>
+          )}
+          {apple_wallet_url && (
+            <a
+              href={apple_wallet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800 transition-colors"
+            >
+              Add to Apple Wallet
+            </a>
+          )}
+          {google_wallet_url && (
+            <a
+              href={google_wallet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              Add to Google Wallet
+            </a>
+          )}
+          {providerUrl && (
+            <a
+              href={providerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Manage tickets
+            </a>
           )}
         </div>
       )}
