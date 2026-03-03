@@ -2,7 +2,8 @@
  * GET /api/v1/trips/:id/items/:itemId/ticket-pdf
  *
  * Returns a short-lived signed URL (1 hour) for downloading a stored ticket PDF.
- * Only accessible by the trip owner or family members with access.
+ * SECURITY: Only accessible by the item OWNER (not family, not collaborators, not share links).
+ * Tickets are access credentials — sharing a trip should never share the ticket PDFs.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -29,13 +30,18 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Verify user can access this item (RLS on trip_items handles owner + family)
+  // SECURITY: Only the item owner can download ticket PDFs (not family, not collaborators)
+  // Tickets are access credentials — never share them via trip sharing
   const { data: item } = await supabase
     .from('trip_items')
-    .select('id, details_json')
+    .select('id, user_id, details_json')
     .eq('id', itemId)
     .eq('trip_id', tripId)
     .single()
+
+  if (item && item.user_id !== user.id) {
+    return NextResponse.json({ error: 'Ticket PDFs are only accessible by the owner' }, { status: 403 })
+  }
 
   if (!item) {
     return NextResponse.json({ error: 'Item not found' }, { status: 404 })
