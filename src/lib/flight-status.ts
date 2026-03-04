@@ -245,11 +245,12 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
   }
 
   const start = `${date}T00:00:00Z`
-  // FlightAware rejects end bounds >2 days in the future.
-  // Cap end to min(end-of-day, now + 47h) to stay within their limit.
+  // FlightAware rejects end bounds >2 days in the future and requires Z suffix (not +00:00).
+  // Cap end to min(end-of-day, now + 47h).
   const endOfDay = new Date(`${date}T23:59:59Z`)
   const maxEnd = new Date(Date.now() + 47 * 60 * 60 * 1000)
-  const end = (endOfDay < maxEnd ? endOfDay : maxEnd).toISOString()
+  const endDate = endOfDay < maxEnd ? endOfDay : maxEnd
+  const end = endDate.toISOString().replace('+00:00', 'Z')
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
 
   try {
