@@ -108,6 +108,7 @@ export function CalendarFeedSection({ isPro }: CalendarFeedSectionProps) {
       <div className="space-y-4">
         {showUpgradePrompt && (
           <UpgradeCard
+            source="calendar_gate"
             title="Live calendar feed is a Pro feature"
             description="Upgrade to enable a private iCal feed that auto-updates as trips change."
             variant="card"

@@ -344,6 +344,7 @@ export function FamilySettings({ currentUserId, subscriptionTier }: FamilySettin
               </form>
             ) : (
               <UpgradeCard
+                source="family_gate"
                 title="Family sharing is a Pro feature"
                 description="Share trips, loyalty programs, and city guides with your family."
                 variant="card"

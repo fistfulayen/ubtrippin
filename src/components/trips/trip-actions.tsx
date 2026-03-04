@@ -183,6 +183,7 @@ export function TripActions({ trip, allTrips, isOwner = true, isPro = false }: T
 
       {showPdfUpsell && (
         <UpgradeCard
+          source="pdf_export_gate"
           title="PDF export is included with Pro"
           description="Export polished itinerary PDFs for offline access, sharing, and printing."
           variant="card"

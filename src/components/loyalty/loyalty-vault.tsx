@@ -472,6 +472,7 @@ export function LoyaltyVault({ isPro, fullName, initialPrograms, initialProvider
 
       {showLimitUpsell && (
         <UpgradeCard
+          source="loyalty_limit"
           title="Loyalty vault limit reached"
           description="You can store up to 3 programs on Free. Upgrade to Pro to add program #4 and keep unlimited loyalty records."
           variant="card"

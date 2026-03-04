@@ -113,6 +113,7 @@ export default async function TripsPage() {
 
       {showFreeTripLimitCard && (
         <UpgradeCard
+          source="trips_limit"
           title="You've reached the free trip limit"
           description="Upgrade to Pro for unlimited trips, live flight status, and more."
           variant="card"

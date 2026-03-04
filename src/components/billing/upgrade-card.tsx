@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo } from 'react'
+import { track } from '@vercel/analytics'
 
 import { EARLY_ADOPTER_LIMIT, PRICE_EARLY_ADOPTER } from '@/lib/billing'
 import { useEarlyAdopterSpots } from '@/hooks/use-early-adopter-spots'
@@ -15,6 +16,8 @@ interface UpgradeCardProps {
   variant?: 'inline' | 'card' | 'banner'
   showEarlyAdopter?: boolean
   className?: string
+  /** Analytics source — identifies which upsell point was clicked */
+  source?: string
 }
 
 function EarlyAdopterBadge({ spotsRemaining }: { spotsRemaining: number }) {
@@ -52,8 +55,13 @@ export function UpgradeCard({
   variant = 'card',
   showEarlyAdopter = false,
   className,
+  source,
 }: UpgradeCardProps) {
   const spotsRemaining = useEarlyAdopterSpots(showEarlyAdopter)
+
+  const trackClick = () => {
+    track('upgrade_clicked', { source: source ?? variant ?? 'unknown', variant: variant ?? 'card' })
+  }
 
   const badge = showEarlyAdopter && spotsRemaining !== null
     ? <EarlyAdopterBadge spotsRemaining={spotsRemaining} />
@@ -67,6 +75,7 @@ export function UpgradeCard({
         <Link
           href="/settings/billing"
           className="font-medium text-indigo-600 transition-colors hover:text-indigo-500"
+          onClick={trackClick}
         >
           Upgrade →
         </Link>
@@ -83,7 +92,7 @@ export function UpgradeCard({
             <span className="font-semibold text-slate-900">{title}</span>
             <span className="text-slate-600">{description}</span>
           </div>
-          <Link href="/settings/billing" className="shrink-0">
+          <Link href="/settings/billing" className="shrink-0" onClick={trackClick}>
             <Button
               size="sm"
               className="bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500"
@@ -105,7 +114,7 @@ export function UpgradeCard({
           <p className="text-sm text-slate-600">{description}</p>
           {badge}
         </div>
-        <Link href="/settings/billing" className="shrink-0">
+        <Link href="/settings/billing" className="shrink-0" onClick={trackClick}>
           <Button className="bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500">
             Upgrade →
           </Button>

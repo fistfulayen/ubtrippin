@@ -48,6 +48,7 @@ export default async function GuidesPage() {
 
       {!isPro && (
         <UpgradeCard
+          source="guides_pro"
           title="Pro features: PDF export, sharing."
           description="Upgrade to export polished guide PDFs and share guides with family or collaborators."
           variant="inline"

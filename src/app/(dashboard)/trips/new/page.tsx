@@ -41,6 +41,7 @@ export default async function NewTripPage() {
       {limitHit ? (
         <div className="space-y-4">
           <UpgradeCard
+            source="trips_new_limit"
             title="You hit the free trip limit"
             description={`You already have ${limitUsed}/${limitMax} active trips. Upgrade to Pro to create trip #${limitMax + 1} now.`}
             variant="card"

@@ -174,6 +174,7 @@ export function EmailCorrectionView({ email }: EmailCorrectionViewProps) {
             {extractionLimitHit && (
               <div className="mb-4">
                 <UpgradeCard
+                  source="extraction_limit"
                   title="Monthly extraction limit reached"
                   description="Free includes 10 email extractions each month. Upgrade to Pro to keep processing incoming bookings without waiting for reset."
                   variant="card"

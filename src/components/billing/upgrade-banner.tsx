@@ -89,6 +89,7 @@ export function UpgradeBanner({ subscriptionTier }: UpgradeBannerProps) {
     <div className="border-b border-slate-200 bg-white/90">
       <div className="mx-auto flex max-w-7xl items-start gap-2 px-4 py-2 sm:px-6 lg:px-8">
         <UpgradeCard
+          source="global_banner"
           title={title}
           description={description}
           variant="banner"

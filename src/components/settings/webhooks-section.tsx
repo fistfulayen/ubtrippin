@@ -416,6 +416,7 @@ export function WebhooksSection({ subscriptionTier }: WebhooksSectionProps) {
     <div className="space-y-6">
       {showUpgradePrompt && (
         <UpgradeCard
+          source="webhook_gate"
           title="Webhook registration is a Pro feature"
           description="Connect your systems to real-time trip updates with signed webhook events on Pro."
           variant="card"
