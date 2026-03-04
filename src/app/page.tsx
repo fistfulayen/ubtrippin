@@ -54,12 +54,12 @@ export default async function HomePage() {
       body: 'Invite co-travelers. Everyone can add and edit. Plan together.',
     },
     {
-      icon: '/ticket_icon.svg',
+      icon: '/ticket_icon.png',
       title: 'Concerts & events',
       body: 'Forward your Ticketmaster email. Venue, seats, performer, door time — all extracted. PDF tickets stored. Wallet links preserved.',
     },
     {
-      icon: '/flight_status_icon.svg',
+      icon: '/flight_status_icon.png',
       title: 'Live flight status',
       body: 'Real-time gate changes, delays, and cancellations via FlightAware. Updated automatically as departure approaches.',
     },
