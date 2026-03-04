@@ -16,7 +16,7 @@ import { searchBraveImages } from '@/lib/images/brave-image-search'
 import { storeCoverImage } from '@/lib/images/store-cover-image'
 import { locationToCityAsync } from '@/lib/images/airport-cities'
 import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
-import { sanitizeHtml } from '@/lib/utils'
+import { extractLocalTime, sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
 import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       : profilesData as { email: string; full_name: string | null } | null
 
     // ── Soft usage gate: check monthly extraction limit ───────────────────────
-    const extractionCheck = await checkExtractionLimit(userId)
+    const extractionCheck = await checkExtractionLimit(userId, supabase)
     if (!extractionCheck.allowed) {
       console.log(`Extraction limit reached for user ${userId}: ${extractionCheck.used}/${extractionCheck.limit}`)
       await supabase
@@ -303,10 +303,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Count this extraction against the user's monthly limit
-      await incrementExtractionCount(userId)
+      await incrementExtractionCount(userId, supabase)
 
       // Track that this user forwarded their first email (idempotent)
-      trackFirstForward(userId).catch((err) =>
+      trackFirstForward(userId, supabase).catch((err) =>
         console.error('[activation] trackFirstForward failed:', err)
       )
 
@@ -501,7 +501,7 @@ export async function POST(request: NextRequest) {
             tripOwnerId = userId
 
             // Track activation milestone (idempotent)
-            trackTripCreated(userId).catch((err) =>
+            trackTripCreated(userId, supabase).catch((err) =>
               console.error('[activation] trackTripCreated failed:', err)
             )
 
@@ -586,6 +586,16 @@ export async function POST(request: NextRequest) {
         }
         tripsToUpdate.get(confirmedTripId)!.items.push(item)
 
+        const details = { ...((item.details as Record<string, unknown>) || {}) }
+        if (item.kind === 'flight' || item.kind === 'train') {
+          if (!details.departure_local_time && item.start_ts) {
+            details.departure_local_time = extractLocalTime(item.start_ts)
+          }
+          if (!details.arrival_local_time && item.end_ts) {
+            details.arrival_local_time = extractLocalTime(item.end_ts)
+          }
+        }
+
         // Create trip item
         const { data: tripItem, error: itemError } = await supabase
           .from('trip_items')
@@ -603,7 +613,7 @@ export async function POST(request: NextRequest) {
             start_location: item.start_location,
             end_location: item.end_location,
             summary: item.summary,
-            details_json: item.details || {},
+            details_json: details,
             status: item.status,
             confidence: item.confidence,
             needs_review: item.needs_review,
@@ -618,6 +628,7 @@ export async function POST(request: NextRequest) {
         }
 
         await applyEmailLoyaltyFlag({
+          supabase,
           userId: confirmedTripOwnerId,
           tripItemId: tripItem.id,
           providerName: item.provider,

@@ -59,6 +59,17 @@ export function formatTime(date: string | Date | null | undefined): string {
 }
 
 /**
+ * Extract local time (HH:MM) from an ISO 8601 timestamp.
+ * The time portion of the ISO string represents local time when an offset is present.
+ * e.g., "2026-03-10T12:52:00-05:00" -> "12:52"
+ */
+export function extractLocalTime(isoString: string | null | undefined): string | null {
+  if (!isoString) return null
+  const match = isoString.match(/T(\d{2}:\d{2})/)
+  return match ? match[1] : null
+}
+
+/**
  * Get the best display time for a trip item, preferring local times from details.
  * Returns [startTime, endTime] as formatted strings.
  */
