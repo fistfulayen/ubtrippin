@@ -140,7 +140,7 @@ function mapFlightStatus(
 // Common airline name → IATA code mapping for when flight_number is digits-only.
 const AIRLINE_IATA: Record<string, string> = {
   'air france': 'AF',
-  'air france hop': 'AF',
+  'air france hop': 'HOP',
   'hop': 'A5',
   'hop!': 'A5',
   'delta': 'DL',
