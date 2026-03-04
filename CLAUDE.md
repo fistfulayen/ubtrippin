@@ -49,6 +49,12 @@ See `src/lib/ai/extract-travel-data.ts` for implementation.
 2. **Auth**: Google OAuth via Supabase → Profile auto-created via trigger
 3. **PDF Generation**: `/trips/[id]/pdf` → React-PDF render → Download
 
+## Security — Hard Rules
+
+- **RLS on every table.** Every `CREATE TABLE` migration MUST include `ENABLE ROW LEVEL SECURITY` + at least one `CREATE POLICY` in the same file. CI enforces this via `scripts/check-rls.sh`.
+- **No service client on happy paths.** Do NOT use `createSecretClient()` or service role to bypass RLS. If RLS blocks an operation, fix the RLS policy. Acceptable uses: error cleanup, admin CLI, webhook processing, cron jobs without user context.
+- **This code is security-audited monthly.** Every RLS bypass is a finding.
+
 ## Environment Variables
 
 See `.env.local.example` for required variables.

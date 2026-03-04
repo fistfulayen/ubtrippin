@@ -121,6 +121,7 @@ Key tables (see `supabase/migrations/` for full schema):
 - **AI extraction processes untrusted input.** The extraction prompt sandwiches email content between delimiters.
 - **Webhook signatures must be verified.** All Resend webhooks use Svix verification.
 - **RLS is non-negotiable.** Every new table needs RLS policies. Test that user A cannot see user B's data.
+- **Migration rule:** Every `CREATE TABLE` in a migration MUST have `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` + at least one `CREATE POLICY` in the same migration file. No exceptions — not even "read-only reference tables." CI will reject PRs that violate this (`scripts/check-rls.sh`).
 - **Service role key stays server-side.** grep for `SUPABASE_SECRET_KEY` — it should only appear in `lib/supabase/server.ts` and `.env` files.
 
 ## Testing

@@ -139,6 +139,14 @@ jobs:
           
           echo "✅ No critical security patterns found"
 
+  rls-check:
+    name: RLS Enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify all public tables have RLS
+        run: bash scripts/check-rls.sh
+
   env-check:
     name: Environment Safety
     runs-on: ubuntu-latest
