@@ -5,6 +5,7 @@ import {
   buildSystemPromptWithExamples,
 } from './prompts'
 import { selectExamples } from './example-selection'
+import { createSecretClient } from '@/lib/supabase/service'
 import type { TripItemKind, TripItemStatus } from '@/types/database'
 
 export interface ExtractedItem {
@@ -33,6 +34,7 @@ export interface ExtractionResult {
 
 export interface ExtractTravelDataOptions {
   senderDomain?: string
+  supabase?: import('@supabase/supabase-js').SupabaseClient
 }
 
 interface DateNormalizationContext {
@@ -95,7 +97,8 @@ export async function extractTravelData(
   options?: ExtractTravelDataOptions
 ): Promise<ExtractionResult> {
   // Select relevant few-shot examples based on sender domain
-  const examples = await selectExamples(options?.senderDomain)
+  const dbClient = options?.supabase ?? createSecretClient()
+  const examples = await selectExamples(options?.senderDomain, dbClient)
 
   if (examples.length > 0) {
     console.log(`Using ${examples.length} extraction examples for ${options?.senderDomain || 'unknown domain'}`)

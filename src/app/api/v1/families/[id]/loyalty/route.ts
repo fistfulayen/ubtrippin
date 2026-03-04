@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { requireFamilyAccess } from '../_lib'
 
@@ -31,11 +31,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   const memberUserIds = Array.from(new Set(access.ctx.members.map((member) => member.user_id)))
 
-  // Use service client for cross-user family loyalty lookup.
-  // Auth is already verified: requireFamilyAccess confirms the viewer
-  // is an accepted member of this family before we reach this point.
-  const service = createSecretClient()
-  const { data: loyaltyRows, error: loyaltyError } = await service
+  const scoped = await createUserScopedClient(access.ctx.viewerId)
+  const { data: loyaltyRows, error: loyaltyError } = await scoped
     .from('loyalty_programs')
     .select('id, user_id, traveler_name, provider_name, provider_key, program_number_encrypted, program_number_masked, preferred, updated_at, created_at')
     .in('user_id', memberUserIds)
@@ -51,7 +48,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
   }
 
   const { data: profileRows } = memberUserIds.length
-    ? await service
+    ? await scoped
         .from('profiles')
         .select('id, full_name, email')
         .in('id', memberUserIds)

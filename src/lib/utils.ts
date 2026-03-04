@@ -59,6 +59,36 @@ export function formatTime(date: string | Date | null | undefined): string {
 }
 
 /**
+ * Extract local time (HH:MM) from an ISO 8601 timestamp.
+ * The time portion of the ISO string represents local time when an offset is present.
+ * e.g., "2026-03-10T12:52:00-05:00" -> "12:52"
+ */
+export function extractLocalTime(isoString: string | null | undefined): string | null {
+  if (!isoString) return null
+  const match = isoString.match(/T(\d{2}:\d{2})/)
+  return match ? match[1] : null
+}
+
+/**
+ * Build details_json for a trip item, ensuring local times are populated
+ * from the ISO timestamps before Postgres normalizes them to UTC.
+ */
+export function buildTripItemDetails(
+  item: { kind: string; start_ts?: string | null; end_ts?: string | null; details?: Record<string, unknown> | null }
+): Record<string, unknown> {
+  const details = { ...(item.details || {}) }
+  if (item.kind === 'flight' || item.kind === 'train') {
+    if (!details.departure_local_time && item.start_ts) {
+      details.departure_local_time = extractLocalTime(item.start_ts)
+    }
+    if (!details.arrival_local_time && item.end_ts) {
+      details.arrival_local_time = extractLocalTime(item.end_ts)
+    }
+  }
+  return details
+}
+
+/**
  * Get the best display time for a trip item, preferring local times from details.
  * Returns [startTime, endTime] as formatted strings.
  */

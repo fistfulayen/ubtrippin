@@ -1,6 +1,5 @@
 import { decryptLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
-import { createSecretClient } from '@/lib/supabase/service'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type DbClient = SupabaseClient
@@ -109,7 +108,7 @@ async function setTripItemFlag(
 }
 
 export async function applyEmailLoyaltyFlag(params: {
-  supabase?: DbClient
+  supabase: DbClient
   userId: string
   tripItemId: string
   providerName: string | null
@@ -118,7 +117,7 @@ export async function applyEmailLoyaltyFlag(params: {
   const providerName = params.providerName?.trim()
   if (!providerName) return
 
-  const supabase = params.supabase ?? createSecretClient()
+  const { supabase } = params
   const match = await matchProviderForUser(supabase, params.userId, providerName)
   if (!match) return
 
@@ -164,7 +163,7 @@ export async function applyEmailLoyaltyFlag(params: {
 }
 
 export async function applyNoVaultEntryFlag(params: {
-  supabase?: DbClient
+  supabase: DbClient
   userId: string
   tripItemId: string
   providerName: string | null
@@ -172,7 +171,7 @@ export async function applyNoVaultEntryFlag(params: {
   const providerName = params.providerName?.trim()
   if (!providerName) return
 
-  const supabase = params.supabase ?? createSecretClient()
+  const { supabase } = params
   const match = await matchProviderForUser(supabase, params.userId, providerName)
   if (!match) return
 

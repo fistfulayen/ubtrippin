@@ -1,4 +1,4 @@
-import { createSecretClient } from '@/lib/supabase/service'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type TripWriteAccessRole = 'owner' | 'editor' | 'family_member'
 export type TripWriteDeniedReason = 'not_found' | 'forbidden' | 'viewer' | 'internal_error'
@@ -7,8 +7,6 @@ interface TripOwnerRow {
   id: string
   user_id: string
 }
-
-type SupabaseSecretClient = ReturnType<typeof createSecretClient>
 
 export type TripWriteAccessResult =
   | {
@@ -23,7 +21,7 @@ export type TripWriteAccessResult =
     }
 
 interface ResolveTripWriteAccessParams {
-  supabase: SupabaseSecretClient
+  supabase: SupabaseClient
   tripId: string
   userId: string
 }

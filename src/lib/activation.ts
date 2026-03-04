@@ -7,7 +7,6 @@
  *   second_trip_at    — second trip created
  */
 
-import { createSecretClient } from '@/lib/supabase/service'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type DbClient = SupabaseClient
@@ -18,7 +17,7 @@ type DbClient = SupabaseClient
  */
 export async function trackFirstForward(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<void> {
 
   // Only set if not already set — idempotent upsert
@@ -37,7 +36,7 @@ export async function trackFirstForward(
  */
 export async function trackTripCreated(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<void> {
 
   // Fetch current activation state

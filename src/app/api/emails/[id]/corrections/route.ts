@@ -4,6 +4,7 @@ import { createSecretClient } from '@/lib/supabase/service'
 import { createEmailSnippet } from '@/lib/ai/example-selection'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 import type { Json } from '@/types/database'
+import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
 interface CorrectionRequest {
@@ -266,7 +267,7 @@ async function syncTripItems(
           start_location: item.start_location,
           end_location: item.end_location,
           summary: item.summary,
-          details_json: item.details || {},
+          details_json: buildTripItemDetails(item),
           status: item.status,
           confidence: 1.0, // User-corrected = high confidence
           needs_review: false,
@@ -316,7 +317,7 @@ async function syncTripItems(
           start_location: item.start_location,
           end_location: item.end_location,
           summary: item.summary,
-          details_json: item.details || {},
+          details_json: buildTripItemDetails(item),
           status: item.status,
           confidence: 1.0,
           needs_review: false,

@@ -8,11 +8,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY!
 
 export async function GET(
   _request: NextRequest,
@@ -58,7 +55,7 @@ export async function GET(
   const bucket = (details?.ticket_pdf_bucket as string) || 'ticket-attachments'
 
   // Generate a 1-hour signed URL using service client
-  const service = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
+  const service = createSecretClient()
   const { data, error } = await service.storage
     .from(bucket)
     .createSignedUrl(pdfPath, 3600) // 1 hour

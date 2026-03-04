@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
 import { assignToTrip, updateTripDates, collectTravelerNames } from '@/lib/trips/assignment'
+import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
 export async function POST(
@@ -112,6 +113,8 @@ export async function POST(
       }
 
       // Create trip item
+      const details = buildTripItemDetails(item)
+
       const { error: itemError } = await secretClient.from('trip_items').insert({
         user_id: user.id,
         trip_id: tripId,
@@ -126,7 +129,7 @@ export async function POST(
         start_location: item.start_location,
         end_location: item.end_location,
         summary: item.summary,
-        details_json: item.details || {},
+        details_json: details,
         status: item.status,
         confidence: item.confidence,
         needs_review: item.needs_review,

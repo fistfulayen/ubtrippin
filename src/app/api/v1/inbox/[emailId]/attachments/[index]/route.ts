@@ -7,11 +7,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY!
 
 interface StoredAttachment {
   filename: string
@@ -62,7 +59,7 @@ export async function GET(
     )
   }
 
-  const service = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
+  const service = createSecretClient()
   const { data, error } = await service.storage
     .from('email-attachments')
     .createSignedUrl(attachment.storage_path, 3600)

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 
 function normalizeFamilyName(value: unknown): string | null {
@@ -83,9 +83,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
     profileIds.add(member.invited_by)
   }
 
-  const secret = createSecretClient()
+  const scoped = await createUserScopedClient(auth.userId)
   const { data: profileRows } = profileIds.size
-    ? await secret
+    ? await scoped
         .from('profiles')
         .select('id, full_name, email, avatar_url')
         .in('id', Array.from(profileIds))
