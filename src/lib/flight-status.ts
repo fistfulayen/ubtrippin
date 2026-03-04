@@ -250,7 +250,8 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
   const endOfDay = new Date(`${date}T23:59:59Z`)
   const maxEnd = new Date(Date.now() + 47 * 60 * 60 * 1000)
   const endDate = endOfDay < maxEnd ? endOfDay : maxEnd
-  const end = endDate.toISOString().replace('+00:00', 'Z')
+  // FlightAware requires Z suffix and no milliseconds (e.g. 2026-03-06T20:00:00Z)
+  const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
 
   try {
