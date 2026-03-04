@@ -236,7 +236,7 @@ export async function POST(request: NextRequest) {
                 pdfBuffers.push(pdfBuffer)
 
                 // Store in email-attachments bucket (all PDFs, not just tickets)
-                const safeFilename = attachment.filename.replace(/^\//, '').replace(/[^a-zA-Z0-9._-]/g, '_')
+                const safeFilename = (attachment.filename ?? 'attachment.pdf').replace(/^\//, '').replace(/[^a-zA-Z0-9._-]/g, '_')
                 const storagePath = `${userId}/${sourceEmail.id}/${safeFilename}`
                 const { error: uploadError } = await storageClient.storage
                   .from('email-attachments')
@@ -247,16 +247,16 @@ export async function POST(request: NextRequest) {
                 if (uploadError) {
                   console.error('Failed to store attachment:', safeFilename, uploadError)
                   enrichedAttachments.push({
-                    filename: attachment.filename,
-                    content_type: attachment.content_type,
+                    filename: attachment.filename ?? 'unknown',
+                    content_type: attachment.content_type ?? 'application/octet-stream',
                     storage_path: null,
                     is_noise: false,
                     is_ticket: false,
                   })
                 } else {
                   enrichedAttachments.push({
-                    filename: attachment.filename,
-                    content_type: attachment.content_type,
+                    filename: attachment.filename ?? 'unknown',
+                    content_type: attachment.content_type ?? 'application/octet-stream',
                     storage_path: storagePath,
                     is_noise: false,
                     is_ticket: false,
@@ -266,8 +266,8 @@ export async function POST(request: NextRequest) {
             } catch (pdfError) {
               console.error('Failed to extract PDF:', attachment.filename, pdfError)
               enrichedAttachments.push({
-                filename: attachment.filename,
-                content_type: attachment.content_type,
+                filename: attachment.filename ?? 'unknown',
+                content_type: attachment.content_type ?? 'application/octet-stream',
                 storage_path: null,
                 is_noise: false,
                 is_ticket: false,
@@ -276,8 +276,8 @@ export async function POST(request: NextRequest) {
           } else {
             // Non-PDF attachment — store metadata only
             enrichedAttachments.push({
-              filename: attachment.filename,
-              content_type: attachment.content_type,
+              filename: attachment.filename ?? 'unknown',
+              content_type: attachment.content_type ?? 'application/octet-stream',
               storage_path: null,
               is_noise: false,
               is_ticket: false,
