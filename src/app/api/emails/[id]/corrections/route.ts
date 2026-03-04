@@ -4,7 +4,7 @@ import { createSecretClient } from '@/lib/supabase/service'
 import { createEmailSnippet } from '@/lib/ai/example-selection'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 import type { Json } from '@/types/database'
-import { extractLocalTime } from '@/lib/utils'
+import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
 interface CorrectionRequest {
@@ -238,19 +238,6 @@ async function syncTripItems(
   emailId: string,
   items: ExtractedItem[]
 ) {
-  const buildDetails = (item: ExtractedItem): Record<string, unknown> => {
-    const details = { ...((item.details as Record<string, unknown>) || {}) }
-    if (item.kind === 'flight' || item.kind === 'train') {
-      if (!details.departure_local_time && item.start_ts) {
-        details.departure_local_time = extractLocalTime(item.start_ts)
-      }
-      if (!details.arrival_local_time && item.end_ts) {
-        details.arrival_local_time = extractLocalTime(item.end_ts)
-      }
-    }
-    return details
-  }
-
   // Get existing trip items for this email
   const { data: existingItems } = await supabase
     .from('trip_items')
@@ -280,7 +267,7 @@ async function syncTripItems(
           start_location: item.start_location,
           end_location: item.end_location,
           summary: item.summary,
-          details_json: buildDetails(item),
+          details_json: buildTripItemDetails(item),
           status: item.status,
           confidence: 1.0, // User-corrected = high confidence
           needs_review: false,
@@ -330,7 +317,7 @@ async function syncTripItems(
           start_location: item.start_location,
           end_location: item.end_location,
           summary: item.summary,
-          details_json: buildDetails(item),
+          details_json: buildTripItemDetails(item),
           status: item.status,
           confidence: 1.0,
           needs_review: false,

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
 import { assignToTrip, updateTripDates, collectTravelerNames } from '@/lib/trips/assignment'
-import { extractLocalTime } from '@/lib/utils'
+import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
 export async function POST(
@@ -113,15 +113,7 @@ export async function POST(
       }
 
       // Create trip item
-      const details = { ...((item.details as Record<string, unknown>) || {}) }
-      if (item.kind === 'flight' || item.kind === 'train') {
-        if (!details.departure_local_time && item.start_ts) {
-          details.departure_local_time = extractLocalTime(item.start_ts)
-        }
-        if (!details.arrival_local_time && item.end_ts) {
-          details.arrival_local_time = extractLocalTime(item.end_ts)
-        }
-      }
+      const details = buildTripItemDetails(item)
 
       const { error: itemError } = await secretClient.from('trip_items').insert({
         user_id: user.id,

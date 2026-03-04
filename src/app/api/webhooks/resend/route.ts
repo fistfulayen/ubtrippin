@@ -16,7 +16,7 @@ import { searchBraveImages } from '@/lib/images/brave-image-search'
 import { storeCoverImage } from '@/lib/images/store-cover-image'
 import { locationToCityAsync } from '@/lib/images/airport-cities'
 import { generateTripName, isDefaultTitle } from '@/lib/trips/naming'
-import { extractLocalTime, sanitizeHtml } from '@/lib/utils'
+import { buildTripItemDetails, sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
 import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
         fullEmail.subject || '',
         fullEmail.text || fullEmail.html || '',
         attachmentText || undefined,
-        { senderDomain }
+        { senderDomain, supabase }
       )
 
       // Update source email with extraction result and attachment text
@@ -586,15 +586,7 @@ export async function POST(request: NextRequest) {
         }
         tripsToUpdate.get(confirmedTripId)!.items.push(item)
 
-        const details = { ...((item.details as Record<string, unknown>) || {}) }
-        if (item.kind === 'flight' || item.kind === 'train') {
-          if (!details.departure_local_time && item.start_ts) {
-            details.departure_local_time = extractLocalTime(item.start_ts)
-          }
-          if (!details.arrival_local_time && item.end_ts) {
-            details.arrival_local_time = extractLocalTime(item.end_ts)
-          }
-        }
+        const details = buildTripItemDetails(item)
 
         // Create trip item
         const { data: tripItem, error: itemError } = await supabase

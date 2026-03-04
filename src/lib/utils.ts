@@ -70,6 +70,25 @@ export function extractLocalTime(isoString: string | null | undefined): string |
 }
 
 /**
+ * Build details_json for a trip item, ensuring local times are populated
+ * from the ISO timestamps before Postgres normalizes them to UTC.
+ */
+export function buildTripItemDetails(
+  item: { kind: string; start_ts?: string | null; end_ts?: string | null; details?: Record<string, unknown> | null }
+): Record<string, unknown> {
+  const details = { ...(item.details || {}) }
+  if (item.kind === 'flight' || item.kind === 'train') {
+    if (!details.departure_local_time && item.start_ts) {
+      details.departure_local_time = extractLocalTime(item.start_ts)
+    }
+    if (!details.arrival_local_time && item.end_ts) {
+      details.arrival_local_time = extractLocalTime(item.end_ts)
+    }
+  }
+  return details
+}
+
+/**
  * Get the best display time for a trip item, preferring local times from details.
  * Returns [startTime, endTime] as formatted strings.
  */

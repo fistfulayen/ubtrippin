@@ -34,6 +34,7 @@ export interface ExtractionResult {
 
 export interface ExtractTravelDataOptions {
   senderDomain?: string
+  supabase?: import('@supabase/supabase-js').SupabaseClient
 }
 
 interface DateNormalizationContext {
@@ -95,9 +96,9 @@ export async function extractTravelData(
   attachmentText?: string,
   options?: ExtractTravelDataOptions
 ): Promise<ExtractionResult> {
-  const supabase = createSecretClient()
   // Select relevant few-shot examples based on sender domain
-  const examples = await selectExamples(options?.senderDomain, supabase)
+  const dbClient = options?.supabase ?? createSecretClient()
+  const examples = await selectExamples(options?.senderDomain, dbClient)
 
   if (examples.length > 0) {
     console.log(`Using ${examples.length} extraction examples for ${options?.senderDomain || 'unknown domain'}`)

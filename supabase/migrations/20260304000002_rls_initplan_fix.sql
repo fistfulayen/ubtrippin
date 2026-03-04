@@ -35,30 +35,26 @@ AS $$
   );
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_family_member_of(target_id uuid)
+-- is_family_member_of: checks if the current user shares a family with target_user_id.
+-- Previously this function also accepted a family_id, but all family_id usage has been
+-- inlined into the consolidated policies (P2B). Now it only handles user_id lookups.
+CREATE OR REPLACE FUNCTION public.is_family_member_of(target_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
 STABLE
 SET search_path = ''
 AS $$
-  SELECT
-    EXISTS (
-      SELECT 1
-      FROM public.family_members
-      WHERE family_id = target_id
-        AND user_id = (SELECT auth.uid())
-        AND accepted_at IS NOT NULL
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.family_members fm1
-      JOIN public.family_members fm2 ON fm1.family_id = fm2.family_id
-      WHERE fm1.user_id = (SELECT auth.uid())
-        AND fm2.user_id = target_id
-        AND fm1.accepted_at IS NOT NULL
-        AND fm2.accepted_at IS NOT NULL
-    );
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.family_members fm1
+    JOIN public.family_members fm2 ON fm1.family_id = fm2.family_id
+    WHERE fm1.user_id = (SELECT auth.uid())
+      AND fm2.user_id = target_user_id
+      AND fm1.accepted_at IS NOT NULL
+      AND fm2.accepted_at IS NOT NULL
+      AND fm1.user_id <> fm2.user_id
+  );
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_family_admin(target_family_id uuid)
