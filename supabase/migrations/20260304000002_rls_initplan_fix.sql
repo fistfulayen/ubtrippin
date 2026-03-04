@@ -36,8 +36,10 @@ AS $$
 $$;
 
 -- is_family_member_of: checks if the current user shares a family with target_user_id.
--- Previously this function also accepted a family_id, but all family_id usage has been
--- inlined into the consolidated policies (P2B). Now it only handles user_id lookups.
+-- Previously this function also accepted a family_id (target_family_id), but all
+-- family_id usage has been inlined into the consolidated policies (P2B).
+-- DROP + recreate required because PostgreSQL forbids renaming parameters via CREATE OR REPLACE.
+DROP FUNCTION IF EXISTS public.is_family_member_of(uuid) CASCADE;
 CREATE OR REPLACE FUNCTION public.is_family_member_of(target_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -92,17 +94,17 @@ BEGIN
     SELECT
       n.nspname AS schema_name,
       c.relname AS table_name,
-      pol.polname,
-      pol.polcmd,
-      pol.polpermissive,
-      pol.polroles,
-      pg_get_expr(pol.polqual, pol.polrelid) AS using_expr,
-      pg_get_expr(pol.polwithcheck, pol.polrelid) AS check_expr
-    FROM pg_policy pol
-    JOIN pg_class c ON c.oid = pol.polrelid
+      pg_pol.polname,
+      pg_pol.polcmd,
+      pg_pol.polpermissive,
+      pg_pol.polroles,
+      pg_get_expr(pg_pol.polqual, pg_pol.polrelid) AS using_expr,
+      pg_get_expr(pg_pol.polwithcheck, pg_pol.polrelid) AS check_expr
+    FROM pg_policy pg_pol
+    JOIN pg_class c ON c.oid = pg_pol.polrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-    ORDER BY c.relname, pol.polname
+    ORDER BY c.relname, pg_pol.polname
   LOOP
     using_expr_original := pol.using_expr;
     check_expr_original := pol.check_expr;
