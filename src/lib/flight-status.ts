@@ -137,6 +137,67 @@ function mapFlightStatus(
   }
 }
 
+// Common airline name → IATA code mapping for when flight_number is digits-only.
+const AIRLINE_IATA: Record<string, string> = {
+  'air france': 'AF',
+  'air france hop': 'AF',
+  'hop': 'A5',
+  'hop!': 'A5',
+  'delta': 'DL',
+  'united': 'UA',
+  'american': 'AA',
+  'american airlines': 'AA',
+  'british airways': 'BA',
+  'lufthansa': 'LH',
+  'klm': 'KL',
+  'easyjet': 'U2',
+  'ryanair': 'FR',
+  'vueling': 'VY',
+  'iberia': 'IB',
+  'swiss': 'LX',
+  'austrian': 'OS',
+  'transavia': 'TO',
+  'alitalia': 'AZ',
+  'ita airways': 'AZ',
+  'tap': 'TP',
+  'tap portugal': 'TP',
+  'sas': 'SK',
+  'finnair': 'AY',
+  'turkish airlines': 'TK',
+  'emirates': 'EK',
+  'qatar': 'QR',
+  'qatar airways': 'QR',
+  'etihad': 'EY',
+  'singapore airlines': 'SQ',
+  'cathay pacific': 'CX',
+  'ana': 'NH',
+  'jal': 'JL',
+  'japan airlines': 'JL',
+  'korean air': 'KE',
+  'spirit': 'NK',
+  'jetblue': 'B6',
+  'southwest': 'WN',
+  'frontier': 'F9',
+  'alaska': 'AS',
+  'alaska airlines': 'AS',
+  'norwegian': 'DY',
+  'wizz air': 'W6',
+  'volotea': 'V7',
+  'aer lingus': 'EI',
+}
+
+function guessIataFromAirline(details: Record<string, unknown>): string | null {
+  // Try airline_code field first (IATA directly)
+  const code = asString(details.airline_code) || asString(details.carrier_code)
+  if (code && /^[A-Z0-9]{2}$/i.test(code.trim())) {
+    return code.trim().toUpperCase()
+  }
+  // Fall back to airline name lookup
+  const airline = asString(details.airline)
+  if (!airline) return null
+  return AIRLINE_IATA[airline.toLowerCase().trim()] ?? null
+}
+
 export function extractFlightIdentFromDetails(detailsJson: unknown): string | null {
   const details = asRecord(detailsJson)
   if (!details) return null
@@ -145,8 +206,18 @@ export function extractFlightIdentFromDetails(detailsJson: unknown): string | nu
   if (!rawFlightNumber) return null
 
   const normalized = rawFlightNumber.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  if (normalized.length < 3 || normalized.length > 8) return null
-  if (!/[A-Z]/.test(normalized) || !/\d/.test(normalized)) return null
+  if (normalized.length < 2 || normalized.length > 8) return null
+  if (!/\d/.test(normalized)) return null
+
+  // If flight number is digits-only (e.g. "1103"), prepend airline IATA code
+  if (!/[A-Z]/.test(normalized)) {
+    const iata = guessIataFromAirline(details)
+    if (!iata) return null
+    const withPrefix = iata + normalized
+    if (withPrefix.length > 8) return null
+    return withPrefix
+  }
+
   return normalized
 }
 
