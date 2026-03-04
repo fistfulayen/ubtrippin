@@ -15,15 +15,21 @@ Zero errors, zero warnings from Supabase linter. Measurable performance improvem
 
 ## Baseline Snapshot (2026-03-04)
 
-| Category | Count | Target |
-|----------|-------|--------|
-| **Errors (RLS disabled)** | 0 ✅ | 0 |
-| **Unindexed foreign keys** | 16 | 0 |
-| **Duplicate indexes** | 4 (public) | 0 |
-| **Security definer functions without search_path** | 5 | 0 |
-| **Tables with RLS enabled but no policies** | 1 | 0 |
-| **Extensions in public schema** | 3 | 0 |
-| **Unused indexes** | 43 | Review & prune |
+**Source:** Supabase Dashboard Linter (176 total findings) + `supabase inspect db` CLI
+
+| Category | Level | Count | Target |
+|----------|-------|-------|--------|
+| **Errors (RLS disabled)** | ERROR | 0 ✅ | 0 |
+| **Multiple permissive policies** | WARN | 70 | 0 |
+| **Auth RLS InitPlan (per-row re-eval)** | WARN | 55 | 0 |
+| **Function search_path mutable** | WARN | 8 | 0 |
+| **Extensions in public schema** | WARN | 3 | 0 |
+| **Leaked password protection disabled** | WARN | 1 | 0 |
+| **Unused indexes** | INFO | 20 | Review & prune |
+| **Unindexed foreign keys** | INFO | 17 | 0 |
+| **RLS enabled, no policies** | INFO | 1 | 0 |
+| **Auth DB connections (config)** | INFO | 1 | Review |
+| **Duplicate indexes** (from CLI) | — | 4 | 0 |
 
 ### Performance Baseline
 - **Database size:** 16 MB
@@ -31,21 +37,25 @@ Zero errors, zero warnings from Supabase linter. Measurable performance improvem
 - **Index overhead:** 1304 kB total (3.3× table size of 392 kB)
 - **Dead rows:** Healthy — autovacuum running
 - **Top query:** Dashboard introspection (1.5s, 34.5% of exec time) — not app code
+- **Full linter JSON:** Obsidian `UB Trippin/Supabase Warnings and Suggestions.md`
 
 ---
 
-## Phase 1: Security (Critical) — Single Migration
+## Phase 1: Security (Critical)
 
-### 1.1 Fix security definer functions without `search_path`
+### 1.1 Fix function `search_path` mutable (8 functions)
 
-5 functions are `SECURITY DEFINER` without a pinned `search_path`. This is a privilege escalation vector — a malicious user could create objects in `public` schema that shadow system functions.
+Functions without a pinned `search_path` are a privilege escalation vector — a malicious user could create objects in `public` schema that shadow system functions.
 
 **Functions to fix:**
-- `guides_nearby`
 - `increment_example_usage`
+- `touch_trip_collaborator`
+- `update_guide_entry_count`
+- `set_updated_at`
+- `guides_nearby`
 - `notify_webhook_delivery`
 - `update_feedback_votes_count`
-- `update_guide_entry_count`
+- `update_updated_at_column`
 
 **Fix:** `ALTER FUNCTION public.<name>(...) SET search_path = public, extensions;`
 
@@ -55,31 +65,91 @@ RLS is enabled but no policies exist — table is inaccessible via PostgREST (ef
 - Add appropriate policies (if API access is needed), or
 - Confirm this is intentional (server-side only via service role)
 
-### 1.3 Review security definer functions
+### 1.3 Enable leaked password protection
 
-16 `SECURITY DEFINER` functions in public schema. Audit each:
-- Is `SECURITY DEFINER` actually needed?
-- Can any be converted to `SECURITY INVOKER`?
-- Do any contain unvalidated input?
+Dashboard toggle: Auth → Settings → Enable HaveIBeenPwned check. No migration needed.
 
-**Functions to audit:**
-- `auto_expand_trip_dates` — likely needs definer (cross-user trip logic?)
-- `billing_pro_subscriber_count` — admin function, verify access control
-- `expire_billing_grace_periods` — cron job, needs definer
-- `handle_new_user` / `handle_user_updated` — auth triggers, needs definer
-- `is_family_admin` / `is_family_member` / `is_family_member_of` — RLS helper functions, needs definer
-- `is_trip_owner` / `trip_owner_user_id` — RLS helper, needs definer
-- `set_request_user` — auth context setter, needs definer
-- `notify_webhook_delivery` — trigger, needs definer
-- `increment_example_usage` — could potentially be invoker
-- `update_feedback_votes_count` / `update_guide_entry_count` — triggers, needs definer
-- `guides_nearby` — spatial query, verify if definer needed
+### 1.4 Review auth DB connections config
+
+Auth server capped at 10 connections. Verify this is adequate. Dashboard setting, not migration.
 
 ---
 
-## Phase 2: Index Hygiene
+## Phase 2: RLS Performance (55 warnings)
 
-### 2.1 Add indexes for unindexed foreign keys
+### 2.1 Fix `auth_rls_initplan` — wrap auth calls in subselect
+
+Every RLS policy using `auth.uid()` directly re-evaluates it per row. At scale, this is O(n) function calls instead of O(1). Fix by wrapping in a subselect.
+
+**Before:** `USING (user_id = auth.uid())`
+**After:** `USING (user_id = (SELECT auth.uid()))`
+
+**Tables affected (55 policies across these tables):**
+- `profiles` (3 policies: view, update, insert)
+- `allowed_senders`
+- `trips`
+- `trip_items`
+- `source_emails`
+- `audit_logs`
+- `trip_pdfs`
+- `city_guides`
+- `guide_entries`
+- `extraction_examples`
+- `extraction_corrections`
+- `api_keys`
+- `notifications`
+- `imports`
+- `loyalty_programs`
+- `user_profiles`
+- `feedback`
+- `feedback_votes`
+- `feedback_comments`
+- `families`
+- `family_members`
+- `trip_collaborators`
+- `webhooks`
+- `webhook_deliveries`
+- `webhook_delivery_queue`
+- `trip_item_status`
+
+**Approach:** Single migration that drops and recreates all affected policies with `(SELECT auth.uid())` and `(SELECT auth.jwt())` wrappers. Must preserve exact same access logic.
+
+### 2.2 Consolidate multiple permissive policies (70 warnings)
+
+When multiple permissive policies exist for the same role+action, Postgres ORs them. This works but:
+1. Makes access logic harder to audit
+2. Can cause unintended access via OR combinations
+3. Generates linter noise
+
+**Tables with multiple permissive policies:**
+- `city_guides` — owner + family + collaborator read policies
+- `families` — creator + member select
+- `guide_entries` — owner + family + shared entries
+- `loyalty_programs` — owner + family read
+- `profiles` — own profile + collaborator visibility
+- `trips` — owner + collaborator + family access
+- `trip_items` — owner + collaborator + family access
+- `source_emails` — owner + various access patterns
+- And more...
+
+**Approach:** For each table, merge multiple permissive policies for the same role+action into a single policy with OR conditions. E.g.:
+```sql
+-- Before: 3 separate SELECT policies that get ORed
+-- After: 1 policy with explicit OR
+CREATE POLICY "select_access" ON public.trips FOR SELECT USING (
+  user_id = (SELECT auth.uid())
+  OR id IN (SELECT trip_id FROM trip_collaborators WHERE user_id = (SELECT auth.uid()))
+  OR user_id IN (SELECT user_id FROM family_members WHERE family_id IN (...))
+);
+```
+
+**Risk:** HIGH — this is the most dangerous phase. Every policy merge must be tested to ensure identical access. Do this table by table, not all at once.
+
+---
+
+## Phase 3: Index Hygiene
+
+### 3.1 Add indexes for unindexed foreign keys
 
 16 foreign keys without indexes. These cause sequential scans on `JOIN` and `DELETE CASCADE` operations. At current scale it's invisible, but it's a ticking bomb.
 
@@ -104,7 +174,7 @@ RLS is enabled but no policies exist — table is inaccessible via PostgREST (ef
 | `imports` | `user_id` | LOW |
 | `trip_item_status_refresh_logs` | `item_id` | LOW |
 
-### 2.2 Remove duplicate indexes
+### 3.2 Remove duplicate indexes
 
 4 pairs of duplicate indexes in public schema (wasting ~128 KB, but the principle matters):
 
@@ -115,7 +185,7 @@ RLS is enabled but no policies exist — table is inaccessible via PostgREST (ef
 | `idx_api_keys_hash` | `api_keys_key_hash_key` (unique) | Drop the non-unique index |
 | `idx_monthly_extractions_user_month` | `monthly_extractions_pkey` | Review — may differ if composite |
 
-### 2.3 Review unused indexes
+### 3.3 Review unused indexes
 
 43 indexes show 0% usage since stats reset (31 days). Many are primary keys on low-traffic tables (expected). Review candidates for removal:
 
@@ -137,9 +207,9 @@ RLS is enabled but no policies exist — table is inaccessible via PostgREST (ef
 
 ---
 
-## Phase 3: Schema Hygiene
+## Phase 4: Schema Hygiene
 
-### 3.1 Move extensions out of public schema
+### 4.1 Move extensions out of public schema
 
 3 extensions installed in `public` schema:
 - `citext`
@@ -153,7 +223,7 @@ RLS is enabled but no policies exist — table is inaccessible via PostgREST (ef
 
 **Risk:** Medium — `citext` is used for case-insensitive text. Moving it may affect column types. Test thoroughly.
 
-### 3.2 Review broad RLS policies
+### 4.2 Review broad RLS policies
 
 `provider_catalog` has `USING (true)` for SELECT — this is intentional (public reference data). No other tables have overly broad policies. ✅
 
@@ -181,27 +251,42 @@ Create `scripts/supabase-health.sh` that runs all checks and outputs a scorecard
 
 ## Implementation Plan
 
-### Migration 1: Security fixes (Phase 1.1 + 1.2)
-- Pin `search_path` on 5 functions
+### Sprint 1: Security (Phase 1) — Target: 2026-03-07
+**Migration A:** `20260305000000_fix_search_path.sql`
+- Pin `search_path` on 8 functions
 - Add/confirm `webhook_delivery_queue` policy
-- **File:** `20260305000000_security_definer_search_path.sql`
+- **Risk:** Low — additive change
 
-### Migration 2: Foreign key indexes (Phase 2.1)
-- Add 16 indexes (all `CREATE INDEX CONCURRENTLY` where possible)
-- **File:** `20260305000001_index_foreign_keys.sql`
+**Dashboard actions:**
+- Enable leaked password protection (Auth → Settings)
+- Review auth DB connections config
 
-### Migration 3: Drop duplicate indexes (Phase 2.2)
-- Drop 3-4 redundant indexes
-- **File:** `20260305000002_drop_duplicate_indexes.sql`
+### Sprint 2: RLS Performance (Phase 2) — Target: 2026-03-14
+**Migration B:** `20260308000000_rls_initplan_fix.sql`
+- Rewrite 55 RLS policies to wrap `auth.uid()` / `auth.jwt()` in `(SELECT ...)`
+- **Risk:** Medium — must preserve identical access logic
+- **Test:** Verify all API routes still work after migration
 
-### Migration 4: Extension schema migration (Phase 3.1)
+**Migration C:** `20260310000000_consolidate_rls_policies.sql` (table by table)
+- Merge 70 multiple permissive policies into consolidated single policies
+- **Risk:** HIGH — most dangerous change. Test each table individually.
+- **Approach:** Do in sub-migrations per table if needed
+
+### Sprint 3: Index Hygiene (Phase 3) — Target: 2026-03-15
+**Migration D:** `20260312000000_index_foreign_keys.sql`
+- Add 17 indexes for unindexed foreign keys
+
+**Migration E:** `20260312000001_drop_duplicate_indexes.sql`
+- Drop 4 redundant indexes
+
+### Sprint 4: Schema Hygiene (Phase 4) — Target: 2026-03-31
+**Migration F:** `20260320000000_move_extensions.sql`
 - Move `citext`, `cube`, `earthdistance` to `extensions` schema
-- **File:** `20260305000003_move_extensions.sql`
-- **Risk:** Highest — test locally first
+- **Risk:** Highest — test locally first, may affect column types
 
-### Script: Monthly health check
+### Ongoing: Monthly health script
 - **File:** `scripts/supabase-health.sh`
-- Add to CI as monthly cron job or manual trigger
+- Add to CI as monthly cron or manual trigger workflow
 
 ---
 
@@ -210,11 +295,15 @@ Create `scripts/supabase-health.sh` that runs all checks and outputs a scorecard
 | Metric | Current | Target | Deadline |
 |--------|---------|--------|----------|
 | Supabase linter errors | 0 | 0 | Maintain |
-| Supabase linter warnings | ~24 | 0 | 2026-03-15 |
-| Unindexed foreign keys | 16 | 0 | 2026-03-15 |
-| Duplicate indexes | 4 | 0 | 2026-03-15 |
-| Insecure SECURITY DEFINER | 5 | 0 | 2026-03-10 |
+| Supabase linter warnings | 137 | 0 | 2026-03-31 |
+| Supabase linter info | 39 | 0 | 2026-03-15 |
+| Multiple permissive policies | 70 | 0 | 2026-03-14 |
+| Auth RLS InitPlan (perf) | 55 | 0 | 2026-03-14 |
+| Function search_path mutable | 8 | 0 | 2026-03-07 |
 | Extensions in public | 3 | 0 | 2026-03-31 |
+| Unindexed foreign keys | 17 | 0 | 2026-03-15 |
+| Duplicate indexes | 4 | 0 | 2026-03-15 |
+| Leaked password protection | Off | On | 2026-03-07 |
 | Monthly audit | None | Automated | 2026-03-15 |
 
 ---
