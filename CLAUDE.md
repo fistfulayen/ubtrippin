@@ -55,6 +55,20 @@ See `src/lib/ai/extract-travel-data.ts` for implementation.
 - **No service client on happy paths.** Do NOT use `createSecretClient()` or service role to bypass RLS. If RLS blocks an operation, fix the RLS policy. Acceptable uses: error cleanup, admin CLI, webhook processing, cron jobs without user context.
 - **This code is security-audited monthly.** Every RLS bypass is a finding.
 
+## Feature Launch Checklist
+
+**Every new user-facing feature MUST update all surfaces before merge.** This is not optional.
+
+When shipping a new feature (new kind, new page, new API endpoint, new Pro feature):
+
+- [ ] **API docs** — Update `src/app/api/v1/docs/route.ts` with endpoint, schema, and example
+- [ ] **Help center** — Update `src/app/(dashboard)/help/page.tsx` — add section or FAQ entry
+- [ ] **Homepage** — Update `src/app/page.tsx` if the feature is user-facing (feature card, pricing table, FAQ)
+- [ ] **Skill** — Update `skill/SKILL.md` with endpoint documentation
+- [ ] **Marketing** — Draft tweet or note for `x-post-queue.md` in Obsidian
+
+If a PR adds a feature without updating these surfaces, it is incomplete. Do not merge.
+
 ## Environment Variables
 
 See `.env.local.example` for required variables.
