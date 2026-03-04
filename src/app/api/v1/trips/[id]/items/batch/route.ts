@@ -180,6 +180,7 @@ export async function POST(
 
   for (const item of items ?? []) {
     void applyNoVaultEntryFlag({
+      supabase,
       userId: auth.userId,
       tripItemId: item.id as string,
       providerName: (item.provider as string | null) ?? null,

@@ -1,4 +1,3 @@
-import { createSecretClient } from '@/lib/supabase/service'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type SubscriptionTier = 'free' | 'pro'
@@ -16,7 +15,7 @@ export interface LimitResult {
 
 export async function getUserTier(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<SubscriptionTier> {
   const { data } = await supabase
     .from('profiles')
@@ -32,7 +31,7 @@ export async function getUserTier(
  */
 export async function checkExtractionLimit(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<LimitResult> {
   const tier = await getUserTier(userId, supabase)
 
@@ -63,7 +62,7 @@ export async function checkExtractionLimit(
  */
 export async function incrementExtractionCount(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<void> {
   const month = new Date().toISOString().slice(0, 7) // YYYY-MM
 
@@ -92,7 +91,7 @@ export async function incrementExtractionCount(
  */
 export async function checkTripLimit(
   userId: string,
-  supabase: DbClient = createSecretClient()
+  supabase: DbClient
 ): Promise<LimitResult> {
   const tier = await getUserTier(userId, supabase)
 

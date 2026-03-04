@@ -5,6 +5,7 @@ import {
   buildSystemPromptWithExamples,
 } from './prompts'
 import { selectExamples } from './example-selection'
+import { createSecretClient } from '@/lib/supabase/service'
 import type { TripItemKind, TripItemStatus } from '@/types/database'
 
 export interface ExtractedItem {
@@ -94,8 +95,9 @@ export async function extractTravelData(
   attachmentText?: string,
   options?: ExtractTravelDataOptions
 ): Promise<ExtractionResult> {
+  const supabase = createSecretClient()
   // Select relevant few-shot examples based on sender domain
-  const examples = await selectExamples(options?.senderDomain)
+  const examples = await selectExamples(options?.senderDomain, supabase)
 
   if (examples.length > 0) {
     console.log(`Using ${examples.length} extraction examples for ${options?.senderDomain || 'unknown domain'}`)

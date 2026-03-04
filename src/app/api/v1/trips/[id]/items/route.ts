@@ -159,6 +159,7 @@ export async function POST(
 
   if (item) {
     void applyNoVaultEntryFlag({
+      supabase,
       userId: trip.user_id,
       tripItemId: item.id,
       providerName: item.provider,
