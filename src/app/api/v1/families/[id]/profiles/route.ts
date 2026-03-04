@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSecretClient } from '@/lib/supabase/service'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { requireFamilyAccess } from '../_lib'
 
 type Params = { params: Promise<{ id: string }> }
@@ -28,18 +28,18 @@ export async function GET(_request: NextRequest, { params }: Params) {
   if ('response' in access) return access.response
 
   const memberUserIds = Array.from(new Set(access.ctx.members.map((member) => member.user_id)))
-  const secret = createSecretClient()
+  const scoped = await createUserScopedClient(access.ctx.viewerId)
 
   const [{ data: profileRows, error: profilesError }, { data: userProfileRows, error: userProfilesError }] =
     await Promise.all([
       memberUserIds.length
-        ? secret
+        ? scoped
             .from('profiles')
             .select('id, full_name, email, avatar_url')
             .in('id', memberUserIds)
         : Promise.resolve({ data: [], error: null }),
       memberUserIds.length
-        ? secret
+        ? scoped
             .from('user_profiles')
             .select('id, seat_preference, meal_preference, airline_alliance, hotel_brand_preference, home_airport, currency_preference, notes')
             .in('id', memberUserIds)
