@@ -276,8 +276,8 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
     return {
       status: mapFlightStatus(first, delayMinutes),
       delayMinutes,
-      gate: asString(first.gate_origin) ?? asString(first.gate_destination),
-      terminal: asString(first.terminal_origin) ?? asString(first.terminal_destination),
+      gate: asString(first.gate_origin) ?? null,
+      terminal: asString(first.terminal_origin) ?? null,
       estimatedDeparture: toIsoOrNull(first.estimated_off),
       estimatedArrival: toIsoOrNull(first.estimated_on),
       actualDeparture: toIsoOrNull(first.actual_off),
