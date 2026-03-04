@@ -36,6 +36,7 @@ const sections: HelpSection[] = [
           <li>Cars</li>
           <li>Restaurants</li>
           <li>Activities</li>
+          <li>Concerts and event tickets (Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, and more)</li>
         </ul>
         <p>
           If extraction misses details, open the message in <Link href="/inbox" className="text-indigo-600 hover:text-indigo-500">Inbox</Link> and correct the parsed fields, or add the missing reservation manually in your trip.
@@ -157,6 +158,47 @@ const sections: HelpSection[] = [
     ),
   },
   {
+    id: 'events-tickets',
+    title: 'Events & Tickets',
+    searchText:
+      'concert event ticket ticketmaster axs eventbrite dice seetickets stubhub pdf apple wallet google wallet venue seats performer',
+    content: (
+      <>
+        <p>
+          Forward concert, theater, sporting event, museum, or festival ticket emails and they&apos;ll be extracted alongside your travel bookings.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Supported providers include Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, StubHub, Viagogo, and venue direct sales.</li>
+          <li>Extracted details: event name, venue, address, section, row, seat, performer, door time, and ticket count.</li>
+          <li>PDF tickets attached to emails are automatically stored and downloadable from the item detail page.</li>
+          <li>Apple Wallet and Google Wallet links in ticket emails are preserved and accessible.</li>
+          <li>View all your events from the <strong>Events</strong> page with upcoming and past filters.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: 'live-status',
+    title: 'Live Flight & Train Status',
+    searchText:
+      'live status flight tracking flightaware gate delay cancellation sncf train real time pro',
+    content: (
+      <>
+        <p>
+          Pro subscribers get real-time flight and train status updates, checked automatically as your departure approaches.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Flight status powered by FlightAware — gate changes, delays, cancellations, terminal info, and baggage claim.</li>
+          <li>SNCF train status for French rail services.</li>
+          <li>Checks increase in frequency closer to departure: every 8 hours at 48h out, every 30 minutes within 4 hours.</li>
+          <li>Status appears on your trip item cards and in your calendar feed.</li>
+          <li>Force a manual refresh from the item detail page.</li>
+          <li>Live status is a Pro feature.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
     id: 'developers-agents',
     title: 'For Developers & Agents',
     searchText:
@@ -257,6 +299,18 @@ const sections: HelpSection[] = [
             <h3 className="font-semibold text-slate-800">Is my data private?</h3>
             <p>
               Data is access-controlled per user account, and loyalty numbers are encrypted at rest. You control public sharing per trip and can turn it off at any time.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-800">Do you support concert and event tickets?</h3>
+            <p>
+              Yes. Forward ticket emails from Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, StubHub, and most other ticket providers. We extract venue, seats, performer, door time, and store any attached PDF tickets. Apple Wallet and Google Wallet links are preserved too.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-semibold text-slate-800">Can I track my flight status?</h3>
+            <p>
+              Pro subscribers get live flight tracking powered by FlightAware. Gate changes, delays, cancellations, and terminal info are updated automatically as your departure approaches. SNCF train status is also supported for French rail.
             </p>
           </div>
           <div>

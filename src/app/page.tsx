@@ -53,6 +53,16 @@ export default async function HomePage() {
       title: 'Collaborate',
       body: 'Invite co-travelers. Everyone can add and edit. Plan together.',
     },
+    {
+      icon: '/ticket_icon.png',
+      title: 'Concerts & events',
+      body: 'Forward your Ticketmaster email. Venue, seats, performer, door time — all extracted. PDF tickets stored. Wallet links preserved.',
+    },
+    {
+      icon: '/airplane_icon.png',
+      title: 'Live flight status',
+      body: 'Real-time gate changes, delays, and cancellations via FlightAware. Updated automatically as departure approaches.',
+    },
   ]
 
   return (
@@ -259,6 +269,8 @@ export default async function HomePage() {
                     ['Loyalty programs', '3'],
                     ['Family sharing', '—'],
                     ['Calendar feed', '—'],
+                    ['Live flight & train status', '—'],
+                    ['Ticket PDF storage', '—'],
                     ['Webhooks', '1'],
                     ['Guides', 'Browse'],
                     ['API', 'Read'],
@@ -305,6 +317,8 @@ export default async function HomePage() {
                     ['Loyalty programs', 'Unlimited'],
                     ['Family sharing', '✓'],
                     ['Calendar feed', '✓'],
+                    ['Live flight & train status', '✓'],
+                    ['Ticket PDF storage', '✓'],
                     ['Webhooks', '10'],
                     ['Guides', 'Create'],
                     ['API', 'Full'],
@@ -354,6 +368,10 @@ export default async function HomePage() {
               {
                 q: 'What emails do you understand?',
                 a: 'Airlines, hotels, trains, car rentals, Airbnb, Booking.com, restaurants, concerts and event tickets (Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, and more). If we miss one, tell us.',
+              },
+              {
+                q: 'Can you track my flights?',
+                a: 'Pro subscribers get live flight status via FlightAware — gate changes, delays, cancellations, terminal info. Checks start 48 hours before departure and increase in frequency as your flight approaches. SNCF train tracking included too.',
               },
               {
                 q: 'Is this open source?',

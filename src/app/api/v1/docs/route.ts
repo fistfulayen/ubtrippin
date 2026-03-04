@@ -182,6 +182,132 @@ Content-Type: application/json
 
 > **Agent tip:** Parse booking confirmations yourself and POST structured items. You handle extraction; UBTRIPPIN handles storage, grouping, and display.
 
+### Example: Add a Concert/Event Ticket
+
+\`\`\`
+POST /api/v1/trips/:id/items
+Authorization: Bearer ubt_k1_abc123...
+Content-Type: application/json
+
+{
+  "kind": "ticket",
+  "start_date": "2026-03-18",
+  "start_ts": "2026-03-18T20:00:00+01:00",
+  "start_location": "Salle Pleyel, Paris",
+  "summary": "David Byrne concert — 2 tickets",
+  "provider": "Ticketmaster",
+  "confirmation_code": "TM-29384756",
+  "traveler_names": ["Ian Rogers", "Hedvig Rogers"],
+  "details_json": {
+    "event_name": "AN EVENING WITH DAVID BYRNE",
+    "venue_name": "Salle Pleyel",
+    "venue_address": "252 Rue du Faubourg Saint-Honoré, 75008 Paris",
+    "performer": "David Byrne",
+    "section": "Orchestre",
+    "row": "G",
+    "seat": "12",
+    "ticket_count": 2,
+    "ticket_type": "Reserved",
+    "door_time": "19:00",
+    "apple_wallet_url": "https://wallet.apple.com/...",
+    "google_wallet_url": "https://pay.google.com/gp/v/save/..."
+  }
+}
+
+201 Created
+{ "data": { "id": "uuid", "kind": "ticket", ... } }
+\`\`\`
+
+**Ticket-specific fields in \`details_json\`:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| event_name | string | Full event title |
+| venue_name | string | Venue name |
+| venue_address | string | Full venue address |
+| performer | string | Artist / show name |
+| section | string | Seating section |
+| row | string | Row identifier |
+| seat | string | Seat number |
+| ticket_count | number | Number of tickets |
+| ticket_type | string | GA, Reserved, VIP, etc. |
+| door_time | string | Door open time (HH:MM) |
+| apple_wallet_url | string | Apple Wallet pass link |
+| google_wallet_url | string | Google Wallet save link |
+
+> **Supported ticket providers:** Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, StubHub, Viagogo, and venue direct sales.
+
+---
+
+## Events & Ticket PDFs
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/trips/:id/items/:itemId/ticket-pdf | Download stored ticket PDF |
+
+Ticket PDFs are automatically stored when a booking email contains a PDF attachment (boarding pass, event ticket, booking confirmation). Access is restricted to the trip owner.
+
+\`\`\`
+GET /api/v1/trips/:id/items/:itemId/ticket-pdf?redirect=1
+Authorization: Bearer ubt_k1_abc123...
+
+302 → Signed Supabase Storage URL (valid 60 minutes)
+\`\`\`
+
+---
+
+## Live Status (Pro)
+
+Real-time flight and train status tracking. Status is checked automatically for upcoming trips:
+- 48-24h before departure → every 8 hours
+- 24-4h before → every 2 hours
+- 4-0h before → every 30 minutes
+- After departure → every 15 minutes
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/items/:id/status | Get current status (gate, delay, terminal, etc.) |
+| POST | /api/v1/items/:id/status/refresh | Force a status refresh |
+
+### Example: Get Flight Status
+
+\`\`\`
+GET /api/v1/items/:id/status
+Authorization: Bearer ubt_k1_abc123...
+
+200 OK
+{
+  "data": {
+    "status": "on_time",
+    "departure_gate": "A42",
+    "departure_terminal": "2E",
+    "arrival_terminal": "1",
+    "departure_delay_minutes": 0,
+    "arrival_delay_minutes": 0,
+    "aircraft_type": "A320",
+    "last_checked_at": "2026-03-06T08:15:00Z",
+    "source": "flightaware"
+  }
+}
+\`\`\`
+
+**Flight status fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| status | string | \`scheduled\`, \`on_time\`, \`delayed\`, \`cancelled\`, \`landed\`, \`diverted\` |
+| departure_gate | string | Gate number |
+| departure_terminal | string | Terminal |
+| arrival_terminal | string | Arrival terminal |
+| departure_delay_minutes | number | Delay in minutes (0 = on time) |
+| arrival_delay_minutes | number | Arrival delay |
+| aircraft_type | string | Aircraft model |
+| baggage_claim | string | Baggage carousel |
+| last_checked_at | string | ISO timestamp of last status check |
+| source | string | \`flightaware\` or \`sncf\` |
+
+> **Powered by FlightAware AeroAPI** for flights and **SNCF real-time API** for French trains.
+
 ---
 
 ## Loyalty Vault
@@ -366,6 +492,9 @@ Authorization: Bearer ubt_k1_abc123...
 6. **Share trip:** \`POST /api/v1/trips/:id/collaborators\` with email + role
 7. **Train status:** \`GET /api/v1/trains/:number/status\`
 8. **Calendar sync:** \`GET /api/v1/calendar/token\` → iCal URL
+9. **Flight status:** \`GET /api/v1/items/:id/status\` → gate, delay, terminal
+10. **Upcoming events:** \`GET /api/v1/trips\` → filter items where kind = "ticket"
+11. **Download ticket PDF:** \`GET /api/v1/trips/:id/items/:itemId/ticket-pdf\`
 
 ---
 
