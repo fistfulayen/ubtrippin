@@ -7,6 +7,17 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return ''
+  // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone shift.
+  // new Date("2026-03-19") = midnight UTC = March 18 in US timezones. Adding T00:00 forces local.
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const d = new Date(date + 'T00:00:00')
+    return d.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
   const d = new Date(date)
   return d.toLocaleDateString('en-US', {
     weekday: 'short',
@@ -117,8 +128,10 @@ export function formatDateRange(start: string | null, end: string | null): strin
   if (!start && !end) return ''
   if (!end || start === end) return formatDate(start)
 
-  const startDate = new Date(start!)
-  const endDate = new Date(end)
+  // Parse date-only strings as local to avoid timezone shift
+  const parseLocal = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00') : new Date(s)
+  const startDate = parseLocal(start!)
+  const endDate = parseLocal(end)
 
   // Same month and year
   if (startDate.getMonth() === endDate.getMonth() &&
