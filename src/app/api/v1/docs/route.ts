@@ -344,6 +344,14 @@ Authorization: Bearer ubt_k1_abc123...
 
 ---
 
+## Referrals
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/referral | Get my referral code and referral stats |
+
+---
+
 ## Family
 
 | Method | Path | Description |

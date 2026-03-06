@@ -37,7 +37,12 @@ function validateEmail(email: string): string | undefined {
   return undefined
 }
 
-export function EmailForm({ redirectPath }: { redirectPath: string }) {
+interface EmailFormProps {
+  redirectPath: string
+  referralCode?: string | null
+}
+
+export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
   const [mode, setMode] = useState<Mode>('sign_in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -126,6 +131,7 @@ export function EmailForm({ redirectPath }: { redirectPath: string }) {
           password,
           options: {
             emailRedirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
+            data: referralCode ? { referral_code: referralCode } : undefined,
           },
         })
 

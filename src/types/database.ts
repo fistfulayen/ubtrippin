@@ -28,6 +28,8 @@ export interface Database {
           stripe_subscription_id: string | null
           subscription_current_period_end: string | null
           subscription_grace_until: string | null
+          referral_code: string | null
+          referred_by: string | null
         }
         Insert: {
           id: string
@@ -42,6 +44,8 @@ export interface Database {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_grace_until?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
         }
         Update: {
           id?: string
@@ -56,6 +60,34 @@ export interface Database {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_grace_until?: string | null
+          referral_code?: string | null
+          referred_by?: string | null
+        }
+      }
+      referrals: {
+        Row: {
+          id: string
+          referrer_id: string
+          referee_id: string
+          status: 'pending' | 'signed_up' | 'converted' | 'expired'
+          created_at: string
+          converted_at: string | null
+        }
+        Insert: {
+          id?: string
+          referrer_id: string
+          referee_id: string
+          status?: 'pending' | 'signed_up' | 'converted' | 'expired'
+          created_at?: string
+          converted_at?: string | null
+        }
+        Update: {
+          id?: string
+          referrer_id?: string
+          referee_id?: string
+          status?: 'pending' | 'signed_up' | 'converted' | 'expired'
+          created_at?: string
+          converted_at?: string | null
         }
       }
       allowed_senders: {
@@ -512,6 +544,7 @@ export type GuideCategory = typeof GUIDE_CATEGORIES[number] | string
 
 // Convenience types for common use
 export type Profile = Database['public']['Tables']['profiles']['Row']
+export type Referral = Database['public']['Tables']['referrals']['Row']
 export type AllowedSender = Database['public']['Tables']['allowed_senders']['Row']
 export type Trip = Database['public']['Tables']['trips']['Row']
 export type TripItem = Database['public']['Tables']['trip_items']['Row']

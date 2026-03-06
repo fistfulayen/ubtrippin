@@ -84,6 +84,24 @@ const sections: HelpSection[] = [
     ),
   },
   {
+    id: 'referrals',
+    title: 'Referrals',
+    searchText:
+      'referral code link invite friends signed up converted pro settings copy',
+    content: (
+      <>
+        <p>
+          Every account gets a personal referral link you can share with friends.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Find your link in <Link href="/settings" className="text-indigo-600 hover:text-indigo-500">Settings</Link> under Referrals.</li>
+          <li>When someone signs up through your link, your signed-up count increases.</li>
+          <li>When that user upgrades to Pro, your converted count increases.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
     id: 'calendar',
     title: 'Calendar Sync',
     searchText:

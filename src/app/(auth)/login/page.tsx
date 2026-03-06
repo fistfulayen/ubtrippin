@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { buildOAuthCallbackUrl, resolveSafeRedirectFromSearchParams } from '@/lib/supabase/auth'
+import { normalizeReferralCode } from '@/lib/referrals'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useMemo, useState } from 'react'
 import Image from 'next/image'
@@ -12,14 +13,27 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleError, setGoogleError] = useState<string | null>(null)
+  const referralCode = useMemo(() => normalizeReferralCode(searchParams.get('ref')), [searchParams])
 
   const redirectPath = useMemo(
-    () =>
-      resolveSafeRedirectFromSearchParams(searchParams, {
+    () => {
+      const safeRedirect = resolveSafeRedirectFromSearchParams(searchParams, {
         fallbackPath: '/trips',
         origin: window.location.origin,
-      }),
-    [searchParams]
+      })
+
+      if (!referralCode) {
+        return safeRedirect
+      }
+
+      const url = new URL(safeRedirect, window.location.origin)
+      if (!url.searchParams.get('ref')) {
+        url.searchParams.set('ref', referralCode)
+      }
+
+      return `${url.pathname}${url.search}${url.hash}`
+    },
+    [searchParams, referralCode]
   )
 
   const authError = searchParams.get('error')
@@ -126,7 +140,7 @@ function LoginContent() {
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-          <EmailForm redirectPath={redirectPath} />
+          <EmailForm redirectPath={redirectPath} referralCode={referralCode} />
 
           <p className="text-center text-xs text-slate-500">
             By signing in, you agree to our <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link>{' '}
