@@ -5,7 +5,7 @@ import { Check, Copy } from 'lucide-react'
 
 const EMAIL = 'trips@ubtrippin.xyz'
 
-export function DemoBanner() {
+export function DemoTripBanner() {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -17,9 +17,8 @@ export function DemoBanner() {
   return (
     <div className="rounded-xl border border-yellow-300 bg-yellow-50 px-5 py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <p className="text-sm text-yellow-800">
-        This is a demo trip. Forward a booking email to{' '}
-        <span className="font-mono font-semibold">{EMAIL}</span> to see your real
-        data.
+        Sample Trip - forward a booking email to{' '}
+        <span className="font-mono font-semibold">{EMAIL}</span> to create your own.
       </p>
       <button
         onClick={handleCopy}

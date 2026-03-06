@@ -14,6 +14,7 @@ function makeTrip(overrides: Partial<Trip> = {}): Trip {
     travelers: ['Alex'],
     notes: null,
     cover_image_url: null,
+    is_demo: false,
     share_token: null,
     share_enabled: false,
     created_at: '2026-01-01T00:00:00.000Z',

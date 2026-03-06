@@ -1,49 +1,47 @@
 /**
- * Nudge email system — PRD 007-p1
+ * Onboarding sequence for PRD-035 activation.
  *
- * Sends time-delayed nudge emails to unactivated users:
- *   Day 1 (>24h)  — "One thing to do with UBTRIPPIN"
- *   Day 3 (>72h)  — "What your trip looks like in UBTRIPPIN"
- *   Day 7 (>168h) — "Need help getting started?"
+ * Email 2 (day 2): no forwarded booking yet
+ * Email 3 (day 5): still no forwarded booking, links to sample trip
+ * Email 4 (day 14): active users only (non-demo trip exists), Pro upsell
  */
 
 import { render } from '@react-email/components'
 import { createSecretClient } from '@/lib/supabase/service'
 import { getResendClient } from '@/lib/resend/client'
-import { NudgeDay1Email } from '@/emails/NudgeDay1Email'
-import { NudgeDay2Email } from '@/emails/NudgeDay2Email'
-import { NudgeDay3Email } from '@/emails/NudgeDay3Email'
+import { OnboardingDay2Email } from '@/components/email/onboarding-day-2'
+import { OnboardingDay5Email } from '@/components/email/onboarding-day-5'
+import { OnboardingDay14FamilyEmail } from '@/components/email/onboarding-day-14-family'
 
 interface ProfileRow {
   id: string
   email: string | null
   full_name: string | null
   created_at: string
-  activated_at: string | null
+  subscription_tier: string | null
   nudge_1_sent_at: string | null
   nudge_2_sent_at: string | null
   nudge_3_sent_at: string | null
 }
 
-/** Hours since a given ISO timestamp. */
+interface TripSummary {
+  id: string
+  is_demo: boolean
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
+
 function hoursSince(isoString: string): number {
   return (Date.now() - new Date(isoString).getTime()) / (1000 * 60 * 60)
 }
 
-/**
- * Checks all unactivated users and sends whichever nudge emails are due.
- * Returns the number of emails sent.
- */
 export async function checkAndSendNudges(): Promise<number> {
   const supabase = createSecretClient()
   const resend = getResendClient()
 
   const { data: profiles, error } = await supabase
     .from('profiles')
-    .select(
-      'id, email, full_name, created_at, activated_at, nudge_1_sent_at, nudge_2_sent_at, nudge_3_sent_at'
-    )
-    .is('activated_at', null)
+    .select('id, email, full_name, created_at, subscription_tier, nudge_1_sent_at, nudge_2_sent_at, nudge_3_sent_at')
 
   if (error) {
     console.error('[nudge-emails] Failed to fetch profiles:', error)
@@ -56,69 +54,104 @@ export async function checkAndSendNudges(): Promise<number> {
   for (const profile of rows) {
     if (!profile.email) continue
 
+    const { data: trips, error: tripsError } = await supabase
+      .from('trips')
+      .select('id, is_demo')
+      .eq('user_id', profile.id)
+
+    if (tripsError) {
+      console.error(`[nudge-emails] Failed to fetch trips for ${profile.id}:`, tripsError)
+      continue
+    }
+
+    const tripRows = (trips ?? []) as TripSummary[]
+    const hasNonDemoTrip = tripRows.some((trip) => !trip.is_demo)
+    const demoTrip = tripRows.find((trip) => trip.is_demo)
+
     const age = hoursSince(profile.created_at)
     const name = profile.full_name ?? 'there'
 
-    // Nudge 1 — after 24h
-    if (age > 24 && !profile.nudge_1_sent_at) {
+    // Day 2: no forwarded booking yet (no non-demo trip)
+    if (!hasNonDemoTrip && age > 48 && !profile.nudge_1_sent_at) {
       try {
-        const html = await render(NudgeDay1Email({ userName: name }))
+        const html = await render(OnboardingDay2Email({ userName: name }))
         await resend.emails.send({
           from: 'UBTRIPPIN <hello@ubtrippin.xyz>',
           to: profile.email,
-          subject: 'One thing to do with UBTRIPPIN',
+          subject: "Here's what happens when you forward an email",
           html,
         })
+
         await supabase
           .from('profiles')
           .update({ nudge_1_sent_at: new Date().toISOString() })
           .eq('id', profile.id)
+
         sent++
-        console.log(`[nudge-emails] Sent day-1 nudge to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-2 onboarding email to ${profile.email}`)
+        continue
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-1 nudge for ${profile.id}:`, err)
+        console.error(`[nudge-emails] Failed day-2 email for ${profile.id}:`, err)
       }
     }
 
-    // Nudge 2 — after 72h
-    if (age > 72 && !profile.nudge_2_sent_at) {
+    // Day 5: still no forwarded booking
+    if (!hasNonDemoTrip && age > 120 && !profile.nudge_2_sent_at) {
       try {
-        const html = await render(NudgeDay2Email({ userName: name }))
+        const demoTripUrl = demoTrip ? `${APP_URL}/trips/${demoTrip.id}` : `${APP_URL}/trips`
+        const html = await render(
+          OnboardingDay5Email({
+            userName: name,
+            demoTripUrl,
+          })
+        )
+
         await resend.emails.send({
           from: 'UBTRIPPIN <hello@ubtrippin.xyz>',
           to: profile.email,
-          subject: 'What your trip looks like in UBTRIPPIN',
+          subject: "Still haven't tried it? Check out your sample trip",
           html,
         })
+
         await supabase
           .from('profiles')
           .update({ nudge_2_sent_at: new Date().toISOString() })
           .eq('id', profile.id)
+
         sent++
-        console.log(`[nudge-emails] Sent day-3 nudge to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-5 onboarding email to ${profile.email}`)
+        continue
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-3 nudge for ${profile.id}:`, err)
+        console.error(`[nudge-emails] Failed day-5 email for ${profile.id}:`, err)
       }
     }
 
-    // Nudge 3 — after 168h (7 days)
-    if (age > 168 && !profile.nudge_3_sent_at) {
+    // Day 14: active users only (has non-demo trip), upsell family sharing for free tier users
+    if (
+      hasNonDemoTrip &&
+      profile.subscription_tier !== 'pro' &&
+      age > 336 &&
+      !profile.nudge_3_sent_at
+    ) {
       try {
-        const html = await render(NudgeDay3Email({ userName: name }))
+        const html = await render(OnboardingDay14FamilyEmail({ userName: name }))
+
         await resend.emails.send({
           from: 'UBTRIPPIN <hello@ubtrippin.xyz>',
           to: profile.email,
-          subject: 'Need help getting started?',
+          subject: 'Did you know about family sharing?',
           html,
         })
+
         await supabase
           .from('profiles')
           .update({ nudge_3_sent_at: new Date().toISOString() })
           .eq('id', profile.id)
+
         sent++
-        console.log(`[nudge-emails] Sent day-7 nudge to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-14 onboarding email to ${profile.email}`)
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-7 nudge for ${profile.id}:`, err)
+        console.error(`[nudge-emails] Failed day-14 email for ${profile.id}:`, err)
       }
     }
   }

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { DEMO_TRIP, DEMO_ITEMS } from '@/app/api/v1/trips/demo/route'
-import { DemoBanner } from './demo-banner'
+import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 
 const KIND_LABELS: Record<string, string> = {
   flight: '✈️ Flight',
@@ -37,7 +37,7 @@ export default function DemoTripPage() {
       </Link>
 
       {/* Demo banner with copy button (client component) */}
-      <DemoBanner />
+      <DemoTripBanner />
 
       {/* Trip header */}
       <div className="rounded-2xl border border-[#cbd5e1] bg-white p-6">
