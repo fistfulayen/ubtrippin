@@ -154,7 +154,9 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: ShareTrip
 })
 
 function normaliseCityLabel(location: string) {
-  return location.split(',')[0].trim()
+  // Strip anything that isn't alphanumeric, space, hyphen, period, or common diacritics
+  const city = location.split(',')[0].trim()
+  return city.replace(/[^\p{L}\p{N}\s.\-']/gu, '').slice(0, 100)
 }
 
 function buildTripSummaryDescription(trip: ShareTrip, items: ShareTripItem[] | null) {
@@ -205,6 +207,8 @@ function formatHoursAndMinutes(totalMinutes: number) {
 
 function parseDateWithOptionalTime(date: string | null, hhmm: string | undefined, endOfDay = false) {
   if (!date) return null
+  // Validate date format to prevent unexpected Date parsing behavior
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
   const normalizedTime = hhmm && /^\d{1,2}:\d{2}$/.test(hhmm)
     ? `${hhmm.padStart(5, '0')}:00`
     : (endOfDay ? '23:59:00' : '00:00:00')
@@ -233,10 +237,8 @@ function formatGapLabel(previous: ShareTripItem, next: ShareTripItem) {
   if (diffMs <= 0) return null
 
   if (diffMs < DAY_MS) {
-    const hours = diffMs / HOUR_MS
-    const minutes = diffMs / MINUTE_MS
-    const duration = hours >= 1 ? `${Math.round(hours)}h` : `${Math.max(1, Math.round(minutes))}m`
-    return `${duration} layover`
+    const totalMinutes = diffMs / MINUTE_MS
+    return `${formatHoursAndMinutes(totalMinutes)} layover`
   }
 
   const days = Math.max(1, Math.round(diffMs / DAY_MS))
@@ -245,46 +247,52 @@ function formatGapLabel(previous: ShareTripItem, next: ShareTripItem) {
   return `${days} ${days === 1 ? 'day' : 'days'} in ${normaliseCityLabel(city)}`
 }
 
-function getItemDurationLabel(item: ShareTripItem) {
+function getFlightDurationLabel(item: ShareTripItem) {
   const details = item.details_json as Record<string, unknown> | null
+  const textDuration = readString(details, 'flight_duration')
+    ?? readString(details, 'duration')
+    ?? readString(details, 'flight_time')
+  if (textDuration) return textDuration
 
-  if (item.kind === 'flight') {
-    const textDuration = readString(details, 'flight_duration')
-      ?? readString(details, 'duration')
-      ?? readString(details, 'flight_time')
-    if (textDuration) return textDuration
+  const minutes = readNumber(details, 'flight_duration_minutes')
+    ?? readNumber(details, 'duration_minutes')
+    ?? readNumber(details, 'flight_time_minutes')
+  if (minutes && minutes > 0) return formatHoursAndMinutes(minutes)
 
-    const minutes = readNumber(details, 'flight_duration_minutes')
-      ?? readNumber(details, 'duration_minutes')
-      ?? readNumber(details, 'flight_time_minutes')
-    if (minutes && minutes > 0) return formatHoursAndMinutes(minutes)
-
-    const start = getItemStartDate(item)
-    const end = getItemEndDate(item)
-    if (start && end) {
-      const diffMinutes = (end.getTime() - start.getTime()) / MINUTE_MS
-      if (diffMinutes > 0 && diffMinutes < 24 * 60) {
-        return formatHoursAndMinutes(diffMinutes)
-      }
+  const start = getItemStartDate(item)
+  const end = getItemEndDate(item)
+  if (start && end) {
+    const diffMinutes = (end.getTime() - start.getTime()) / MINUTE_MS
+    if (diffMinutes > 0 && diffMinutes < 48 * 60) {
+      return formatHoursAndMinutes(diffMinutes)
     }
   }
-
-  if (item.kind === 'hotel') {
-    const nightsFromDetails = readNumber(details, 'nights')
-    if (nightsFromDetails && nightsFromDetails > 0) {
-      return `${nightsFromDetails} ${nightsFromDetails === 1 ? 'night' : 'nights'}`
-    }
-    if (item.end_date) {
-      const start = parseDateWithOptionalTime(item.start_date, undefined, false)
-      const end = parseDateWithOptionalTime(item.end_date, undefined, false)
-      if (start && end) {
-        const nights = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS))
-        return `${nights} ${nights === 1 ? 'night' : 'nights'}`
-      }
-    }
-  }
-
   return null
+}
+
+function getHotelDurationLabel(item: ShareTripItem) {
+  const details = item.details_json as Record<string, unknown> | null
+  const nightsFromDetails = readNumber(details, 'nights')
+  if (nightsFromDetails && nightsFromDetails > 0) {
+    return `${nightsFromDetails} ${nightsFromDetails === 1 ? 'night' : 'nights'}`
+  }
+  if (item.end_date) {
+    const start = parseDateWithOptionalTime(item.start_date, undefined, false)
+    const end = parseDateWithOptionalTime(item.end_date, undefined, false)
+    if (start && end) {
+      const nights = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS))
+      return `${nights} ${nights === 1 ? 'night' : 'nights'}`
+    }
+  }
+  return null
+}
+
+function getItemDurationLabel(item: ShareTripItem) {
+  switch (item.kind) {
+    case 'flight': return getFlightDurationLabel(item)
+    case 'hotel': return getHotelDurationLabel(item)
+    default: return null
+  }
 }
 
 function TripItemRow({ item, durationLabel }: { item: ShareTripItem; durationLabel?: string | null }) {
