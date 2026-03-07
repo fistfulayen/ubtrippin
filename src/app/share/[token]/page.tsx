@@ -228,6 +228,20 @@ function getItemEndDate(item: ShareTripItem) {
   return parseDateWithOptionalTime(item.end_date ?? item.start_date, arrivalTime, true)
 }
 
+/**
+ * Extract a city name from a location string.
+ * Hotel locations are often full names like "The Stephen F Austin Royal Sonesta Hotel"
+ * with no comma-separated city. We only return a city if the location looks like
+ * "City, State" or "Place, City, Country" — i.e., has a comma.
+ */
+function extractCity(location: string | null): string | null {
+  if (!location) return null
+  // Only treat as a city if there's a comma (e.g. "Austin, TX" or "Miami, FL")
+  // Full hotel/venue names without commas are not useful city labels
+  if (!location.includes(',')) return null
+  return normaliseCityLabel(location)
+}
+
 function formatGapLabel(previous: ShareTripItem, next: ShareTripItem) {
   const previousEnd = getItemEndDate(previous)
   const nextStart = getItemStartDate(next)
@@ -241,10 +255,12 @@ function formatGapLabel(previous: ShareTripItem, next: ShareTripItem) {
     return `${formatHoursAndMinutes(totalMinutes)} layover`
   }
 
-  const days = Math.max(1, Math.round(diffMs / DAY_MS))
-  const city = next.start_location || previous.end_location
-  if (!city) return `${days} ${days === 1 ? 'day' : 'days'} break`
-  return `${days} ${days === 1 ? 'day' : 'days'} in ${normaliseCityLabel(city)}`
+  // Use ceiling for day count — a gap from Tue afternoon to Thu morning is 2 days, not 1
+  const days = Math.max(1, Math.ceil(diffMs / DAY_MS))
+  // Prefer the city where you ARE (previous end), not where you're going
+  const city = extractCity(previous.end_location) ?? extractCity(next.start_location)
+  if (!city) return `${days} ${days === 1 ? 'day' : 'days'}`
+  return `${days} ${days === 1 ? 'day' : 'days'} in ${city}`
 }
 
 function getFlightDurationLabel(item: ShareTripItem) {
