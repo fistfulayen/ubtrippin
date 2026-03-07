@@ -404,6 +404,17 @@ Also accepts `POST` with the same body.
 
 ---
 
+### Referrals
+
+#### Get My Referral Stats
+```
+GET /api/v1/referral
+```
+
+Returns your referral code, sharable referral link, and counts for referred users who signed up and converted to Pro.
+
+---
+
 ### Family
 
 #### List My Families

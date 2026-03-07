@@ -6,6 +6,7 @@ import {
 } from '@/lib/billing'
 import { stripe } from '@/lib/stripe'
 import { createSecretClient } from '@/lib/supabase/service'
+import { markReferralConverted } from '@/lib/referrals'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -276,6 +277,8 @@ async function handleCheckoutSessionCompleted(
     },
     'checkout.session.completed'
   )
+
+  await markReferralConverted(supabase, profile.id)
 }
 
 async function handleCustomerCreated(
@@ -375,6 +378,8 @@ async function handleSubscriptionCreated(
     },
     'customer.subscription.created'
   )
+
+  await markReferralConverted(supabase, profile.id)
 }
 
 async function handleSubscriptionUpdated(
@@ -408,6 +413,10 @@ async function handleSubscriptionUpdated(
     },
     'customer.subscription.updated'
   )
+
+  if (nextTier === 'pro') {
+    await markReferralConverted(supabase, profile.id)
+  }
 }
 
 async function handleSubscriptionDeleted(
@@ -492,6 +501,8 @@ async function handleSubscriptionResumed(
     },
     'customer.subscription.resumed'
   )
+
+  await markReferralConverted(supabase, profile.id)
 }
 
 async function handleInvoicePaid(
@@ -527,6 +538,8 @@ async function handleInvoicePaid(
     },
     'invoice.paid'
   )
+
+  await markReferralConverted(supabase, profile.id)
 }
 
 async function handleInvoicePaymentFailed(

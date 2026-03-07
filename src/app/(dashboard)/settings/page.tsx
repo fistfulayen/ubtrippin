@@ -4,8 +4,9 @@ import { AllowedSendersList } from '@/components/settings/allowed-senders-list'
 import { AddSenderForm } from '@/components/settings/add-sender-form'
 import { ApiKeysSection } from '@/components/settings/api-keys-section'
 import { CalendarFeedSection } from '@/components/settings/calendar-feed-section'
+import { ReferralsSection } from '@/components/settings/referrals-section'
 import { SettingsNav } from '@/components/settings/settings-nav'
-import { Mail, User, Info, Key, Rss } from 'lucide-react'
+import { Mail, User, Info, Key, Rss, Gift } from 'lucide-react'
 import { UserAvatar } from '@/components/user-avatar'
 import type { Profile, AllowedSender } from '@/types/database'
 
@@ -128,6 +129,22 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent>
           <CalendarFeedSection isPro={isPro} />
+        </CardContent>
+      </Card>
+
+      {/* Referrals */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="h-5 w-5" />
+            Referrals
+          </CardTitle>
+          <CardDescription>
+            Invite friends with your referral link and track who signs up and converts to Pro.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ReferralsSection />
         </CardContent>
       </Card>
 
