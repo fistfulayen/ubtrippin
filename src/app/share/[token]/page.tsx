@@ -56,6 +56,10 @@ interface ShareTripItem {
   details_json: Record<string, unknown> | null
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
+const MINUTE_MS = 60 * 1000
+
 /** Return first name + last initial only (e.g. "John Smith" -> "John S.") */
 function obfuscateName(name: string): string {
   const parts = name.trim().split(/\s+/)
@@ -150,7 +154,9 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: ShareTrip
 })
 
 function normaliseCityLabel(location: string) {
-  return location.split(',')[0].trim()
+  // Strip anything that isn't alphanumeric, space, hyphen, period, or common diacritics
+  const city = location.split(',')[0].trim()
+  return city.replace(/[^\p{L}\p{N}\s.\-']/gu, '').slice(0, 100)
 }
 
 function buildTripSummaryDescription(trip: ShareTrip, items: ShareTripItem[] | null) {
@@ -169,7 +175,127 @@ function buildTripSummaryDescription(trip: ShareTrip, items: ShareTripItem[] | n
   return [dateLabel, itemLabel, cityList].filter(Boolean).join(' · ')
 }
 
-function TripItemRow({ item }: { item: ShareTripItem }) {
+function formatTimelineDate(date: string | null) {
+  if (!date) return 'Date TBD'
+  const parsed = new Date(`${date}T00:00:00`)
+  if (Number.isNaN(parsed.getTime())) return 'Date TBD'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed)
+}
+
+function readNumber(details: Record<string, unknown> | null, key: string) {
+  const value = details?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function readString(details: Record<string, unknown> | null, key: string) {
+  const value = details?.[key]
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+function formatHoursAndMinutes(totalMinutes: number) {
+  const roundedMinutes = Math.max(1, Math.round(totalMinutes))
+  const hours = Math.floor(roundedMinutes / 60)
+  const minutes = roundedMinutes % 60
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`
+  if (hours > 0) return `${hours}h`
+  return `${minutes}m`
+}
+
+function parseDateWithOptionalTime(date: string | null, hhmm: string | undefined, endOfDay = false) {
+  if (!date) return null
+  // Validate date format to prevent unexpected Date parsing behavior
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  const normalizedTime = hhmm && /^\d{1,2}:\d{2}$/.test(hhmm)
+    ? `${hhmm.padStart(5, '0')}:00`
+    : (endOfDay ? '23:59:00' : '00:00:00')
+  const parsed = new Date(`${date}T${normalizedTime}`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getItemStartDate(item: ShareTripItem) {
+  const details = item.details_json as Record<string, unknown> | null
+  const departureTime = readString(details, 'departure_local_time') ?? undefined
+  return parseDateWithOptionalTime(item.start_date, departureTime, false)
+}
+
+function getItemEndDate(item: ShareTripItem) {
+  const details = item.details_json as Record<string, unknown> | null
+  const arrivalTime = readString(details, 'arrival_local_time') ?? undefined
+  return parseDateWithOptionalTime(item.end_date ?? item.start_date, arrivalTime, true)
+}
+
+function formatGapLabel(previous: ShareTripItem, next: ShareTripItem) {
+  const previousEnd = getItemEndDate(previous)
+  const nextStart = getItemStartDate(next)
+  if (!previousEnd || !nextStart) return null
+
+  const diffMs = nextStart.getTime() - previousEnd.getTime()
+  if (diffMs <= 0) return null
+
+  if (diffMs < DAY_MS) {
+    const totalMinutes = diffMs / MINUTE_MS
+    return `${formatHoursAndMinutes(totalMinutes)} layover`
+  }
+
+  const days = Math.max(1, Math.round(diffMs / DAY_MS))
+  const city = next.start_location || previous.end_location
+  if (!city) return `${days} ${days === 1 ? 'day' : 'days'} break`
+  return `${days} ${days === 1 ? 'day' : 'days'} in ${normaliseCityLabel(city)}`
+}
+
+function getFlightDurationLabel(item: ShareTripItem) {
+  const details = item.details_json as Record<string, unknown> | null
+  const textDuration = readString(details, 'flight_duration')
+    ?? readString(details, 'duration')
+    ?? readString(details, 'flight_time')
+  if (textDuration) return textDuration
+
+  const minutes = readNumber(details, 'flight_duration_minutes')
+    ?? readNumber(details, 'duration_minutes')
+    ?? readNumber(details, 'flight_time_minutes')
+  if (minutes && minutes > 0) return formatHoursAndMinutes(minutes)
+
+  const start = getItemStartDate(item)
+  const end = getItemEndDate(item)
+  if (start && end) {
+    const diffMinutes = (end.getTime() - start.getTime()) / MINUTE_MS
+    if (diffMinutes > 0 && diffMinutes < 48 * 60) {
+      return formatHoursAndMinutes(diffMinutes)
+    }
+  }
+  return null
+}
+
+function getHotelDurationLabel(item: ShareTripItem) {
+  const details = item.details_json as Record<string, unknown> | null
+  const nightsFromDetails = readNumber(details, 'nights')
+  if (nightsFromDetails && nightsFromDetails > 0) {
+    return `${nightsFromDetails} ${nightsFromDetails === 1 ? 'night' : 'nights'}`
+  }
+  if (item.end_date) {
+    const start = parseDateWithOptionalTime(item.start_date, undefined, false)
+    const end = parseDateWithOptionalTime(item.end_date, undefined, false)
+    if (start && end) {
+      const nights = Math.max(1, Math.round((end.getTime() - start.getTime()) / DAY_MS))
+      return `${nights} ${nights === 1 ? 'night' : 'nights'}`
+    }
+  }
+  return null
+}
+
+function getItemDurationLabel(item: ShareTripItem) {
+  switch (item.kind) {
+    case 'flight': return getFlightDurationLabel(item)
+    case 'hotel': return getHotelDurationLabel(item)
+    default: return null
+  }
+}
+
+function TripItemRow({ item, durationLabel }: { item: ShareTripItem; durationLabel?: string | null }) {
   const names = item.traveler_names.map(obfuscateName)
   const location =
     item.start_location && item.end_location
@@ -196,7 +322,7 @@ function TripItemRow({ item }: { item: ShareTripItem }) {
         : null
 
   return (
-    <div className="flex items-start gap-3 border-b border-[#f1f5f9] py-4 last:border-0">
+    <div className="flex items-start gap-3 py-4">
       {airlineLogoUrl ? (
         <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-white">
           <AirlineLogoIcon url={airlineLogoUrl} alt={item.provider || 'Airline'} />
@@ -219,6 +345,11 @@ function TripItemRow({ item }: { item: ShareTripItem }) {
           >
             {capitalise(item.kind)}
           </span>
+          {durationLabel && (
+            <span className="inline-flex items-center rounded-full border border-[#cbd5e1] bg-[#eef2ff] px-2 py-0.5 text-xs font-medium text-[#4338ca]">
+              {durationLabel}
+            </span>
+          )}
         </div>
 
         {timeDisplay && (
@@ -460,12 +591,41 @@ export default async function SharePage({ params }: SharePageProps) {
           {items && items.length > 0 ? (
             <Card className="border-[#cbd5e1]">
               <CardContent className="p-0">
-                <div className="divide-y divide-[#f1f5f9]">
-                  {items.map((item) => (
-                    <div key={item.id} className="px-5">
-                      <TripItemRow item={item} />
-                    </div>
-                  ))}
+                <div className="relative px-4 py-3 sm:px-5 sm:py-4">
+                  <div className="absolute bottom-8 left-3 top-8 w-px bg-gradient-to-b from-[#4f46e5]/50 via-[#94a3b8] to-[#4f46e5]/50 sm:left-3.5" />
+
+                  <div className="relative pl-7 sm:pl-8">
+                    <div className="absolute left-2 top-1 h-2 w-2 rounded-full bg-[#4338ca] sm:left-2.5" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#4338ca]">Trip starts</p>
+                    <p className="text-sm font-medium text-[#334155]">{formatTimelineDate(trip.start_date)}</p>
+                  </div>
+
+                  <div className="mt-2 space-y-0.5">
+                    {items.map((item, index) => {
+                      const gapLabel = index < items.length - 1 ? formatGapLabel(item, items[index + 1]) : null
+                      return (
+                        <div key={item.id}>
+                          <div className="relative border-b border-[#f1f5f9] pl-7 last:border-0 sm:pl-8">
+                            <div className="absolute left-[7px] top-8 h-2.5 w-2.5 rounded-full border-2 border-[#4f46e5] bg-white sm:left-2" />
+                            <TripItemRow item={item} durationLabel={getItemDurationLabel(item)} />
+                          </div>
+                          {gapLabel && (
+                            <div className="relative pl-7 py-1.5 sm:pl-8">
+                              <p className="text-xs font-medium text-[#475569]">{gapLabel}</p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <div className="relative mt-2 pl-7 sm:pl-8">
+                    <div className="absolute left-2 top-1 h-2 w-2 rounded-full bg-[#4338ca] sm:left-2.5" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[#4338ca]">Trip ends</p>
+                    <p className="text-sm font-medium text-[#334155]">
+                      {formatTimelineDate(trip.end_date ?? trip.start_date)}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
