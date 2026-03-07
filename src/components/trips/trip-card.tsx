@@ -145,6 +145,11 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
               )}
               <TripStatusSummary tripId={trip.id} enabled={showStatusSummary} />
             </div>
+            {trip.is_demo && (
+              <Badge variant="secondary" className="shrink-0">
+                Sample Trip
+              </Badge>
+            )}
             {needsReview && (
               <Badge variant="warning" className="shrink-0">
                 <AlertCircle className="mr-1 h-3 w-3" />

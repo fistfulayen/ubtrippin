@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/cleanup-ticket-pdfs",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/nudge-emails",
+      "schedule": "0 9 * * *"
     }
   ],
   "redirects": [

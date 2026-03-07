@@ -4,6 +4,7 @@ import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
 import { sendWelcomeEmail } from './actions'
+import { createDemoTrip } from '@/lib/trips/demo-trip'
 import { Button } from '@/components/ui/button'
 import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Plus } from 'lucide-react'
@@ -20,7 +21,7 @@ export default async function TripsPage() {
   const { data: profile } = user
     ? await supabase
         .from('profiles')
-        .select('welcome_email_sent, onboarding_completed, full_name, email, subscription_tier')
+        .select('welcome_email_sent, onboarding_completed, full_name, email, subscription_tier, created_at')
         .eq('id', user.id)
         .single()
     : { data: null }
@@ -34,10 +35,26 @@ export default async function TripsPage() {
     ).catch(() => {}) // swallow errors to not break page
   }
 
-  const { data: trips } = await supabase
+  let { data: trips } = await supabase
     .from('trips')
     .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
     .order('start_date', { ascending: true })
+
+  // Create a sample trip for brand new users after email confirmation.
+  if (user && profile && (trips?.length ?? 0) === 0) {
+    await createDemoTrip({
+      userId: user.id,
+      travelerName: profile.full_name,
+      signupAt: profile.created_at,
+    }).catch(() => {})
+
+    const { data: refreshedTrips } = await supabase
+      .from('trips')
+      .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
+      .order('start_date', { ascending: true })
+
+    trips = refreshedTrips ?? []
+  }
 
   const ownerIds = Array.from(
     new Set((trips ?? []).map((trip) => trip.user_id).filter((ownerId) => ownerId && ownerId !== user?.id))
