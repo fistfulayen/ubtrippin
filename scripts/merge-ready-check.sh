@@ -16,10 +16,12 @@ echo ""
 
 # 1. All CI checks pass
 echo "--- CI Status ---"
-CHECKS=$(gh pr checks "$PR" 2>&1)
-if echo "$CHECKS" | grep -q "fail"; then
+CHECKS=$(gh pr checks "$PR" 2>&1 || true)
+if echo "$CHECKS" | grep -qi "fail"; then
   fail "CI has failing checks"
-  echo "$CHECKS" | grep "fail"
+  echo "$CHECKS" | grep -i "fail"
+elif echo "$CHECKS" | grep -qi "pending"; then
+  fail "CI still running — wait for completion"
 else
   pass "All CI checks pass"
 fi
