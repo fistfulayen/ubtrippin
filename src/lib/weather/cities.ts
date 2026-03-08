@@ -31,6 +31,20 @@ function cleanCityPart(value: string) {
       .replace(/\([^)]*\)/g, ' ')
       .replace(/[-/]/g, ',')
       .replace(/\s+,/g, ',')
+      .replace(/\b\d{5}(-\d{4})?\b/g, '')  // strip US zip codes
+  )
+}
+
+/**
+ * Detect venue/hotel names that aren't city names.
+ * "The Vendue" → true, "Grand Beach Hotel Surfside" → true, "Park Hyatt Tokyo" → true
+ * "Salt Lake City" → false, "New York" → false
+ */
+function looksLikeVenueName(name: string): boolean {
+  return (
+    /^(The|A|An)\s/i.test(name) ||
+    /\b(Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Apartments?|Villas?|Palace|House|Gardens?|Manor|Hall|Centre|Center|Venue|Club|Hyatt|Marriott|Hilton|Sheraton|Westin|Radisson|Novotel|Ibis|Sofitel|Intercontinental|Holiday Inn|Best Western|Hampton|Courtyard)\b/i.test(name) ||
+    /\d{3,}/.test(name) // street addresses contain 3+ digit numbers
   )
 }
 
@@ -46,17 +60,37 @@ export function toCityQuery(location: string | null | undefined): string | null 
 
   if (segments.length === 0) return null
 
+  // Strip leading airport codes (e.g. "CDG, Paris" → start from "Paris")
   const usableSegments =
     segments[0] && /^[A-Z]{3,4}$/.test(segments[0]) && segments.length > 1
       ? segments.slice(1)
       : segments
 
-  const city = usableSegments[0]
-  const region = usableSegments[1]
-  const country = usableSegments[2]
+  // If the first segment looks like a venue/hotel name, skip to the next segment
+  // "Grand Beach Hotel Surfside, 9449 Collins Avenue, Surfside, Florida" → skip to find "Surfside"
+  let cityIndex = 0
+  while (cityIndex < usableSegments.length && looksLikeVenueName(usableSegments[cityIndex])) {
+    cityIndex++
+  }
+  // If we skipped everything (single venue name with no commas), try to extract a city
+  // from the venue name itself by stripping known hotel keywords
+  if (cityIndex >= usableSegments.length) {
+    const stripped = usableSegments[0]
+      .replace(/\b(The|A|An|Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Grand|Royal|Palace|House|Manor|Hall|Park|Hyatt|Marriott|Hilton|Sheraton|Westin|Radisson|Novotel|Ibis|Sofitel|Sonesta|Intercontinental|Hampton|Courtyard|Best|Western)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (stripped && stripped.length > 2) {
+      return stripped
+    }
+    cityIndex = 0
+  }
+
+  const city = usableSegments[cityIndex]
+  // Look for a region/country after the city
+  const regionIndex = cityIndex + 1
+  const region = regionIndex < usableSegments.length ? usableSegments[regionIndex] : null
   const parts = [city]
-  if (region) parts.push(region)
-  else if (country) parts.push(country)
+  if (region && !/^\d/.test(region)) parts.push(region)
   return parts.join(', ')
 }
 

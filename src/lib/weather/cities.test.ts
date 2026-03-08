@@ -93,4 +93,33 @@ describe('extractTripCities', () => {
 
     expect(cities.map((city) => city.city)).toEqual(['Austin, TX', 'Chicago, IL', 'New York, NY'])
   })
+
+  it('strips full hotel address to city name', () => {
+    const cities = extractTripCities([
+      makeItem({
+        id: 'hotel-1',
+        kind: 'hotel',
+        start_date: '2026-03-09',
+        end_date: '2026-03-10',
+        start_location: 'Grand Beach Hotel Surfside, 9449 Collins Avenue, Surfside, Florida 33154',
+      }),
+    ])
+    expect(cities[0].city).toContain('Surfside')
+    expect(cities[0].city).not.toContain('Collins Avenue')
+    expect(cities[0].city).not.toContain('9449')
+  })
+
+  it('extracts city from branded hotel name without address', () => {
+    const cities = extractTripCities([
+      makeItem({
+        id: 'hotel-1',
+        kind: 'hotel',
+        start_date: '2026-03-13',
+        end_date: '2026-03-14',
+        start_location: 'Park Hyatt Tokyo',
+      }),
+    ])
+    expect(cities[0].city).toContain('Tokyo')
+    expect(cities[0].city).not.toContain('Hyatt')
+  })
 })
