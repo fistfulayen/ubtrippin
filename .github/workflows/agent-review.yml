@@ -8,7 +8,7 @@ jobs:
     if: |
       (github.event.action == 'labeled' && github.event.label.name == 'agent-built') ||
       (github.event.action == 'opened' &&
-       (startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/')))
+       (startsWith(github.head_ref, 'feat') || startsWith(github.head_ref, 'fix/')))
     runs-on: ubuntu-latest
     permissions:
       contents: read
