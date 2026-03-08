@@ -249,7 +249,7 @@ const server = new McpServer(
 This server provides access to your UBTRIPPIN travel data and city guides.
 Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 
-Read: list_trips, get_trip, get_item, search_trips, get_upcoming, get_calendar, get_trip_status, get_item_status
+Read: list_trips, get_trip, get_item, get_trip_weather, search_trips, get_upcoming, get_calendar, get_trip_status, get_item_status
 Write (trips): create_trip, update_trip, delete_trip, merge_trips, rename_trip
 Write (items): add_item, add_items, update_item, delete_item, move_item, refresh_item_status
 City Guides: list_guides, get_guide, find_or_create_guide, add_guide_entry, update_guide_entry, delete_guide_entry, update_guide, delete_guide, get_guide_markdown, get_nearby_places
@@ -322,6 +322,27 @@ server.registerTool(
   },
   async ({ item_id }) => {
     const result = await apiFetch<{ data: TripItem }>(`/api/v1/items/${item_id}`)
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    }
+  }
+)
+
+server.registerTool(
+  'get_trip_weather',
+  {
+    title: 'Get Trip Weather',
+    description: 'Get weather forecasts and packing suggestions for a trip destination set.',
+    inputSchema: {
+      trip_id: z.string().uuid().describe('The UUID of the trip to retrieve weather for'),
+      refresh: z.boolean().optional().describe('Force-refresh weather and packing data'),
+    },
+  },
+  async ({ trip_id, refresh = false }) => {
+    const qs = new URLSearchParams()
+    if (refresh) qs.set('refresh', 'true')
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    const result = await apiFetch<unknown>(`/api/v1/trips/${trip_id}/weather${suffix}`)
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     }

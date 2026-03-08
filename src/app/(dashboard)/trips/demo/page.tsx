@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
-import { DEMO_TRIP, DEMO_ITEMS } from '@/app/api/v1/trips/demo/route'
+import { DEMO_TRIP, DEMO_ITEMS } from '@/lib/trips/demo-trip-data'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 
 const KIND_LABELS: Record<string, string> = {

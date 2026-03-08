@@ -14,6 +14,7 @@ import {
   Ticket,
   CalendarDays,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { formatDateRange, getKindIcon } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +22,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { extractAirlineCode } from '@/lib/images/airline-logo'
 import type { TripItemKind } from '@/types/database'
+import { WeatherSection } from '@/components/trips/weather/weather-section'
+import { buildWeatherPayload, getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
+import type { Json } from '@/types/database'
+import type { WeatherTripItem } from '@/lib/weather/types'
 import { AirlineLogoIcon } from './airline-logo-icon'
 import { ShareTripButton } from './share-trip-button'
 
@@ -57,7 +62,6 @@ interface ShareTripItem {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const HOUR_MS = 60 * 60 * 1000
 const MINUTE_MS = 60 * 1000
 
 /** Return first name + last initial only (e.g. "John Smith" -> "John S.") */
@@ -485,6 +489,68 @@ export default async function SharePage({ params }: SharePageProps) {
 
   const travelers = (trip.travelers ?? []).map(obfuscateName)
   const itemCount = items?.length ?? 0
+  const sessionSupabase = await createClient()
+  const {
+    data: { user },
+  } = await sessionSupabase.auth.getUser()
+
+  let sharedWeather = items
+    ? await buildWeatherPayload({
+        trip: {
+          id: trip.id,
+          user_id: '',
+          title: trip.title,
+          start_date: trip.start_date,
+          end_date: trip.end_date,
+          share_enabled: trip.share_enabled ?? false,
+        },
+        items: items.map(
+          (item): WeatherTripItem => ({
+            id: item.id,
+            trip_id: trip.id,
+            kind: item.kind,
+            start_date: item.start_date,
+            end_date: item.end_date,
+            start_ts: null,
+            end_ts: null,
+            start_location: item.start_location,
+            end_location: item.end_location,
+            provider: item.provider,
+            summary: item.summary,
+            details_json: (item.details_json ?? {}) as Json,
+          })
+        ),
+        unit: 'fahrenheit',
+        includePacking: false,
+      })
+    : null
+
+  let showPacking = false
+  if (user) {
+    const { data: accessibleTrip } = await sessionSupabase
+      .from('trips')
+      .select('id, user_id')
+      .eq('id', trip.id)
+      .maybeSingle()
+
+    if (accessibleTrip) {
+      const { data: ownerProfile } = await sessionSupabase
+        .from('profiles')
+        .select('subscription_tier')
+        .eq('id', accessibleTrip.user_id)
+        .maybeSingle()
+
+      showPacking = ownerProfile?.subscription_tier === 'pro'
+      const unit = await getTemperatureUnit(user.id, sessionSupabase)
+      sharedWeather = await getTripWeather({
+        tripId: trip.id,
+        supabase: sessionSupabase,
+        userId: user.id,
+        requestedUnit: unit,
+        includePacking: showPacking,
+      })
+    }
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-[#ffffff]">
@@ -603,6 +669,18 @@ export default async function SharePage({ params }: SharePageProps) {
               </CardContent>
             </Card>
           )}
+
+          {sharedWeather ? (
+            <div className="mb-6">
+              <WeatherSection
+                endpoint={`/api/trips/${trip.id}/weather`}
+                initialData={sharedWeather}
+                allowRefresh={false}
+                shareMode={!showPacking}
+                showPacking={showPacking}
+              />
+            </div>
+          ) : null}
 
           {items && items.length > 0 ? (
             <Card className="border-[#cbd5e1]">

@@ -18,6 +18,7 @@ interface ProfileData {
   hotel_brand_preference: string | null
   home_airport: string | null
   currency_preference: string
+  temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
   loyalty_count: number
 }
@@ -34,6 +35,7 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
   const [airlineAlliance, setAirlineAlliance] = useState<AlliancePreference>(initialProfile.airline_alliance)
   const [hotelBrandPreference, setHotelBrandPreference] = useState(initialProfile.hotel_brand_preference ?? '')
   const [currencyPreference, setCurrencyPreference] = useState(initialProfile.currency_preference || 'USD')
+  const [temperatureUnit, setTemperatureUnit] = useState<'fahrenheit' | 'celsius'>(initialProfile.temperature_unit)
   const [notes, setNotes] = useState(initialProfile.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -58,6 +60,7 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
           airline_alliance: airlineAlliance,
           hotel_brand_preference: hotelBrandPreference.trim() || null,
           currency_preference: currencyPreference,
+          temperature_unit: temperatureUnit,
           notes: canEditNotes ? (notes.trim() || null) : null,
         }),
       })
@@ -112,6 +115,18 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
             <option value="JPY">JPY</option>
             <option value="INR">INR</option>
             <option value="CHF">CHF</option>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="temperature_unit" className="text-sm font-medium text-gray-700">Temperature Unit</label>
+          <Select
+            id="temperature_unit"
+            value={temperatureUnit}
+            onChange={(event) => setTemperatureUnit(event.target.value as 'fahrenheit' | 'celsius')}
+          >
+            <option value="fahrenheit">Fahrenheit</option>
+            <option value="celsius">Celsius</option>
           </Select>
         </div>
 

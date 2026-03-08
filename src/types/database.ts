@@ -64,6 +64,47 @@ export interface Database {
           referred_by?: string | null
         }
       }
+      user_profiles: {
+        Row: {
+          id: string
+          seat_preference: 'window' | 'aisle' | 'middle' | 'no_preference'
+          meal_preference: 'standard' | 'vegetarian' | 'vegan' | 'kosher' | 'halal' | 'gluten_free' | 'no_preference'
+          airline_alliance: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
+          hotel_brand_preference: string | null
+          home_airport: string | null
+          currency_preference: string
+          temperature_unit: 'fahrenheit' | 'celsius'
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id: string
+          seat_preference?: 'window' | 'aisle' | 'middle' | 'no_preference'
+          meal_preference?: 'standard' | 'vegetarian' | 'vegan' | 'kosher' | 'halal' | 'gluten_free' | 'no_preference'
+          airline_alliance?: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
+          hotel_brand_preference?: string | null
+          home_airport?: string | null
+          currency_preference?: string
+          temperature_unit?: 'fahrenheit' | 'celsius'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          seat_preference?: 'window' | 'aisle' | 'middle' | 'no_preference'
+          meal_preference?: 'standard' | 'vegetarian' | 'vegan' | 'kosher' | 'halal' | 'gluten_free' | 'no_preference'
+          airline_alliance?: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
+          hotel_brand_preference?: string | null
+          home_airport?: string | null
+          currency_preference?: string
+          temperature_unit?: 'fahrenheit' | 'celsius'
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       referrals: {
         Row: {
           id: string
@@ -238,6 +279,59 @@ export interface Database {
           source_email_id?: string | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      trip_weather_cache: {
+        Row: {
+          id: string
+          trip_id: string
+          user_id: string
+          city: string
+          latitude: number
+          longitude: number
+          date_start: string
+          date_end: string
+          temperature_unit: 'fahrenheit' | 'celsius'
+          forecast_json: Json
+          source: string
+          packing_json: Json | null
+          fetched_at: string
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          user_id: string
+          city: string
+          latitude: number
+          longitude: number
+          date_start: string
+          date_end: string
+          temperature_unit?: 'fahrenheit' | 'celsius'
+          forecast_json: Json
+          source?: string
+          packing_json?: Json | null
+          fetched_at?: string
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          user_id?: string
+          city?: string
+          latitude?: number
+          longitude?: number
+          date_start?: string
+          date_end?: string
+          temperature_unit?: 'fahrenheit' | 'celsius'
+          forecast_json?: Json
+          source?: string
+          packing_json?: Json | null
+          fetched_at?: string
+          created_at?: string | null
+          updated_at?: string | null
         }
       }
       source_emails: {

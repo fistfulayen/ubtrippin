@@ -14,6 +14,7 @@ interface UserProfileRow {
   hotel_brand_preference: string | null
   home_airport: string | null
   currency_preference: string
+  temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
   created_at: string
   updated_at: string
@@ -33,6 +34,7 @@ function defaultProfile(userId: string): UserProfileRow {
     hotel_brand_preference: null,
     home_airport: null,
     currency_preference: 'USD',
+    temperature_unit: 'fahrenheit',
     notes: null,
     created_at: now,
     updated_at: now,
@@ -136,6 +138,17 @@ async function upsertProfile(request: NextRequest) {
     )
   }
 
+  if (
+    body.temperature_unit !== undefined &&
+    body.temperature_unit !== 'fahrenheit' &&
+    body.temperature_unit !== 'celsius'
+  ) {
+    return NextResponse.json(
+      { error: { code: 'invalid_param', message: 'temperature_unit must be fahrenheit or celsius.', field: 'temperature_unit' } },
+      { status: 400 }
+    )
+  }
+
   const hotelBrand = normalizeNullableString(body.hotel_brand_preference)
   const homeAirport = normalizeNullableString(body.home_airport)
   const notes = normalizeNullableString(body.notes)
@@ -175,6 +188,7 @@ async function upsertProfile(request: NextRequest) {
     ...(body.hotel_brand_preference !== undefined ? { hotel_brand_preference: hotelBrand } : {}),
     ...(body.home_airport !== undefined ? { home_airport: homeAirport ? homeAirport.toUpperCase() : null } : {}),
     ...(currencyPreference !== undefined ? { currency_preference: currencyPreference } : {}),
+    ...(body.temperature_unit !== undefined ? { temperature_unit: body.temperature_unit } : {}),
     ...(body.notes !== undefined ? { notes } : {}),
     updated_at: new Date().toISOString(),
   }
