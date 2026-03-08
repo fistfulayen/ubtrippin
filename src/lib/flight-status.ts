@@ -92,6 +92,15 @@ function calculateDelayMinutes(flight: Record<string, unknown>): number | null {
     return Math.max(0, Math.round(departureDelaySeconds / 60))
   }
 
+  // Prefer gate times (out) over takeoff times (off) for delay calculation
+  // — passengers care about when they leave the gate, not wheels-up
+  const scheduledOut = toIsoOrNull(flight.scheduled_out)
+  const estimatedOut = toIsoOrNull(flight.estimated_out)
+  if (scheduledOut && estimatedOut) {
+    const diff = diffMinutes(scheduledOut, estimatedOut)
+    if (diff !== null) return diff
+  }
+
   const scheduledOff = toIsoOrNull(flight.scheduled_off)
   const estimatedOff = toIsoOrNull(flight.estimated_off)
   if (scheduledOff && estimatedOff) {
@@ -278,7 +287,10 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
       delayMinutes,
       gate: asString(first.gate_origin) ?? null,
       terminal: asString(first.terminal_origin) ?? null,
-      estimatedDeparture: toIsoOrNull(first.estimated_off),
+      // Prefer estimated_out (gate departure — what passengers see) over
+      // estimated_off (wheels-up takeoff time). The booking email shows gate
+      // departure, so the live update should match.
+      estimatedDeparture: toIsoOrNull(first.estimated_out) ?? toIsoOrNull(first.estimated_off),
       estimatedArrival: toIsoOrNull(first.estimated_on),
       actualDeparture: toIsoOrNull(first.actual_off),
       actualArrival: toIsoOrNull(first.actual_on),

@@ -32,6 +32,8 @@ interface ItemStatusBadgeProps {
   itemId: string
   /** The departure time shown on the card (from booking data), e.g. "10:40" */
   scheduledDeparture?: string | null
+  /** The item's start_ts in UTC (ISO string), used to derive local timezone offset */
+  startTs?: string | null
   /** Called when live status data is fetched, so parent can pass terminal/gate to details */
   onStatusUpdate?: (payload: StatusPayload) => void
 }
@@ -91,7 +93,36 @@ function renderLastChecked(iso: string | null): string {
   return `Last checked ${formatDistanceToNow(checked, { addSuffix: true })}`
 }
 
-export function ItemStatusBadge({ itemId, scheduledDeparture, onStatusUpdate }: ItemStatusBadgeProps) {
+/**
+ * Derive the UTC offset (in ms) of the departure airport from the booking's
+ * local time and UTC timestamp.  e.g. local 10:40 + UTC 09:40 → +1h (CET).
+ */
+function deriveOffsetMs(localTime: string | null | undefined, utcIso: string | null | undefined): number | null {
+  if (!localTime || !utcIso) return null
+  const m = localTime.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m) return null
+  const localMinutes = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+  const utcDate = new Date(utcIso)
+  if (Number.isNaN(utcDate.getTime())) return null
+  const utcMinutes = utcDate.getUTCHours() * 60 + utcDate.getUTCMinutes()
+  // Handle day boundary (e.g. local 01:00, UTC 23:00 → +2h)
+  let diff = localMinutes - utcMinutes
+  if (diff < -720) diff += 1440
+  if (diff > 720) diff -= 1440
+  return diff * 60_000
+}
+
+/** Convert a UTC ISO timestamp to local HH:MM using a known offset. */
+function toLocalTime(utcIso: string, offsetMs: number): string {
+  const d = new Date(utcIso)
+  if (Number.isNaN(d.getTime())) return formatTime(utcIso)
+  const local = new Date(d.getTime() + offsetMs)
+  const h = local.getUTCHours()
+  const m = local.getUTCMinutes().toString().padStart(2, '0')
+  return `${h}:${m}`
+}
+
+export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusUpdate }: ItemStatusBadgeProps) {
   const [status, setStatus] = useState<StatusPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -152,7 +183,10 @@ export function ItemStatusBadge({ itemId, scheduledDeparture, onStatusUpdate }: 
   const effective = status
 
   const baseLabel = STATUS_META[effective.status].label
-  const estimatedTime = effective.estimated_departure ? formatTime(effective.estimated_departure) : null
+  const offsetMs = deriveOffsetMs(scheduledDeparture, startTs)
+  const estimatedTime = effective.estimated_departure
+    ? (offsetMs !== null ? toLocalTime(effective.estimated_departure, offsetMs) : formatTime(effective.estimated_departure))
+    : null
 
   let heading: string
   if (effective.status === 'delayed' && (effective.delay_minutes ?? 0) > 0) {
