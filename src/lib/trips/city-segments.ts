@@ -306,18 +306,26 @@ export function attachWeatherToTimeline(entries: TimelineEntry[], destinations: 
     const destination = destinations.find((candidate) => matchesWeatherCity(entry.segment!.city, candidate.city))
     if (!destination) return entry
 
+    // Filter weather to the segment's actual date range — no fallback to
+    // unfiltered data (which could leak other segments' dates)
+    const segStart = entry.segment.startDate
+    const segEnd = entry.segment.endDate
+    const daily = destination.daily
+      .filter((day) => day.date >= segStart && day.date <= segEnd)
+      .map((day) => ({
+        date: day.date,
+        emoji: weatherCodeToEmoji(day.weather_code),
+        high: day.temp_high,
+        low: day.temp_low,
+      }))
+
+    if (daily.length === 0) return entry
+
     return {
       ...entry,
       segment: {
         ...entry.segment,
-        weather: {
-          daily: destination.daily.map((day) => ({
-            date: day.date,
-            emoji: weatherCodeToEmoji(day.weather_code),
-            high: day.temp_high,
-            low: day.temp_low,
-          })),
-        },
+        weather: { daily },
       },
     }
   })
