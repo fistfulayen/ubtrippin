@@ -283,7 +283,21 @@ function cityKey(value: string): string {
 function matchesWeatherCity(segmentCity: string, weatherCity: string): boolean {
   const left = cityKey(segmentCity)
   const right = cityKey(weatherCity)
-  return left === right || left.startsWith(right) || right.startsWith(left)
+  if (left === right || left.startsWith(right) || right.startsWith(left)) return true
+
+  // Weather extraction may return airport codes (e.g. "EWR") while segments
+  // resolve to city names (e.g. "New York"). Try resolving the weather city
+  // as an airport code and comparing.
+  const code = weatherCity.trim().toUpperCase()
+  if (/^[A-Z]{3}$/.test(code)) {
+    const airport = resolveAirportCity(code)
+    if (airport) {
+      const airportKey = cityKey(airport.city)
+      if (left === airportKey || left.startsWith(airportKey) || airportKey.startsWith(left)) return true
+    }
+  }
+
+  return false
 }
 
 export function attachWeatherToTimeline(entries: TimelineEntry[], destinations: WeatherDestination[]): TimelineEntry[] {
