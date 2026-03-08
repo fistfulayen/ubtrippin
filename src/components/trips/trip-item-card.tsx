@@ -48,7 +48,7 @@ import {
   TicketDetailsView,
   GenericDetailsView,
 } from './item-details'
-import { ItemStatusBadge } from './item-status-badge'
+import { ItemStatusBadge, type StatusPayload } from './item-status-badge'
 
 interface TripItemCardProps {
   item: TripItem
@@ -138,6 +138,7 @@ function isWithin48Hours(item: { start_ts?: string | null; start_date?: string |
 export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProps) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
+  const [liveStatus, setLiveStatus] = useState<StatusPayload | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -357,6 +358,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                   scheduledDeparture={
                     typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
                   }
+                  onStatusUpdate={setLiveStatus}
                 />
               )}
 
@@ -449,7 +451,13 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
               {expanded && (
                 <div className="mt-3">
                   {item.kind === 'flight' && (
-                    <FlightDetailsView details={details as FlightDetails} />
+                    <FlightDetailsView
+                      details={details as FlightDetails}
+                      liveOverrides={liveStatus ? {
+                        departure_terminal: liveStatus.terminal,
+                        departure_gate: liveStatus.gate,
+                      } : undefined}
+                    />
                   )}
                   {item.kind === 'hotel' && (
                     <HotelDetailsView details={details as HotelDetails} />
