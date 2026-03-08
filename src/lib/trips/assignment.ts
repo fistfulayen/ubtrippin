@@ -121,22 +121,118 @@ export function updateTripDates(
   }
 }
 
+/**
+ * Derive the primary location for a trip from its items.
+ *
+ * Priority:
+ * 1. Hotel/accommodation start_location (where you sleep = where you are)
+ * 2. Most-repeated city across all non-flight items (activities, restaurants, trains)
+ * 3. Most-repeated flight destination as fallback
+ *
+ * Normalises city names so "Paris CDG", "Paris, France", and "Paris" all count as "Paris".
+ */
 export function getPrimaryLocation(items: ExtractedItem[]): string | null {
-  // Find the most common destination location
-  const locations: Record<string, number> = {}
-
+  // 1. Prefer hotel locations — where you sleep is where you are
+  const hotelLocations: string[] = []
   for (const item of items) {
-    const loc = item.end_location || item.start_location
-    if (loc) {
-      locations[loc] = (locations[loc] || 0) + 1
+    if (item.kind === 'hotel') {
+      const loc = item.start_location
+      if (loc) hotelLocations.push(loc)
+    }
+  }
+  if (hotelLocations.length > 0) {
+    const best = mostFrequentCity(hotelLocations)
+    if (best) return best
+    // Single hotel — normalise to city (strip hotel names)
+    return normaliseToCity(hotelLocations[0]) || hotelLocations[0]
+  }
+
+  // 2. Non-flight items: activities, restaurants, trains, etc.
+  const groundLocations: string[] = []
+  for (const item of items) {
+    if (item.kind !== 'flight') {
+      const loc = item.end_location || item.start_location
+      if (loc) groundLocations.push(loc)
+    }
+  }
+  if (groundLocations.length > 0) {
+    const best = mostFrequentCity(groundLocations)
+    if (best) return best
+  }
+
+  // 3. Flight destinations as last resort
+  const flightDests: string[] = []
+  for (const item of items) {
+    if (item.kind === 'flight' && item.end_location) {
+      flightDests.push(item.end_location)
+    }
+  }
+  if (flightDests.length > 0) {
+    const best = mostFrequentCity(flightDests)
+    if (best) return best
+  }
+
+  return null
+}
+
+/**
+ * Normalise a location string to just the city name.
+ * "Paris CDG" → "Paris", "The Vendue, Charleston, SC" → "Charleston",
+ * "New York JFK" → "New York", "Tokyo, Japan" → "Tokyo"
+ */
+function normaliseToCity(location: string): string {
+  let city = location.trim()
+
+  // Strip known airport codes (3-letter suffix after a space)
+  city = city.replace(/\s+[A-Z]{3}$/, '')
+
+  // If it contains a comma, figure out which segment is the city
+  if (city.includes(',')) {
+    const segments = city.split(',').map(s => s.trim())
+    const first = segments[0]
+    // If first segment looks like a venue/hotel name (starts with "The", or has 3+ words),
+    // the city is likely the second segment
+    const looksLikeVenue = /^The\s/i.test(first) || first.split(/\s+/).length >= 3
+    if (looksLikeVenue && segments.length >= 2 && segments[1].length > 1) {
+      city = segments[1]
+    } else {
+      city = first
     }
   }
 
-  if (Object.keys(locations).length === 0) return null
+  return city
+}
 
-  // Return the most frequent location
-  const sorted = Object.entries(locations).sort((a, b) => b[1] - a[1])
-  return sorted[0][0]
+/** Return the most frequent city from a list of location strings. */
+function mostFrequentCity(locations: string[]): string | null {
+  const counts: Record<string, { count: number; original: string }> = {}
+
+  for (const loc of locations) {
+    const city = normaliseToCity(loc)
+    if (!city) continue
+    if (!counts[city]) {
+      counts[city] = { count: 0, original: loc }
+    }
+    counts[city].count++
+  }
+
+  const entries = Object.values(counts)
+  if (entries.length === 0) return null
+
+  entries.sort((a, b) => b.count - a.count)
+
+  const best = entries[0]
+  const orig = best.original
+  const normalised = normaliseToCity(orig)
+
+  // If original is a clean "City, Country" or "City, State" (2 segments, no venue name),
+  // prefer it for display. Otherwise use the normalised city.
+  const segments = orig.split(',').map((s: string) => s.trim())
+  const firstIsCity = segments.length === 2 && !(/^The\s/i.test(segments[0])) && segments[0].split(/\s+/).length <= 2
+  if (firstIsCity) {
+    return orig
+  }
+  return normalised
 }
 
 export function collectTravelerNames(items: ExtractedItem[]): string[] {
