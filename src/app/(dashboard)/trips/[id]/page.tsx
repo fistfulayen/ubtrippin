@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TripHeader } from '@/components/trips/trip-header'
-import { TripTimeline } from '@/components/trips/trip-timeline'
+import { MovementTimeline } from '@/components/trips/movement-timeline'
 import { TripActions } from '@/components/trips/trip-actions'
 import { CollaboratorsSection } from '@/components/trips/collaborators-section'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
-import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { ArrowLeft, Users } from 'lucide-react'
 import Link from 'next/link'
+import { buildCitySegments } from '@/lib/trips/city-segments'
+import { getTripWeather } from '@/lib/weather/service'
 
 interface TripPageProps {
   params: Promise<{ id: string }>
@@ -82,10 +83,19 @@ export default async function TripPage({ params }: TripPageProps) {
     ? await supabase
         .from('profiles')
         .select('subscription_tier')
-        .eq('id', user.id)
+        .eq('id', trip.user_id)
         .maybeSingle()
     : { data: null }
-  const isPro = profileData?.subscription_tier === 'pro'
+  const ownerIsPro = profileData?.subscription_tier === 'pro'
+  const segments = buildCitySegments(items || [])
+  const weather = user
+    ? await getTripWeather({
+        tripId: trip.id,
+        supabase,
+        userId: user.id,
+        includePacking: ownerIsPro,
+      })
+    : null
 
   return (
     <div className="space-y-6">
@@ -116,7 +126,7 @@ export default async function TripPage({ params }: TripPageProps) {
 
       {/* Actions bar — show to owners and editors */}
       {canEdit && (
-        <TripActions trip={trip} allTrips={allTrips || []} isOwner={isOwner} isPro={isPro} />
+        <TripActions trip={trip} allTrips={allTrips || []} isOwner={isOwner} isPro={ownerIsPro} />
       )}
 
       {/* Collaborators section */}
@@ -126,10 +136,15 @@ export default async function TripPage({ params }: TripPageProps) {
         isOwner={isOwner}
       />
 
-      {/* Timeline */}
-      <TripTimeline items={items || []} tripId={trip.id} allTrips={allTrips || []} currentUserId={user?.id} />
-
-      <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} showPacking />
+      <MovementTimeline
+        segments={segments}
+        tripId={trip.id}
+        allTrips={allTrips || []}
+        currentUserId={user?.id}
+        weatherEndpoint={`/api/trips/${trip.id}/weather`}
+        initialWeather={weather}
+        showPacking
+      />
     </div>
   )
 }
