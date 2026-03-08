@@ -42,14 +42,39 @@ fi
 # 3. No unresolved review comments
 echo ""
 echo "--- Code Reviews ---"
-REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" --jq 'length' 2>/dev/null || echo "0")
 REVIEWS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
 if [ "$REVIEWS" -gt 0 ]; then
   fail "Has CHANGES_REQUESTED reviews"
 else
-  pass "No blocking reviews"
+  pass "No blocking reviews (CHANGES_REQUESTED)"
 fi
-echo "   Inline review comments: $REVIEW_COMMENTS"
+
+# Check for unaddressed inline review comments from code review bots
+# These are substantive findings (security, correctness) that MUST be addressed
+REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" --jq 'length' 2>/dev/null || echo "0")
+BOT_FINDINGS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" \
+  --jq '[.[] | select(.user.login | test("gemini|claude|github-actions"; "i")) | select(.body | test("security|critical|high|medium|bug|risk|incorrect|regression"; "i"))] | length' \
+  2>/dev/null || echo "0")
+
+if [ "$BOT_FINDINGS" -gt 0 ]; then
+  # Check if there are commits AFTER the review comments (i.e., fixes were pushed)
+  LAST_REVIEW_TIME=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" \
+    --jq '[.[] | select(.user.login | test("gemini|claude|github-actions"; "i"))] | sort_by(.created_at) | last | .created_at' \
+    2>/dev/null || echo "")
+  LAST_COMMIT_TIME=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/commits" \
+    --jq 'last | .commit.committer.date' \
+    2>/dev/null || echo "")
+
+  if [ -n "$LAST_REVIEW_TIME" ] && [ -n "$LAST_COMMIT_TIME" ] && [[ "$LAST_COMMIT_TIME" > "$LAST_REVIEW_TIME" ]]; then
+    pass "Code review findings addressed (${BOT_FINDINGS} findings, commits pushed after reviews)"
+  else
+    fail "Code review bots found ${BOT_FINDINGS} substantive issues — address them before declaring merge-ready"
+    echo "   Run: gh api repos/fistfulayen/ubtrippin/pulls/${PR}/comments --jq '.[] | select(.user.login | test(\"gemini|claude\"; \"i\")) | .body[:200]'"
+  fi
+else
+  pass "No substantive bot review findings"
+fi
+echo "   Total inline comments: $REVIEW_COMMENTS"
 
 # 4. Build passes locally
 echo ""

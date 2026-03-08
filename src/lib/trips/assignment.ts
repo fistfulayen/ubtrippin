@@ -1,5 +1,6 @@
 import type { Trip } from '@/types/database'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
+import { deduplicateTravelers } from './traveler-dedup'
 
 const GAP_TOLERANCE_DAYS = 1
 
@@ -188,7 +189,7 @@ function looksLikeVenueName(name: string): boolean {
  * "New York JFK" → "New York", "New York (JFK)" → "New York",
  * "New York City, NY" → "New York City", "Tokyo, Japan" → "Tokyo"
  */
-function normaliseToCity(location: string): string {
+export function normaliseToCity(location: string): string {
   let city = location.trim()
 
   // Strip airport codes: parenthesized "(JFK)" style and trailing " JFK" style
@@ -244,15 +245,15 @@ function mostFrequentCity(locations: string[]): string | null {
 }
 
 export function collectTravelerNames(items: ExtractedItem[]): string[] {
-  const names = new Set<string>()
+  const names: string[] = []
 
   for (const item of items) {
     for (const name of item.traveler_names || []) {
       if (name.trim()) {
-        names.add(name.trim())
+        names.push(name.trim())
       }
     }
   }
 
-  return Array.from(names)
+  return deduplicateTravelers(names)
 }
