@@ -30,7 +30,11 @@ async function geocodeSingle(query: string): Promise<GeocodeResult | null> {
   url.searchParams.set('format', 'json')
 
   const response = await fetch(url, { cache: 'no-store' })
-  if (!response.ok) return null
+  if (!response.ok) {
+    // Throw on HTTP errors so transient failures don't trigger fallback logic
+    // (which could geocode the wrong city)
+    throw new Error(`Geocoding failed with status ${response.status}`)
+  }
 
   const payload = (await response.json()) as OpenMeteoGeocodeResponse
   const best = payload.results?.sort((a, b) => scoreResult(query, b) - scoreResult(query, a))[0] ?? null
@@ -50,20 +54,36 @@ export async function geocodeCity(query: string): Promise<GeocodeResult | null> 
   if (!key) return null
   if (cache.has(key)) return cache.get(key) ?? null
 
-  // Try the full query first
-  let result = await geocodeSingle(query)
-
-  // If that fails, try variations for small towns the geocoder doesn't know
-  if (!result && query.includes(',')) {
-    const parts = query.split(',').map((p) => p.trim()).filter(Boolean)
-    // Try just the first part without qualifier: "Surfside" (might match in some DBs)
-    if (parts.length >= 2 && !result) {
-      result = await geocodeSingle(parts[0])
+  try {
+    // Try the full query first
+    const result = await geocodeSingle(query)
+    if (result) {
+      cache.set(key, result)
+      return result
     }
-  }
 
-  cache.set(key, result)
-  return result
+    // For small towns the geocoder doesn't know (e.g. "Surfside, Florida"),
+    // try just the first part ("Surfside") which may match with lower population
+    if (query.includes(',')) {
+      const parts = query.split(',').map((p) => p.trim()).filter(Boolean)
+      if (parts.length >= 2) {
+        const fallback = await geocodeSingle(parts[0])
+        if (fallback) {
+          // Cache under the fallback key too, not the original — prevents
+          // a "Paris, TX" lookup caching France's coords under "paris, tx"
+          cache.set(parts[0].toLowerCase(), fallback)
+          cache.set(key, fallback)
+          return fallback
+        }
+      }
+    }
+
+    cache.set(key, null)
+    return null
+  } catch {
+    // HTTP errors (429, 500, 503) — don't cache, don't fallback
+    return null
+  }
 }
 
 export function clearGeocodeCache() {

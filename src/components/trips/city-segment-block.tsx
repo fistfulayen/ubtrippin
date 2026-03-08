@@ -49,14 +49,14 @@ export function CitySegmentBlock({
               </div>
             </div>
 
-            {segment.weather?.daily?.length ? (() => {
-              const firstDay = segment.weather.daily[0]
+            {(() => {
+              const firstDay = segment.weather?.daily?.[0]
               return firstDay ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                   {firstDay.emoji} {Math.round(firstDay.high)}° / {Math.round(firstDay.low)}°
                 </div>
               ) : null
-            })() : null}
+            })()}
           </div>
 
           {!hasHotel ? (
