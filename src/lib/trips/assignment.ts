@@ -175,7 +175,7 @@ export function getPrimaryLocation(items: ExtractedItem[]): string | null {
  * Uses leading articles and hospitality keywords — NOT word count, which incorrectly
  * flags multi-word city names like "New York City", "Salt Lake City", "Mexico City".
  */
-function looksLikeVenueName(name: string): boolean {
+export function looksLikeVenueName(name: string): boolean {
   return (
     /^(The|A|An)\s/i.test(name) ||
     /\b(Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Apartments?|Villas?|Palace|House|Gardens|Manor|Hall|Centre|Center|Venue|Club)\b/i.test(name)
@@ -188,7 +188,7 @@ function looksLikeVenueName(name: string): boolean {
  * "New York JFK" → "New York", "New York (JFK)" → "New York",
  * "New York City, NY" → "New York City", "Tokyo, Japan" → "Tokyo"
  */
-function normaliseToCity(location: string): string {
+export function normaliseToCity(location: string): string {
   let city = location.trim()
 
   // Strip airport codes: parenthesized "(JFK)" style and trailing " JFK" style
