@@ -352,7 +352,12 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
               </div>
 
               {item.kind === 'flight' && isWithin48Hours(item) && (
-                <ItemStatusBadge itemId={item.id} />
+                <ItemStatusBadge
+                  itemId={item.id}
+                  scheduledDeparture={
+                    (item.details_json as Record<string, unknown> | null)?.departure_local_time as string | undefined
+                  }
+                />
               )}
 
               {item.kind === 'train' && isWithin48Hours(item) && (

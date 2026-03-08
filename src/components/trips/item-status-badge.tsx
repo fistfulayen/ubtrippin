@@ -30,6 +30,8 @@ interface StatusPayload {
 
 interface ItemStatusBadgeProps {
   itemId: string
+  /** The departure time shown on the card (from booking data), e.g. "10:40" */
+  scheduledDeparture?: string | null
 }
 
 const STATUS_META: Record<LiveStatus, { label: string; toneClass: string }> = {
@@ -87,7 +89,7 @@ function renderLastChecked(iso: string | null): string {
   return `Last checked ${formatDistanceToNow(checked, { addSuffix: true })}`
 }
 
-export function ItemStatusBadge({ itemId }: ItemStatusBadgeProps) {
+export function ItemStatusBadge({ itemId, scheduledDeparture }: ItemStatusBadgeProps) {
   const [status, setStatus] = useState<StatusPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -144,14 +146,24 @@ export function ItemStatusBadge({ itemId }: ItemStatusBadgeProps) {
   const effective = status
 
   const baseLabel = STATUS_META[effective.status].label
-  const heading =
-    effective.status === 'delayed' && (effective.delay_minutes ?? 0) > 0
-      ? `${baseLabel} ${effective.delay_minutes} min${
-          effective.estimated_departure
-            ? ` · New departure ${formatTime(effective.estimated_departure)}`
-            : ''
-        }`
-      : baseLabel
+  const estimatedTime = effective.estimated_departure ? formatTime(effective.estimated_departure) : null
+
+  let heading: string
+  if (effective.status === 'delayed' && (effective.delay_minutes ?? 0) > 0) {
+    if (estimatedTime && scheduledDeparture && estimatedTime !== scheduledDeparture) {
+      // Live data differs from booking — show the update clearly
+      heading = `${baseLabel} · Now departing ${estimatedTime}`
+    } else if (estimatedTime) {
+      heading = `${baseLabel} ${effective.delay_minutes} min · New departure ${estimatedTime}`
+    } else {
+      heading = `${baseLabel} ${effective.delay_minutes} min`
+    }
+  } else if (effective.status === 'on_time' && estimatedTime && scheduledDeparture && estimatedTime !== scheduledDeparture) {
+    // Schedule changed but still "on time" per airline — show updated time
+    heading = `${baseLabel} · Departure updated to ${estimatedTime}`
+  } else {
+    heading = baseLabel
+  }
 
   const previousText = effective.previous_status
     ? `(was ${STATUS_META[effective.previous_status].label.toLowerCase()})`
