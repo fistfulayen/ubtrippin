@@ -5,6 +5,7 @@ import { TripTimeline } from '@/components/trips/trip-timeline'
 import { TripActions } from '@/components/trips/trip-actions'
 import { CollaboratorsSection } from '@/components/trips/collaborators-section'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
+import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { ArrowLeft, Users } from 'lucide-react'
 import Link from 'next/link'
 
@@ -127,6 +128,8 @@ export default async function TripPage({ params }: TripPageProps) {
 
       {/* Timeline */}
       <TripTimeline items={items || []} tripId={trip.id} allTrips={allTrips || []} currentUserId={user?.id} />
+
+      <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} showPacking />
     </div>
   )
 }

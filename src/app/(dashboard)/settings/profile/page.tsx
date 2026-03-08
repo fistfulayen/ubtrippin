@@ -13,6 +13,7 @@ interface ProfileResponse {
   hotel_brand_preference: string | null
   home_airport: string | null
   currency_preference: string
+  temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
   loyalty_count: number
 }
@@ -26,6 +27,7 @@ function fallbackProfile(userId: string): ProfileResponse {
     hotel_brand_preference: null,
     home_airport: null,
     currency_preference: 'USD',
+    temperature_unit: 'fahrenheit',
     notes: null,
     loyalty_count: 0,
   }

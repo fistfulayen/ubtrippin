@@ -793,6 +793,104 @@ for r in rows:
 "
 }
 
+cmd_trips_weather() {
+  local trip_id="${1:?Usage: ubt trips weather <trip_id> [--json] [--refresh] [--celsius]}"
+  shift || true
+  trip_id=$(_resolve_trip_id "$trip_id")
+
+  local refresh=false
+  local celsius=false
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --json)
+        FORMAT=json
+        shift
+        ;;
+      --refresh)
+        refresh=true
+        shift
+        ;;
+      --celsius)
+        celsius=true
+        shift
+        ;;
+      *)
+        echo "Unknown option: $1" >&2
+        echo "Usage: ubt trips weather <trip_id> [--json] [--refresh] [--celsius]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  local path="${API_V1}/trips/$(_urlencode "${trip_id}")/weather"
+  local qs=""
+  if [ "$refresh" = true ]; then
+    qs="refresh=true"
+  fi
+  if [ "$celsius" = true ]; then
+    if [ -n "$qs" ]; then qs="${qs}&"; fi
+    qs="${qs}unit=celsius"
+  fi
+  if [ -n "$qs" ]; then
+    path="${path}?${qs}"
+  fi
+
+  local result
+  if [ "$refresh" = true ]; then
+    result=$(_api -X POST "$path")
+  else
+    result=$(_api "$path")
+  fi
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | _python3c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+title = payload.get('trip_title') or 'Trip'
+temp_range = payload.get('temp_range') or {}
+destinations = payload.get('destinations') or []
+packing = payload.get('packing')
+print(f\"Weather — {title}\")
+if temp_range:
+    print(f\"  Temperature range: {round(temp_range.get('min', 0))}{temp_range.get('unit', '')} to {round(temp_range.get('max', 0))}{temp_range.get('unit', '')}\")
+for destination in destinations:
+    daily = destination.get('daily') or []
+    if not daily:
+        continue
+    high = max(day.get('temp_high', 0) for day in daily)
+    low = min(day.get('temp_low', 0) for day in daily)
+    precip = max(day.get('precipitation_probability', 0) for day in daily)
+    desc = daily[0].get('weather_description') or 'Forecast ready'
+    dates = destination.get('dates') or {}
+    print()
+    print(f\"  {destination.get('city')} ({dates.get('start')} to {dates.get('end')})\")
+    print(f\"    High {round(high)}{temp_range.get('unit', '')} / Low {round(low)}{temp_range.get('unit', '')} — {desc}, {round(precip)}% precip\")
+if packing:
+    print()
+    print(\"  Packing Suggestions:\")
+    for key in ('essentials', 'clothing', 'footwear', 'accessories'):
+        values = packing.get(key) or []
+        rendered = []
+        for value in values:
+            if isinstance(value, dict):
+                rendered.append(value.get('item'))
+            else:
+                rendered.append(value)
+        if rendered:
+            print(f\"    {key.capitalize()}: {', '.join([v for v in rendered if v])}\")
+    if packing.get('tip'):
+        print(f\"    Tip: {packing['tip']}\")
+"
+}
+
 cmd_items_show() {
   local item_id="${1:?Usage: ubt items show <item_id>}"
   item_id=$(_resolve_item_id "$item_id")
@@ -3438,6 +3536,7 @@ Examples:
   ubt family loyalty lookup <family_id> united
   ubt notifications list --unread
   ubt notifications read <notification_id>
+  ubt trips weather <trip_id> [--refresh] [--celsius]
   ubt profile show
   ubt profile set seat window
   ubt profile loyalty lookup united
@@ -3456,6 +3555,7 @@ case "${1:-}" in
       rename) cmd_trips_rename "${3:?Usage: ubt trips rename <trip_id> <new_title>}" "${@:4}" ;;
       delete) shift 2; cmd_trips_delete "$@" ;;
       status) cmd_trips_status "${3:?Usage: ubt trips status <trip_id>}" ;;
+      weather) shift 2; cmd_trips_weather "$@" ;;
       merge) shift 2; cmd_trips_merge "$@" ;;
       *)     usage ;;
     esac
