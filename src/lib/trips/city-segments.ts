@@ -252,8 +252,8 @@ function nightsBetween(startDate: string, endDate: string): number {
 
 function buildSegment(raw: RawSegment): CitySegment {
   const startDate =
-    raw.items[0]?.start_date ??
     raw.incoming?.legs[raw.incoming.legs.length - 1]?.end_date ??
+    raw.items[0]?.start_date ??
     raw.incoming?.date ??
     raw.outgoing?.date ??
     ''
