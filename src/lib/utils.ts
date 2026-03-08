@@ -39,11 +39,6 @@ export function formatDate(date: string | Date | null | undefined): string {
  * 
  * Uses 24-hour format for consistency with international travel.
  */
-/**
- * Format a time value for display. Always in destination timezone.
- * For ISO strings: extracts the local time portion directly (24h format).
- * For Date objects (fallback): uses browser locale (12h for en-US, 24h for de-DE).
- */
 export function formatTime(date: string | Date | null | undefined): string {
   if (!date) return ''
   
@@ -70,7 +65,7 @@ export function formatTime(date: string | Date | null | undefined): string {
   return d.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: undefined,
+    hour12: false,
   })
 }
 
