@@ -79,6 +79,9 @@ export default async function TripPage({ params }: TripPageProps) {
 
   const canEdit = isOwner || collabRole === 'editor'
 
+  // Check the TRIP OWNER's tier, not the viewer's. This is intentional:
+  // collaborators on a Pro user's trip see Pro features (packing suggestions).
+  // The Pro subscription belongs to the trip, not the viewer.
   const { data: profileData } = user
     ? await supabase
         .from('profiles')

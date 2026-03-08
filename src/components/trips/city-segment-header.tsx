@@ -8,6 +8,7 @@ interface CitySegmentHeaderProps {
 }
 
 function countryCodeToFlag(code: string): string {
+  if (!code || code.length !== 2) return ''
   return code.toUpperCase().replace(/./g, (char) =>
     String.fromCodePoint(char.charCodeAt(0) + 127397)
   )
@@ -18,16 +19,26 @@ function formatSegmentRange(startDate: string, endDate: string) {
   const end = new Date(`${endDate}T00:00:00`)
   const sameDay = startDate === endDate
   const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+  const sameYear = start.getFullYear() === end.getFullYear()
+
+  const startOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+  const endOpts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+
+  // Include year when crossing year boundaries
+  if (!sameYear) {
+    startOpts.year = 'numeric'
+    endOpts.year = 'numeric'
+  }
 
   if (sameDay) {
-    return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return start.toLocaleDateString('en-US', startOpts)
   }
 
   if (sameMonth) {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${end.getDate()}`
+    return `${start.toLocaleDateString('en-US', startOpts)}-${end.getDate()}`
   }
 
-  return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+  return `${start.toLocaleDateString('en-US', startOpts)} – ${end.toLocaleDateString('en-US', endOpts)}`
 }
 
 function durationLabel(segment: CitySegment) {

@@ -115,10 +115,17 @@ function resolveHotelPlace(item: TripItem): ResolvedPlace | null {
   const city = normaliseToCity(location)
   if (!city) return null
 
+  // Derive country code from known country names, not state abbreviations
+  const US_STATES = new Set(['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'])
+  const lastPart = parts[parts.length - 1]?.trim().toUpperCase() ?? ''
   const countryCode =
-    parts[parts.length - 1]?.toUpperCase() === 'USA' || /^[A-Z]{2}$/.test(parts[parts.length - 1] ?? '')
+    lastPart === 'USA' || lastPart === 'US' || lastPart === 'UNITED STATES'
       ? 'US'
-      : undefined
+      : US_STATES.has(lastPart)
+        ? 'US'  // State abbreviation implies US
+        : /^[A-Z]{2}$/.test(lastPart) && !US_STATES.has(lastPart)
+          ? lastPart  // Actual 2-letter country code (FR, IT, JP, etc.)
+          : undefined
 
   const displayCity =
     parts.length >= 2

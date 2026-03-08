@@ -100,6 +100,7 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: SharedTri
     .from('trips')
     .select('id, user_id, title, start_date, end_date, primary_location, travelers, notes, cover_image_url, share_enabled')
     .eq('share_enabled', true)
+    .eq('share_token', token)  // defense-in-depth: don't rely solely on RLS
     .single()
 
   const trip = (tripRow as SharedTrip | null) ?? null
@@ -125,10 +126,21 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: SharedTri
     void confirmation_code
     void booking_reference
 
+    // Strip sensitive fields: user_id (owner UUID), confirmation codes, traveler full names
+    const obfuscatedTravelers = Array.isArray(item.traveler_names)
+      ? item.traveler_names.map((name: string) => {
+          const parts = name.trim().split(/\s+/)
+          if (parts.length >= 2) return `${parts[0]} ${parts[parts.length - 1][0]}.`
+          return parts[0]
+        })
+      : item.traveler_names
+
     return {
       ...item,
+      user_id: '00000000-0000-0000-0000-000000000000',  // null out owner UUID
       confirmation_code: null,
       source_email_id: null,
+      traveler_names: obfuscatedTravelers,
       details_json: safeDetails as Json,
     } as TripItem
   })
