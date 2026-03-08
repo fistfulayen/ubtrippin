@@ -6,11 +6,19 @@ import { Plane, MapPin, Clock, Armchair } from 'lucide-react'
 import type { FlightDetails } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 
-interface FlightDetailsViewProps {
-  details: FlightDetails
+interface LiveOverrides {
+  departure_terminal?: string | null
+  departure_gate?: string | null
+  arrival_terminal?: string | null
+  arrival_gate?: string | null
 }
 
-export function FlightDetailsView({ details }: FlightDetailsViewProps) {
+interface FlightDetailsViewProps {
+  details: FlightDetails
+  liveOverrides?: LiveOverrides
+}
+
+export function FlightDetailsView({ details, liveOverrides }: FlightDetailsViewProps) {
   const [logoError, setLogoError] = useState(false)
 
   const {
@@ -18,13 +26,19 @@ export function FlightDetailsView({ details }: FlightDetailsViewProps) {
     airline,
     departure_airport,
     arrival_airport,
-    departure_terminal,
-    arrival_terminal,
-    departure_gate,
-    arrival_gate,
+    departure_terminal: booking_departure_terminal,
+    arrival_terminal: booking_arrival_terminal,
+    departure_gate: booking_departure_gate,
+    arrival_gate: booking_arrival_gate,
     cabin_class,
     seat,
   } = details
+
+  // Live data (FlightAware) overrides stale booking data
+  const departure_terminal = liveOverrides?.departure_terminal ?? booking_departure_terminal
+  const departure_gate = liveOverrides?.departure_gate ?? booking_departure_gate
+  const arrival_terminal = liveOverrides?.arrival_terminal ?? booking_arrival_terminal
+  const arrival_gate = liveOverrides?.arrival_gate ?? booking_arrival_gate
 
   const flightCode = flight_number
     ? airline

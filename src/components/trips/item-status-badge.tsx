@@ -18,7 +18,7 @@ type LiveStatus =
   | 'arrived'
   | 'unknown'
 
-interface StatusPayload {
+export interface StatusPayload {
   status: LiveStatus
   delay_minutes: number | null
   gate: string | null
@@ -32,6 +32,8 @@ interface ItemStatusBadgeProps {
   itemId: string
   /** The departure time shown on the card (from booking data), e.g. "10:40" */
   scheduledDeparture?: string | null
+  /** Called when live status data is fetched, so parent can pass terminal/gate to details */
+  onStatusUpdate?: (payload: StatusPayload) => void
 }
 
 const STATUS_META: Record<LiveStatus, { label: string; toneClass: string }> = {
@@ -89,7 +91,7 @@ function renderLastChecked(iso: string | null): string {
   return `Last checked ${formatDistanceToNow(checked, { addSuffix: true })}`
 }
 
-export function ItemStatusBadge({ itemId, scheduledDeparture }: ItemStatusBadgeProps) {
+export function ItemStatusBadge({ itemId, scheduledDeparture, onStatusUpdate }: ItemStatusBadgeProps) {
   const [status, setStatus] = useState<StatusPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -126,6 +128,10 @@ export function ItemStatusBadge({ itemId, scheduledDeparture }: ItemStatusBadgeP
   useEffect(() => {
     void loadStatus()
   }, [loadStatus])
+
+  useEffect(() => {
+    if (status && onStatusUpdate) onStatusUpdate(status)
+  }, [status, onStatusUpdate])
 
   useEffect(() => {
     const timer = setInterval(() => {
