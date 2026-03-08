@@ -22,11 +22,7 @@ function scoreResult(query: string, result: NonNullable<OpenMeteoGeocodeResponse
   return score
 }
 
-export async function geocodeCity(query: string): Promise<GeocodeResult | null> {
-  const key = query.trim().toLowerCase()
-  if (!key) return null
-  if (cache.has(key)) return cache.get(key) ?? null
-
+async function geocodeSingle(query: string): Promise<GeocodeResult | null> {
   const url = new URL('https://geocoding-api.open-meteo.com/v1/search')
   url.searchParams.set('name', query)
   url.searchParams.set('count', '5')
@@ -34,13 +30,11 @@ export async function geocodeCity(query: string): Promise<GeocodeResult | null> 
   url.searchParams.set('format', 'json')
 
   const response = await fetch(url, { cache: 'no-store' })
-  if (!response.ok) {
-    throw new Error(`Geocoding failed with status ${response.status}`)
-  }
+  if (!response.ok) return null
 
   const payload = (await response.json()) as OpenMeteoGeocodeResponse
   const best = payload.results?.sort((a, b) => scoreResult(query, b) - scoreResult(query, a))[0] ?? null
-  const result = best
+  return best
     ? {
         city: best.name,
         latitude: best.latitude,
@@ -49,6 +43,24 @@ export async function geocodeCity(query: string): Promise<GeocodeResult | null> 
         admin1: best.admin1 ?? null,
       }
     : null
+}
+
+export async function geocodeCity(query: string): Promise<GeocodeResult | null> {
+  const key = query.trim().toLowerCase()
+  if (!key) return null
+  if (cache.has(key)) return cache.get(key) ?? null
+
+  // Try the full query first
+  let result = await geocodeSingle(query)
+
+  // If that fails, try variations for small towns the geocoder doesn't know
+  if (!result && query.includes(',')) {
+    const parts = query.split(',').map((p) => p.trim()).filter(Boolean)
+    // Try just the first part without qualifier: "Surfside" (might match in some DBs)
+    if (parts.length >= 2 && !result) {
+      result = await geocodeSingle(parts[0])
+    }
+  }
 
   cache.set(key, result)
   return result
