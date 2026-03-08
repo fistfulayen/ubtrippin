@@ -323,6 +323,47 @@ POST /api/v1/items/:id/status/refresh
 
 Re-checks live status (e.g. flight delays, gate changes).
 
+#### Ticket PDF Download
+```
+GET /api/v1/trips/:id/items/:itemId/ticket-pdf
+GET /api/v1/trips/:id/items/:itemId/ticket-pdf?redirect=1
+```
+
+Returns a signed download URL (60 min) for a stored ticket PDF (boarding pass, event ticket, booking confirmation). Use `?redirect=1` to get a 302 redirect directly to the file.
+
+---
+
+### Inbox (Email Attachments)
+
+#### Download Email Attachment
+```
+GET /api/v1/inbox/:emailId/attachments/:index
+```
+
+Returns a 1-hour signed download URL for an attachment from a processed email. Index refers to position in the attachments array (0-based).
+
+---
+
+### Trip Cover Images
+
+#### Auto-Generate Cover Image
+```
+POST /api/v1/trips/:id/auto-cover
+```
+
+Automatically finds and sets a cover image for a trip. For event trips (concerts, etc.): searches for performer/event images. For travel trips: searches for destination photos. Skips if the trip already has a cover image.
+
+---
+
+### API Documentation
+
+#### API Docs
+```
+GET /api/v1/docs
+```
+
+Returns the interactive API documentation page (HTML). No auth required.
+
 ---
 
 ### Loyalty Vault
