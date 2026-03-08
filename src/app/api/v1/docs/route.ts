@@ -55,6 +55,8 @@ Rate limit: 100 req/min per key. HTTP 429 → back off 60s.
 | POST | /api/v1/trips/:id/rename | Rename trip |
 | POST | /api/v1/trips/:id/merge | Merge another trip into this one |
 | GET | /api/v1/trips/:id/status | Trip processing status |
+| GET | /api/v1/trips/:id/weather | Weather forecast + packing suggestions (PRO) |
+| POST | /api/v1/trips/:id/weather | Force-refresh weather data |
 | GET | /api/v1/trips/demo | Demo trip (no auth) |
 
 ### Example: List Trips
@@ -253,6 +255,43 @@ Authorization: Bearer ubt_k1_abc123...
 
 302 → Signed Supabase Storage URL (valid 60 minutes)
 \`\`\`
+
+---
+
+## Weather & Packing (Pro)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/trips/:id/weather | Weather forecast + AI packing suggestions |
+| POST | /api/v1/trips/:id/weather | Force-refresh weather data |
+
+Returns weather forecasts for all trip destinations within the 16-day forecast window (Open-Meteo). PRO subscribers also get AI-generated packing suggestions.
+
+\`\`\`
+GET /api/v1/trips/:id/weather?unit=celsius
+Authorization: Bearer ubt_k1_abc123...
+
+{
+  "trip_id": "uuid",
+  "temp_range": { "min": 32, "max": 84, "unit": "°C" },
+  "destinations": [
+    {
+      "city": "Paris",
+      "dates": { "start": "2026-03-15", "end": "2026-03-18" },
+      "daily": [
+        { "date": "2026-03-15", "temp_high": 12, "temp_low": 5, "weather_description": "Partly cloudy", ... }
+      ]
+    }
+  ],
+  "packing": {
+    "essentials": ["Passport", "Phone charger"],
+    "clothing": [{ "item": "Light layers for Paris", "reason": "12°C means your jacket is doing overtime." }],
+    "tip": "Paris in March: dress like an onion. Layers are your friend."
+  }
+}
+\`\`\`
+
+Query params: \`unit=fahrenheit|celsius\` (defaults to user preference). POST triggers a refresh (rate-limited to once per minute).
 
 ---
 

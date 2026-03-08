@@ -131,6 +131,15 @@ GET /api/v1/trips/demo
 
 Returns a sample trip for onboarding — no auth required.
 
+#### Trip Weather & Packing
+```
+GET /api/v1/trips/:id/weather
+GET /api/v1/trips/:id/weather?unit=celsius
+POST /api/v1/trips/:id/weather          # force refresh
+```
+
+Returns weather forecasts for all trip destinations within the 16-day forecast window. PRO subscribers also receive AI-generated packing suggestions. Query param `unit=fahrenheit|celsius` overrides user preference.
+
 ---
 
 ### Items
