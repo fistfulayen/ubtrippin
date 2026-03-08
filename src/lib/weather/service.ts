@@ -188,33 +188,40 @@ export async function buildWeatherPayload(params: {
     }
   }
 
-  const destinations: WeatherDestination[] = []
-  for (const city of cities) {
-    const geocoded = await geocodeCity(city.query)
-    if (!geocoded) continue
+  // Fetch all cities in parallel — sequential was causing 30s+ page loads
+  const results = await Promise.allSettled(
+    cities.map(async (city) => {
+      const geocoded = await geocodeCity(city.query)
+      if (!geocoded) return null
 
-    const daily = await fetchForecast({
-      latitude: geocoded.latitude,
-      longitude: geocoded.longitude,
-      unit: params.unit,
-      dateStart: city.dateStart,
-      dateEnd: city.dateEnd,
+      const daily = await fetchForecast({
+        latitude: geocoded.latitude,
+        longitude: geocoded.longitude,
+        unit: params.unit,
+        dateStart: city.dateStart,
+        dateEnd: city.dateEnd,
+      })
+
+      if (daily.length === 0) return null
+
+      return {
+        city: city.city,
+        latitude: geocoded.latitude,
+        longitude: geocoded.longitude,
+        dates: {
+          start: city.dateStart,
+          end: city.dateEnd,
+        },
+        source: 'forecast' as const,
+        daily,
+      }
     })
+  )
 
-    if (daily.length === 0) continue
-
-    destinations.push({
-      city: city.city,
-      latitude: geocoded.latitude,
-      longitude: geocoded.longitude,
-      dates: {
-        start: city.dateStart,
-        end: city.dateEnd,
-      },
-      source: 'forecast',
-      daily,
-    })
-  }
+  const destinations: WeatherDestination[] = results
+    .filter((r): r is PromiseFulfilledResult<WeatherDestination | null> => r.status === 'fulfilled')
+    .map((r) => r.value)
+    .filter((d): d is WeatherDestination => d !== null)
 
   if (destinations.length === 0) {
     return {
