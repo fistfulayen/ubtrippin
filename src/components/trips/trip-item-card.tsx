@@ -363,6 +363,7 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                   scheduledDeparture={
                     typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
                   }
+                  startTs={item.start_ts}
                   onStatusUpdate={setLiveStatus}
                 />
               )}
