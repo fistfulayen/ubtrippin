@@ -1,11 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TripHeader } from '@/components/trips/trip-header'
-import { TripTimeline } from '@/components/trips/trip-timeline'
+import { MovementTimeline } from '@/components/trips/movement-timeline'
 import { TripActions } from '@/components/trips/trip-actions'
 import { CollaboratorsSection } from '@/components/trips/collaborators-section'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 import { WeatherSection } from '@/components/trips/weather/weather-section'
+import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
+import { getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
 import { ArrowLeft, Users } from 'lucide-react'
 import Link from 'next/link'
 
@@ -86,6 +88,16 @@ export default async function TripPage({ params }: TripPageProps) {
         .maybeSingle()
     : { data: null }
   const isPro = profileData?.subscription_tier === 'pro'
+  const weather = user
+    ? await getTripWeather({
+        tripId: trip.id,
+        supabase,
+        userId: user.id,
+        requestedUnit: await getTemperatureUnit(user.id, supabase),
+        includePacking: isPro,
+      })
+    : null
+  const timeline = attachWeatherToTimeline(buildTimeline(items || []), weather?.destinations ?? [])
 
   return (
     <div className="space-y-6">
@@ -126,10 +138,9 @@ export default async function TripPage({ params }: TripPageProps) {
         isOwner={isOwner}
       />
 
-      {/* Timeline */}
-      <TripTimeline items={items || []} tripId={trip.id} allTrips={allTrips || []} currentUserId={user?.id} />
+      <MovementTimeline entries={timeline} allTrips={allTrips || []} currentUserId={user?.id} />
 
-      <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} showPacking />
+      <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
     </div>
   )
 }

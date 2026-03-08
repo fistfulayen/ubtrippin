@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -54,6 +54,8 @@ interface TripItemCardProps {
   item: TripItem
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
   currentUserId?: string
+  readOnly?: boolean
+  metaChips?: ReactNode
 }
 
 function loyaltyChip(loyaltyFlag: unknown): { text: string; className: string } | null {
@@ -135,7 +137,7 @@ function isWithin48Hours(item: { start_ts?: string | null; start_date?: string |
   return now >= dep - h48 && now <= endTime
 }
 
-export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProps) {
+export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, metaChips }: TripItemCardProps) {
   const router = useRouter()
   const [expanded, setExpanded] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -292,11 +294,14 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                 </p>
               )}
 
-              {loyalty && (
-                <div className="mt-1.5">
-                  <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', loyalty.className)}>
-                    {loyalty.text}
-                  </span>
+              {(loyalty || metaChips) && (
+                <div className="mt-1.5 flex flex-wrap gap-2">
+                  {loyalty ? (
+                    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', loyalty.className)}>
+                      {loyalty.text}
+                    </span>
+                  ) : null}
+                  {metaChips}
                 </div>
               )}
 
@@ -366,64 +371,66 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
             </div>
 
             {/* Actions */}
-            <div className="relative flex items-center gap-1">
-              {sourceEmailId ? (
-                <Link href={`/inbox/${sourceEmailId}`}>
+            {!readOnly ? (
+              <div className="relative flex items-center gap-1">
+                {sourceEmailId ? (
+                  <Link href={`/inbox/${sourceEmailId}`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      title="Edit extraction in Inbox"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                ) : (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0"
-                    title="Edit extraction in Inbox"
+                    className="h-8 w-8 p-0 text-gray-300"
+                    disabled
+                    title="No source email for this item"
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                </Link>
-              ) : (
+                )}
+
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 w-8 p-0 text-gray-300"
-                  disabled
-                  title="No source email for this item"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setMenuOpen(!menuOpen)}
                 >
-                  <Pencil className="h-4 w-4" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setMenuOpen(!menuOpen)}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-
-              {menuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border bg-white py-1 shadow-lg">
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setMoveOpen(true)
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                    Move to...
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setDeleteOpen(true)
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border bg-white py-1 shadow-lg">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setMoveOpen(true)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      Move to...
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setDeleteOpen(true)
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {/* Expandable details */}
@@ -486,7 +493,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
       </Card>
 
       {/* Move dialog */}
-      <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
+      <Dialog open={!readOnly && moveOpen} onOpenChange={setMoveOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Move Item</DialogTitle>
@@ -529,7 +536,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
       </Dialog>
 
       {/* Delete dialog */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog open={!readOnly && deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Item</DialogTitle>
