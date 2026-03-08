@@ -355,7 +355,7 @@ export function TripItemCard({ item, allTrips, currentUserId }: TripItemCardProp
                 <ItemStatusBadge
                   itemId={item.id}
                   scheduledDeparture={
-                    (item.details_json as Record<string, unknown> | null)?.departure_local_time as string | undefined
+                    typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
                   }
                 />
               )}
