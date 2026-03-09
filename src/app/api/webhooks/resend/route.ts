@@ -673,8 +673,11 @@ export async function POST(request: NextRequest) {
           .eq('id', tripId)
           .single()
 
-        const mergedTravelers = Array.from(
-          new Set([...(existingTripData?.travelers || []), ...newTravelers])
+        // Deduplicate using collectTravelerNames to handle name variants
+        const mergedTravelers = collectTravelerNames(
+          [...(existingTripData?.travelers || []), ...newTravelers].map((name) => ({
+            traveler_names: [name],
+          })) as ExtractedItem[]
         )
 
         // Build update object
