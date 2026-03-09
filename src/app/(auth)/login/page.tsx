@@ -62,6 +62,9 @@ function LoginContent() {
       provider: 'google',
       options: {
         redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     })
 

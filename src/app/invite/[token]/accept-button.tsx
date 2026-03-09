@@ -58,6 +58,7 @@ export function AcceptInviteButton({
       options: {
         redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectTo),
         queryParams: {
+          prompt: 'select_account',
           login_hint: invitedEmail,
         },
       },
