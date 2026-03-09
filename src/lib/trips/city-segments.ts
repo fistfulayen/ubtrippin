@@ -1,6 +1,6 @@
 import type { TripItem, Json } from '@/types/database'
 import type { WeatherDestination } from '@/lib/weather/types'
-import { getWeatherForDate, weatherCodeToEmoji, type TimelineWeatherDay } from '@/lib/weather/item-weather'
+import { weatherCodeToEmoji, type TimelineWeatherDay } from '@/lib/weather/item-weather'
 import { looksLikeVenueName, normaliseToCity } from './assignment'
 import { isSameMetroArea, resolveAirportCity } from './airport-cities'
 
@@ -329,10 +329,6 @@ export function attachWeatherToTimeline(entries: TimelineEntry[], destinations: 
       },
     }
   })
-}
-
-export function weatherForItem(segment: CitySegment, item: TripItem): TimelineWeatherDay | null {
-  return getWeatherForDate(segment.weather?.daily, item.start_date)
 }
 
 export function buildTimeline(items: TripItem[]): TimelineEntry[] {
