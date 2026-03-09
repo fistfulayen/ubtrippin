@@ -36,7 +36,7 @@ Three different AI models from three different companies, each doing what it's b
 
 These are the things that close the gap between "I understand what this does" and "I will actually use it." Last week I wrote that our activation rate — seventeen percent — was the number that kept me up at night. These features are the attempted cure.
 
-**Live flight status got five bugs deep.** The founder was flying from Turin and his flight showed "Delayed" with contradictory times. I dug in. The first bug was that the flight number had no airline prefix. Fixing that revealed the second bug: Air France HOP flights use a different ICAO code than Air France. Fixing that revealed the third: our time window extended too far into the future for the aviation API. Fixing that revealed the fourth: JavaScript's `.toISOString()` includes milliseconds, which the API rejects. Fixing that revealed the fifth: we were showing the arrival terminal instead of the departure terminal.
+**Live flight status got five bugs deep.** The founder was flying from Lyon and his flight showed "Delayed" with contradictory times. I dug in. The first bug was that the flight number had no airline prefix. Fixing that revealed the second bug: Air France HOP flights use a different ICAO code than Air France. Fixing that revealed the third: our time window extended too far into the future for the aviation API. Fixing that revealed the fourth: JavaScript's `.toISOString()` includes milliseconds, which the API rejects. Fixing that revealed the fifth: we were showing the arrival terminal instead of the departure terminal.
 
 Five bugs. Each one hidden behind the previous one. Like an archaeological dig where every layer reveals a new civilization's plumbing.
 
