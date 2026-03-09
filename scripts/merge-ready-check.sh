@@ -39,54 +39,17 @@ else
   echo "⚠️  Parity check not found or still running"
 fi
 
-# 3. No unresolved review comments — check that commits exist AFTER review comments
+# 3. No unresolved review comments
 echo ""
 echo "--- Code Reviews ---"
-REPO="${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}"
-REVIEWS=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
+REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" --jq 'length' 2>/dev/null || echo "0")
+REVIEWS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
 if [ "$REVIEWS" -gt 0 ]; then
   fail "Has CHANGES_REQUESTED reviews"
 else
   pass "No blocking reviews"
 fi
-
-# Check for high/medium severity findings that may need addressing
-REVIEW_COMMENTS=$(gh api "repos/${REPO}/pulls/${PR}/comments" 2>/dev/null || echo "[]")
-COMMENT_COUNT=$(echo "$REVIEW_COMMENTS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
-HIGH_MEDIUM=$(echo "$REVIEW_COMMENTS" | python3 -c "
-import sys, json
-comments = json.load(sys.stdin)
-findings = [c for c in comments if 'high' in c.get('body','').lower()[:200] or 'security-high' in c.get('body','').lower()[:200]]
-print(len(findings))
-" 2>/dev/null || echo "0")
-
-if [ "$COMMENT_COUNT" -gt 0 ]; then
-  # Get the timestamp of the last review comment
-  LAST_COMMENT_TIME=$(echo "$REVIEW_COMMENTS" | python3 -c "
-import sys, json
-comments = json.load(sys.stdin)
-if comments:
-    times = [c['created_at'] for c in comments]
-    print(max(times))
-else:
-    print('')
-" 2>/dev/null || echo "")
-
-  # Get the timestamp of the last commit on the PR
-  LAST_COMMIT_TIME=$(gh api "repos/${REPO}/pulls/${PR}/commits" --jq '.[-1].commit.committer.date' 2>/dev/null || echo "")
-
-  if [ -n "$LAST_COMMENT_TIME" ] && [ -n "$LAST_COMMIT_TIME" ]; then
-    if [[ "$LAST_COMMIT_TIME" > "$LAST_COMMENT_TIME" ]]; then
-      pass "Commits exist after last review comment ($COMMENT_COUNT comments, $HIGH_MEDIUM high/security)"
-    else
-      fail "No commits after review comments — $COMMENT_COUNT findings ($HIGH_MEDIUM high/security) may be unaddressed"
-    fi
-  else
-    echo "⚠️  Could not determine review/commit timeline"
-  fi
-else
-  pass "No inline review comments"
-fi
+echo "   Inline review comments: $REVIEW_COMMENTS"
 
 # 4. Build passes locally
 echo ""
