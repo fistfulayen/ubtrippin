@@ -90,8 +90,13 @@ const METRO_ALIASES: Record<string, string> = {
  * Resolve a city name to its metro canonical name if it's a known alias.
  * Returns the canonical name (lowercase) or the input key unchanged.
  */
+/**
+ * Resolve a city name to its metro canonical name if it's a known alias.
+ * Extracts city part before comma (e.g. "Newark, NJ" → "newark").
+ * Returns the canonical name (lowercase) or the normalized city name.
+ */
 export function resolveMetroAlias(cityName: string): string {
-  const key = cityName.toLowerCase().replace(/[^a-z\s]+/g, '').trim()
+  const key = cityName.split(',')[0].toLowerCase().replace(/[^a-z\s]+/g, '').trim()
   return METRO_ALIASES[key] ?? key
 }
 

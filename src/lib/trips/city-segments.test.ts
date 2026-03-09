@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { TripItem } from '@/types/database'
-import { buildTimeline } from './city-segments'
+import { attachWeatherToTimeline, buildTimeline } from './city-segments'
+import type { TimelineEntry } from './city-segments'
+import type { WeatherDestination } from '@/lib/weather/types'
 
 function makeItem(overrides: Partial<TripItem>): TripItem {
   return {
@@ -390,7 +392,6 @@ describe('hotel segment assignment', () => {
     expect(nycSegment!.segment!.items).toHaveLength(1) // just the activity
     expect(nycSegment!.segment!.anchorType).toBe('activity')
   })
-})
 
   it('keeps hotel in same metro area as departure (Coconut Grove / MIA)', () => {
     // Same-day check-in + departure, but hotel is in departure metro area
@@ -440,3 +441,37 @@ describe('hotel segment assignment', () => {
     expect(miaSegment).toBeDefined()
     expect(miaSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
   })
+})
+
+describe('attachWeatherToTimeline — metro aliases', () => {
+  function makeEntry(city: string, startDate: string, endDate: string): TimelineEntry {
+    return {
+      type: 'segment',
+      segment: { city, countryCode: 'US', anchorType: 'airport', startDate, endDate, durationNights: 3, items: [] },
+    }
+  }
+
+  function makeForecastDay(date: string, weather_code: number, temp_high: number, temp_low: number) {
+    return { date, weather_code, temp_high, temp_low, precipitation_mm: 0, precipitation_probability: 0, weather_description: 'Clear', wind_speed_max_mph: 5 }
+  }
+
+  function makeDestination(city: string, daily: ReturnType<typeof makeForecastDay>[]): WeatherDestination {
+    return { city, latitude: 0, longitude: 0, dates: { start: daily[0].date, end: daily[daily.length - 1].date }, source: 'forecast', daily }
+  }
+
+  it('matches Newark weather to New York segment', () => {
+    const entries = [makeEntry('New York', '2026-03-10', '2026-03-13')]
+    const destinations = [makeDestination('Newark', [makeForecastDay('2026-03-10', 0, 60, 45), makeForecastDay('2026-03-11', 1, 62, 47)])]
+    const result = attachWeatherToTimeline(entries, destinations)
+    expect(result[0].segment?.weather?.daily).toHaveLength(2)
+    expect(result[0].segment?.weather?.daily?.[0].high).toBe(60)
+  })
+
+  it('matches Surfside weather to Miami segment', () => {
+    const entries = [makeEntry('Miami', '2026-03-08', '2026-03-09')]
+    const destinations = [makeDestination('Surfside', [makeForecastDay('2026-03-08', 2, 82, 72)])]
+    const result = attachWeatherToTimeline(entries, destinations)
+    expect(result[0].segment?.weather?.daily).toHaveLength(1)
+    expect(result[0].segment?.weather?.daily?.[0].high).toBe(82)
+  })
+})
