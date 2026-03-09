@@ -243,16 +243,62 @@ function mostFrequentCity(locations: string[]): string | null {
   return normalised
 }
 
+/**
+ * Normalize a traveler name to title case for consistent display.
+ * "IAN ROGERS" → "Ian Rogers", "ian christian rogers" → "Ian Christian Rogers"
+ */
+function titleCase(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+/**
+ * Check if two names refer to the same person.
+ * Handles case differences and subset names (e.g., "Ian Rogers" matches "Ian Christian Rogers").
+ */
+function isSamePerson(a: string, b: string): boolean {
+  const partsA = a.toLowerCase().split(/\s+/).filter(Boolean)
+  const partsB = b.toLowerCase().split(/\s+/).filter(Boolean)
+  // Exact match (case-insensitive)
+  if (partsA.join(' ') === partsB.join(' ')) return true
+  // Check if one name's parts are a subset of the other's (handles middle names)
+  const setA = new Set(partsA)
+  const setB = new Set(partsB)
+  const aSubsetB = partsA.every((p) => setB.has(p))
+  const bSubsetA = partsB.every((p) => setA.has(p))
+  return aSubsetB || bSubsetA
+}
+
+/**
+ * Deduplicate and normalize traveler names from trip items.
+ * Handles case variants ("IAN ROGERS" vs "Ian Rogers") and name subsets
+ * ("Ian Rogers" vs "Ian Christian Rogers" → keeps the longest form).
+ */
 export function collectTravelerNames(items: ExtractedItem[]): string[] {
-  const names = new Set<string>()
+  const rawNames: string[] = []
 
   for (const item of items) {
     for (const name of item.traveler_names || []) {
       if (name.trim()) {
-        names.add(name.trim())
+        rawNames.push(name.trim())
       }
     }
   }
 
-  return Array.from(names)
+  // Deduplicate: group names that refer to the same person, keep the longest variant
+  const deduped: string[] = []
+  for (const name of rawNames) {
+    const existingIndex = deduped.findIndex((existing) => isSamePerson(existing, name))
+    if (existingIndex === -1) {
+      deduped.push(name)
+    } else {
+      // Keep the longer name (more complete form)
+      if (name.length > deduped[existingIndex].length) {
+        deduped[existingIndex] = name
+      }
+    }
+  }
+
+  return deduped.map(titleCase)
 }

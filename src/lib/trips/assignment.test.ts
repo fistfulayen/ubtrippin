@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getPrimaryLocation } from './assignment'
+import { getPrimaryLocation, collectTravelerNames } from './assignment'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 
 function makeItem(overrides: Partial<ExtractedItem>): ExtractedItem {
@@ -116,5 +116,42 @@ describe('getPrimaryLocation', () => {
     const result = getPrimaryLocation(items)
     expect(result).not.toBe('UT')
     expect(result).toContain('Salt Lake City')
+  })
+})
+
+describe('collectTravelerNames', () => {
+  function makeItems(...names: string[][]) {
+    return names.map((traveler_names) => ({ traveler_names }) as ExtractedItem)
+  }
+
+  it('deduplicates case variants', () => {
+    const result = collectTravelerNames(makeItems(['Ian Rogers'], ['IAN ROGERS'], ['ian rogers']))
+    expect(result).toEqual(['Ian Rogers'])
+  })
+
+  it('keeps longest name variant (middle name)', () => {
+    const result = collectTravelerNames(makeItems(['Ian Rogers'], ['Ian Christian Rogers']))
+    expect(result).toEqual(['Ian Christian Rogers'])
+  })
+
+  it('deduplicates all three variants from screenshot bug', () => {
+    const result = collectTravelerNames(makeItems(
+      ['Ian Christian Rogers'],
+      ['Ian Rogers'],
+      ['Ian ROGERS']
+    ))
+    expect(result).toEqual(['Ian Christian Rogers'])
+  })
+
+  it('keeps genuinely different travelers', () => {
+    const result = collectTravelerNames(makeItems(['Ian Rogers'], ['Hedvig Maigre']))
+    expect(result).toHaveLength(2)
+    expect(result).toContain('Ian Rogers')
+    expect(result).toContain('Hedvig Maigre')
+  })
+
+  it('returns title case', () => {
+    const result = collectTravelerNames(makeItems(['HEDVIG MAIGRE']))
+    expect(result).toEqual(['Hedvig Maigre'])
   })
 })
