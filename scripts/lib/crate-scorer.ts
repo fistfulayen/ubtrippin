@@ -89,20 +89,22 @@ async function fetchLastFmArtist(
   }
 }
 
-let lastMbFetch = 0
+/** Serialized rate limiter for MusicBrainz (1 req/sec enforced by ToS) */
+let mbQueue: Promise<void> = Promise.resolve()
+
+const MB_HEADERS = { 'User-Agent': 'UBTrippin/1.0 (https://www.ubtrippin.xyz; hello@ubtrippin.xyz)' }
+
+async function mbFetch(url: string): Promise<Response> {
+  const ticket = mbQueue.then(() => sleep(1100))
+  mbQueue = ticket
+  await ticket
+  return fetch(url, { headers: MB_HEADERS, signal: AbortSignal.timeout(8000) })
+}
 
 async function fetchMusicBrainzDiscography(artistName: string): Promise<number> {
   try {
-    // Rate limit: 1 req/sec for MusicBrainz
-    const now = Date.now()
-    if (now - lastMbFetch < 1100) await sleep(1100 - (now - lastMbFetch))
-    lastMbFetch = Date.now()
-
     const searchUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${encodeURIComponent(artistName)}&fmt=json&limit=1`
-    const searchRes = await fetch(searchUrl, {
-      headers: { 'User-Agent': 'UBTrippin/1.0 (https://www.ubtrippin.xyz; hello@ubtrippin.xyz)' },
-      signal: AbortSignal.timeout(8000),
-    })
+    const searchRes = await mbFetch(searchUrl)
 
     if (!searchRes.ok) return 0
 
@@ -112,15 +114,8 @@ async function fetchMusicBrainzDiscography(artistName: string): Promise<number> 
     const mbid = searchData.artists?.[0]?.id
     if (!mbid || (searchData.artists?.[0]?.score ?? 0) < 80) return 0
 
-    // Wait for rate limit
-    await sleep(1100)
-    lastMbFetch = Date.now()
-
     const rgUrl = `https://musicbrainz.org/ws/2/release-group?artist=${mbid}&type=album&fmt=json&limit=100`
-    const rgRes = await fetch(rgUrl, {
-      headers: { 'User-Agent': 'UBTrippin/1.0 (https://www.ubtrippin.xyz; hello@ubtrippin.xyz)' },
-      signal: AbortSignal.timeout(8000),
-    })
+    const rgRes = await mbFetch(rgUrl)
 
     if (!rgRes.ok) return 0
 
@@ -187,7 +182,6 @@ async function fetchTavilyCoverage(
 
 export async function scoreArtistWithCrate(args: {
   artistName: string
-  city: string
 }): Promise<CrateScore> {
   const lastfmKey = process.env.LASTFM_API_KEY
   const tavilyKey = process.env.TAVILY_API_KEY

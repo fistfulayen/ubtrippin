@@ -475,17 +475,19 @@ export async function runCityDiscovery(args: {
       const artistName = extractArtistName(entry.candidate.title, lineup)
       if (artistName) {
         try {
-          const crate = await scoreArtistWithCrate({ artistName, city: args.city.city })
+          const crate = await scoreArtistWithCrate({ artistName })
           if (crate.crateScore > 0) {
             entry.score = crate.crateScore
             entry.tier = crate.crateScore >= 80 ? 'major' : crate.crateScore >= 60 ? 'medium' : 'local'
+            // Replace existing crate tags to prevent duplicates on re-processing
+            const baseTags = (entry.candidate.tags ?? []).filter(
+              (t) => !t.startsWith('reviewed:') && !t.startsWith('lastfm:')
+            )
             entry.candidate.tags = [
-              ...(entry.candidate.tags ?? []),
+              ...baseTags,
               ...crate.sources.map((s) => `reviewed:${s}`),
+              `lastfm:${crate.listenerCount}`,
             ]
-            if (!entry.candidate.tags.includes(`lastfm:${crate.listenerCount}`)) {
-              entry.candidate.tags.push(`lastfm:${crate.listenerCount}`)
-            }
           }
         } catch {
           // Crate scoring failed — keep existing AI score
