@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getLocalTimes, cn } from '@/lib/utils'
+import { getLocalTimes, formatShortDate, cn } from '@/lib/utils'
 import {
   Plane,
   Building,
@@ -327,17 +327,13 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
 
                   // Hotels: show dates (Apr 24 → Apr 28) instead of just times (15:00 - 11:00)
                   if (item.kind === 'hotel' && (item.start_date || item.end_date)) {
-                    const fmt = (iso: string) => {
-                      const d = new Date(iso + 'T00:00:00')
-                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                    }
                     const ci = det?.check_in_time as string | undefined
                     const co = det?.check_out_time as string | undefined
                     return (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />
-                        {item.start_date && fmt(item.start_date)}{ci && `, ${ci}`}
-                        {item.end_date && ` → ${fmt(item.end_date)}`}{co && `, ${co}`}
+                        {item.start_date && formatShortDate(item.start_date)}{ci && `, ${ci}`}
+                        {item.end_date && ` → ${formatShortDate(item.end_date)}`}{co && `, ${co}`}
                       </span>
                     )
                   }

@@ -1,5 +1,6 @@
 import { MapPin, Clock, BedDouble, Phone, Calendar } from 'lucide-react'
 import type { HotelDetails } from '@/types/database'
+import { cn, formatShortDate } from '@/lib/utils'
 
 interface HotelDetailsViewProps {
   details: HotelDetails
@@ -7,11 +8,6 @@ interface HotelDetailsViewProps {
   checkInDate?: string | null
   /** ISO date string for the last morning (check-out day) */
   checkOutDate?: string | null
-}
-
-function formatShortDate(iso: string): string {
-  const d = new Date(iso + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export function HotelDetailsView({ details, checkInDate, checkOutDate }: HotelDetailsViewProps) {
@@ -62,7 +58,7 @@ export function HotelDetailsView({ details, checkInDate, checkOutDate }: HotelDe
                 </div>
               )}
               {check_in_time && (
-                <div className={`flex items-center gap-1.5 text-sm text-gray-600${checkInDate ? ' mt-0.5 ml-5.5' : ' mt-1 text-lg font-semibold text-gray-900'}`}>
+                <div className={cn('flex items-center gap-1.5 text-sm text-gray-600', checkInDate ? 'mt-0.5 ml-5.5' : 'mt-1 text-lg font-semibold text-gray-900')}>
                   {!checkInDate && <Clock className="h-4 w-4 text-green-500" />}
                   {check_in_time}
                 </div>
@@ -81,7 +77,7 @@ export function HotelDetailsView({ details, checkInDate, checkOutDate }: HotelDe
                 </div>
               )}
               {check_out_time && (
-                <div className={`flex items-center gap-1.5 text-sm text-gray-600${checkOutDate ? ' mt-0.5 ml-5.5' : ' mt-1 text-lg font-semibold text-gray-900'}`}>
+                <div className={cn('flex items-center gap-1.5 text-sm text-gray-600', checkOutDate ? 'mt-0.5 ml-5.5' : 'mt-1 text-lg font-semibold text-gray-900')}>
                   {!checkOutDate && <Clock className="h-4 w-4 text-red-500" />}
                   {check_out_time}
                 </div>

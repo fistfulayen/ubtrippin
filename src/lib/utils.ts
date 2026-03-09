@@ -119,6 +119,13 @@ export function getLocalTimes(
   return [startTime || '', endTime || '']
 }
 
+/** Format a date-only string as "Mar 24" (short month + day, no year/weekday) */
+export function formatShortDate(date: string | null | undefined): string {
+  if (!date) return ''
+  const d = new Date(date + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export function formatDateTime(date: string | Date | null | undefined): string {
   if (!date) return ''
   return `${formatDate(date)} at ${formatTime(date)}`
