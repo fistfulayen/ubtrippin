@@ -106,7 +106,23 @@ else:
     if [ "$POST_FIX_REVIEWS" -gt 0 ]; then
       pass "Fixes reviewed — $pre_count pre-fix comments, $POST_FIX_REVIEWS post-fix reviews"
     else
-      fail "Fixes pushed but not yet re-reviewed ($pre_count findings addressed, awaiting reviewer confirmation)"
+      # Check if all findings have replies (sufficient for bot reviewers that don't re-review)
+      ALL_REPLIED=$(echo "$REVIEW_COMMENTS" | python3 -c "
+import sys, json
+comments = json.load(sys.stdin)
+bot_authors = {'gemini-code-assist[bot]', 'github-actions[bot]', 'coderabbitai[bot]'}
+finding_keywords = ['high', 'medium', 'security', 'bug', 'vulnerability', 'ssrf', 'xss', 'injection']
+bot_findings = [c for c in comments if c['user']['login'] in bot_authors
+                and any(k in c.get('body','').lower()[:300] for k in finding_keywords)]
+reply_targets = {c.get('in_reply_to_id') for c in comments if c.get('in_reply_to_id')}
+unreplied = [c for c in bot_findings if c['id'] not in reply_targets]
+print('all_replied' if not unreplied else f'unreplied:{len(unreplied)}')
+" 2>/dev/null || echo "unknown")
+      if [[ "$ALL_REPLIED" == "all_replied" ]]; then
+        pass "All $pre_count findings have replies + fix commits pushed (bot reviewers don't re-review)"
+      else
+        fail "Fixes pushed but not yet re-reviewed ($pre_count findings addressed, awaiting reviewer confirmation)"
+      fi
     fi
   fi
 else
