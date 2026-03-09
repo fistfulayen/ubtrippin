@@ -20,28 +20,16 @@ export async function GET() {
     .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
 
-  // TEMPORARY DEBUG: return diagnostic info in response
+  if (memberError) {
+    console.error('[v1/families GET] membership lookup failed', memberError)
+    return NextResponse.json(
+      { error: { code: 'internal_error', message: 'Failed to load families.' } },
+      { status: 500 }
+    )
+  }
+
   if (!memberRows || memberRows.length === 0) {
-    // Check if we can see ANY family_members rows (without user_id filter)
-    const { data: allRows, error: allError } = await auth.supabase
-      .from('family_members')
-      .select('family_id, user_id, role')
-      .limit(5)
-
-    const { data: { user } } = await auth.supabase.auth.getUser()
-
-    return NextResponse.json({
-      data: [],
-      _debug: {
-        authUserId: auth.userId,
-        jwtUserId: user?.id ?? null,
-        jwtEmail: user?.email ?? null,
-        step1_rows: memberRows,
-        step1_error: memberError,
-        step1_all_rows: allRows,
-        step1_all_error: allError,
-      }
-    })
+    return NextResponse.json({ data: [] })
   }
 
   const familyIds = memberRows.map((row) => row.family_id)
@@ -52,8 +40,6 @@ export async function GET() {
     .from('families')
     .select('id, name, created_by, created_at, updated_at')
     .in('id', familyIds)
-
-  console.log('[v1/families GET] step2 families:', JSON.stringify(families), 'error:', familyError)
 
   if (familyError) {
     console.error('[v1/families GET] families lookup failed', familyError)
