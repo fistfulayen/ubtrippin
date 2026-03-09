@@ -78,8 +78,9 @@ if unreplied:
     print(f'unreplied_findings:{len(unreplied)}')
     sys.exit()
 
-post_fix = [c for c in comments if c['created_at'] > commit_time]
-pre_fix = [c for c in comments if c['created_at'] <= commit_time]
+bot_authors = {'gemini-code-assist[bot]', 'github-actions[bot]', 'coderabbitai[bot]'}
+post_fix = [c for c in comments if c['created_at'] > commit_time and c['user']['login'] in bot_authors]
+pre_fix = [c for c in comments if c['created_at'] <= commit_time and c['user']['login'] in bot_authors]
 post_high = len([c for c in post_fix if any(k in c.get('body','').lower()[:200] for k in ['high', 'security-high'])])
 post_medium = len([c for c in post_fix if 'medium' in c.get('body','').lower()[:200]])
 if post_fix:
