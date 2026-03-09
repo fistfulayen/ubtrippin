@@ -637,6 +637,41 @@ GET /api/v1/events?city=paris&tier=major&category=art
 - Rate-limited: 10 requests/minute per IP
 - Events are curated by the UB Trippin editorial pipeline — not real-time scraped
 
+#### Trigger Event Pipeline Refresh (Admin Only)
+```
+POST /api/v1/events/refresh
+```
+
+Triggers an asynchronous re-discovery run for a given city. Spawns the event pipeline in the background and returns immediately. Only users whose email is listed in `EVENT_PIPELINE_ADMIN_EMAILS` (server env var) are permitted.
+
+**Request body:**
+```json
+{ "citySlug": "paris" }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| citySlug | string | ✅ | City slug to refresh (e.g. `paris`, `new-york`). Must match `^[a-z0-9-]+$`. |
+
+**Response (202 Accepted):**
+```json
+{ "ok": true, "queued": true, "citySlug": "paris" }
+```
+
+**Errors:**
+
+| Status | Code | Meaning |
+|--------|------|---------|
+| 400 | `invalid_request` | `citySlug` missing or not a valid slug |
+| 403 | `forbidden` | Caller's email not in the admin allowlist |
+| 500 | `server_misconfigured` | `EVENT_PIPELINE_ADMIN_EMAILS` env var not set |
+| 500 | `launch_failed` | Pipeline process failed to start |
+
+**Notes:**
+- Requires session auth (Bearer token) — this is **not** a public endpoint
+- The pipeline runs asynchronously; poll `GET /api/v1/events?city=<slug>` to see updated results
+- Admin allowlist is set via the `EVENT_PIPELINE_ADMIN_EMAILS` environment variable (comma-separated emails)
+
 ---
 
 ### City Guides
