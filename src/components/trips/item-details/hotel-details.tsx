@@ -1,11 +1,20 @@
-import { MapPin, Clock, BedDouble, Phone } from 'lucide-react'
+import { MapPin, Clock, BedDouble, Phone, Calendar } from 'lucide-react'
 import type { HotelDetails } from '@/types/database'
 
 interface HotelDetailsViewProps {
   details: HotelDetails
+  /** ISO date string for the first night (check-in day) */
+  checkInDate?: string | null
+  /** ISO date string for the last morning (check-out day) */
+  checkOutDate?: string | null
 }
 
-export function HotelDetailsView({ details }: HotelDetailsViewProps) {
+function formatShortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+export function HotelDetailsView({ details, checkInDate, checkOutDate }: HotelDetailsViewProps) {
   const {
     hotel_name,
     address,
@@ -38,29 +47,45 @@ export function HotelDetailsView({ details }: HotelDetailsViewProps) {
         </div>
       )}
 
-      {/* Check-in/out times */}
-      {(check_in_time || check_out_time) && (
+      {/* Check-in/out dates and times */}
+      {(checkInDate || checkOutDate || check_in_time || check_out_time) && (
         <div className="mt-4 grid grid-cols-2 gap-4">
-          {check_in_time && (
+          {(checkInDate || check_in_time) && (
             <div>
               <div className="text-xs font-medium uppercase tracking-wider text-gray-500">
                 Check-in
               </div>
-              <div className="mt-1 flex items-center gap-1.5 text-lg font-semibold text-gray-900">
-                <Clock className="h-4 w-4 text-green-500" />
-                {check_in_time}
-              </div>
+              {checkInDate && (
+                <div className="mt-1 flex items-center gap-1.5 text-base font-semibold text-gray-900">
+                  <Calendar className="h-4 w-4 text-green-500" />
+                  {formatShortDate(checkInDate)}
+                </div>
+              )}
+              {check_in_time && (
+                <div className={`flex items-center gap-1.5 text-sm text-gray-600${checkInDate ? ' mt-0.5 ml-5.5' : ' mt-1 text-lg font-semibold text-gray-900'}`}>
+                  {!checkInDate && <Clock className="h-4 w-4 text-green-500" />}
+                  {check_in_time}
+                </div>
+              )}
             </div>
           )}
-          {check_out_time && (
+          {(checkOutDate || check_out_time) && (
             <div>
               <div className="text-xs font-medium uppercase tracking-wider text-gray-500">
                 Check-out
               </div>
-              <div className="mt-1 flex items-center gap-1.5 text-lg font-semibold text-gray-900">
-                <Clock className="h-4 w-4 text-red-500" />
-                {check_out_time}
-              </div>
+              {checkOutDate && (
+                <div className="mt-1 flex items-center gap-1.5 text-base font-semibold text-gray-900">
+                  <Calendar className="h-4 w-4 text-red-500" />
+                  {formatShortDate(checkOutDate)}
+                </div>
+              )}
+              {check_out_time && (
+                <div className={`flex items-center gap-1.5 text-sm text-gray-600${checkOutDate ? ' mt-0.5 ml-5.5' : ' mt-1 text-lg font-semibold text-gray-900'}`}>
+                  {!checkOutDate && <Clock className="h-4 w-4 text-red-500" />}
+                  {check_out_time}
+                </div>
+              )}
             </div>
           )}
         </div>

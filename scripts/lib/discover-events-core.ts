@@ -159,14 +159,18 @@ async function sourceToCandidatesFromSearch(args: {
   sourceName: string
   site?: string
 }): Promise<DiscoveredEventCandidate[]> {
+  console.log(`    [search] ${args.query}${args.site ? ` (site:${args.site})` : ''}`)
   const results = await searchBraveWeb(args.query, { count: 10, site: args.site })
+  console.log(`    [search] ${results.length} results`)
   const candidates: DiscoveredEventCandidate[] = []
 
   for (const result of results) {
     // Deep extraction: fetch the actual page and extract multiple events
+    console.log(`    [fetch] ${result.url.slice(0, 80)}...`)
     const page = await fetchPageContent(result.url)
 
     if (page.ok && page.text.length > 200) {
+      console.log(`    [extract] ${page.text.length} chars, sending to AI...`)
       const pageEvents = await extractEventsFromPage({
         city: args.city,
         sourceUrl: result.url,
@@ -301,6 +305,7 @@ export async function runCityDiscovery(args: {
   const reports: DiscoverySourceResult[] = []
   const rawCandidates: DiscoveredEventCandidate[] = []
 
+  console.log(`  [${args.city.city}] ${sources.length} sources`)
   for (const source of sources) {
     const startedAt = Date.now()
     if (shouldSkipSource(source) || adaptedPlan.sourcesToSkip.some((entry) => source.name.includes(entry) || source.url.includes(entry))) {
@@ -318,6 +323,7 @@ export async function runCityDiscovery(args: {
 
     if (source.source_type !== 'rss') continue
 
+    console.log(`  [RSS] ${source.name} → ${source.url.slice(0, 60)}`)
     try {
       const candidates = await sourceToCandidatesFromFeed({
         city: args.city,
