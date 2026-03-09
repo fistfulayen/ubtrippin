@@ -13,34 +13,73 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  // Use SECURITY DEFINER RPC to avoid RLS circular dependency on families ↔ family_members
-  const { data: families, error } = await auth.supabase.rpc('get_my_families')
+  const { data: memberships, error } = await auth.supabase
+    .from('family_members')
+    .select('family_id, role, family:families(id, name, created_by, created_at, updated_at)')
+    .eq('user_id', auth.userId)
+    .not('accepted_at', 'is', null)
+
+  console.log('[v1/families GET] userId:', auth.userId, 'memberships:', JSON.stringify(memberships), 'error:', error)
 
   if (error) {
-    console.error('[v1/families GET] get_my_families RPC failed', error)
+    console.error('[v1/families GET] membership lookup failed', error)
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to load families.' } },
       { status: 500 }
     )
   }
 
-  const data = (families ?? []).map((row: {
-    id: string
-    name: string
-    created_by: string
-    role: string
-    member_count: number
-    created_at: string
-    updated_at: string
-  }) => ({
-    id: row.id,
-    name: row.name,
-    created_by: row.created_by,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    role: row.role,
-    member_count: Number(row.member_count),
-  }))
+  const rows = (memberships ?? []) as Array<{
+    family_id: string
+    role: 'admin' | 'member'
+    family: Array<{
+      id: string
+      name: string
+      created_by: string
+      created_at: string
+      updated_at: string
+    }> | null
+  }>
+
+  const familyIds = rows.map((row) => row.family_id)
+  const memberCountMap = new Map<string, number>()
+
+  if (familyIds.length > 0) {
+    const { data: memberRows, error: countError } = await auth.supabase
+      .from('family_members')
+      .select('family_id')
+      .in('family_id', familyIds)
+      .not('accepted_at', 'is', null)
+
+    if (countError) {
+      console.error('[v1/families GET] member count lookup failed', countError)
+      return NextResponse.json(
+        { error: { code: 'internal_error', message: 'Failed to load families.' } },
+        { status: 500 }
+      )
+    }
+
+    for (const row of memberRows ?? []) {
+      const count = memberCountMap.get(row.family_id as string) ?? 0
+      memberCountMap.set(row.family_id as string, count + 1)
+    }
+  }
+
+  const data = rows
+    .map((row) => {
+      const family = Array.isArray(row.family) ? row.family[0] : row.family
+      if (!family) return null
+      return {
+        id: family.id,
+        name: family.name,
+        created_by: family.created_by,
+        created_at: family.created_at,
+        updated_at: family.updated_at,
+        role: row.role,
+        member_count: memberCountMap.get(row.family_id) ?? 0,
+      }
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null)
 
   return NextResponse.json({ data })
 }
