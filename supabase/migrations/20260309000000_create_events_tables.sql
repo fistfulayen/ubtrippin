@@ -192,3 +192,17 @@ INSERT INTO tracked_cities (city, country, country_code, slug, latitude, longitu
   ('Amsterdam', 'Netherlands', 'NL', 'amsterdam', 52.3676, 4.9041, 'Europe/Amsterdam'),
   ('Berlin', 'Germany', 'DE', 'berlin', 52.5200, 13.4050, 'Europe/Berlin')
 ON CONFLICT DO NOTHING;
+
+-- Auto-update updated_at on city_events modification
+CREATE OR REPLACE FUNCTION update_city_events_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER city_events_updated_at
+  BEFORE UPDATE ON city_events
+  FOR EACH ROW
+  EXECUTE FUNCTION update_city_events_updated_at();

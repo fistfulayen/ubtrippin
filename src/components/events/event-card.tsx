@@ -5,6 +5,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn, formatDateRange } from '@/lib/utils'
 import type { CityEvent } from '@/types/events'
 
+/** Only allow http/https URLs — blocks javascript:, data:, etc. */
+function safeHref(url: string | null | undefined): string | undefined {
+  if (!url) return undefined
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? url : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function getEventCardClasses(event: Pick<CityEvent, 'event_tier' | 'venue_type'>): string {
   const sacred = event.venue_type === 'sacred_venue'
   if (event.event_tier === 'major') {
@@ -41,13 +52,13 @@ export function EventCard({
   const isMajor = event.event_tier === 'major'
   const isLocal = event.event_tier === 'local'
   const sacred = event.venue_type === 'sacred_venue'
-  const detailHref = href ?? event.source_url ?? event.booking_url ?? undefined
+  const detailHref = safeHref(href) ?? safeHref(event.source_url) ?? safeHref(event.booking_url)
   const detailIsExternal = Boolean(detailHref?.startsWith('http'))
   const body = (
     <Card className={cn('overflow-hidden rounded-2xl shadow-sm', getEventCardClasses(event))}>
-      {isMajor && event.image_url ? (
+      {isMajor && safeHref(event.image_url) ? (
         <div className="relative h-56 w-full overflow-hidden bg-slate-100">
-          <img src={event.image_url} alt={event.title} className="h-full w-full object-cover" />
+          <img src={safeHref(event.image_url)!} alt={event.title} className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
           <div className="absolute left-4 top-4">
             <Badge className="rounded-full bg-white/90 text-slate-900">Featured</Badge>
@@ -110,9 +121,9 @@ export function EventCard({
                   </Link>
                 )
               ) : null}
-              {event.booking_url ? (
+              {safeHref(event.booking_url) ? (
                 <a
-                  href={event.booking_url}
+                  href={safeHref(event.booking_url) ?? "#"}
                   target="_blank"
                   rel="noreferrer noopener"
                   className="inline-flex h-10 items-center justify-center rounded-xl border-2 border-gray-200 px-4 text-sm font-medium transition-colors hover:bg-gray-50"
@@ -172,9 +183,9 @@ export function EventCard({
                 </Link>
               )
             ) : null}
-            {event.booking_url ? (
+            {safeHref(event.booking_url) ? (
               <a
-                href={event.booking_url}
+                href={safeHref(event.booking_url) ?? "#"}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="inline-flex h-8 items-center justify-center rounded-xl border-2 border-gray-200 px-3 text-sm font-medium transition-colors hover:bg-gray-50"
@@ -188,5 +199,5 @@ export function EventCard({
     </Card>
   )
 
-  return href && !isLocal ? <div>{body}</div> : body
+  return body
 }

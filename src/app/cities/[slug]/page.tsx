@@ -20,24 +20,43 @@ interface CityPageProps {
   searchParams: Promise<{ from?: string; to?: string; segment?: string }>
 }
 
+/** Escape strings for safe embedding in JSON-LD <script> tags */
+function sanitizeForJsonLd(value: string): string {
+  return value
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026')
+    .replace(/\//g, '\\u002f')
+}
+
+function isHttpUrl(url: string | null): url is string {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 function buildStructuredData(cityName: string, events: Array<{ title: string; start_date: string; end_date: string | null; description: string | null; venue_name: string | null; booking_url: string | null }>) {
   return {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
-    name: `What's On in ${cityName}`,
+    name: `What's On in ${sanitizeForJsonLd(cityName)}`,
     hasPart: events.map((event) => ({
       '@type': 'Event',
-      name: event.title,
+      name: sanitizeForJsonLd(event.title),
       startDate: event.start_date,
       endDate: event.end_date ?? event.start_date,
-      description: event.description ?? undefined,
+      description: event.description ? sanitizeForJsonLd(event.description) : undefined,
       location: event.venue_name
         ? {
             '@type': 'Place',
-            name: event.venue_name,
+            name: sanitizeForJsonLd(event.venue_name),
           }
         : undefined,
-      offers: event.booking_url
+      offers: isHttpUrl(event.booking_url)
         ? {
             '@type': 'Offer',
             url: event.booking_url,
