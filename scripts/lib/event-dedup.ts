@@ -12,7 +12,8 @@ function normalizeText(value: string | null | undefined): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/&/g, ' and ')
     .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\b(the|a|an|live|official|tour|show|event)\b/g, ' ')
+    .replace(/\b(the|a|an|live|official|tour|show|event|in concert|en concert|concert|exhibition|exposition)\b/g, ' ')
+    .replace(/\s*\|.*$/, '')  // strip source suffixes like "| Music Festival Wizard"
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -107,11 +108,26 @@ export function findDuplicate<TExisting extends Pick<
 
   for (const existing of existingEvents) {
     const similarity = titleSimilarity(candidate.title, existing.title)
-    if (similarity < 0.8) continue
-    if (!datesOverlap(candidate.start_date, candidate.end_date, existing.start_date, existing.end_date)) continue
-    if (!sameVenue(candidate.venue_name, existing.venue_name)) continue
-    if (!best || similarity > best.similarity) {
-      best = { existing, similarity }
+    const venueMatch = sameVenue(candidate.venue_name, existing.venue_name)
+    const dateMatch = datesOverlap(candidate.start_date, candidate.end_date, existing.start_date, existing.end_date)
+
+    if (!dateMatch) continue
+
+    // Standard dedup: title similarity ≥ 0.8 (regardless of venue)
+    if (similarity >= 0.8 && venueMatch) {
+      if (!best || similarity > best.similarity) {
+        best = { existing, similarity }
+      }
+      continue
+    }
+
+    // Venue-anchored dedup: same venue + same date + lower title threshold (0.4)
+    // Catches FR/EN translations like "Renoir et l'amour" / "Renoir and Love"
+    // and variant titles like "Nan Goldin : This Will Not End Well" / "This Will Not End Well"
+    if (venueMatch && similarity >= 0.4 && candidate.venue_name && existing.venue_name) {
+      if (!best || similarity > best.similarity) {
+        best = { existing, similarity }
+      }
     }
   }
 
