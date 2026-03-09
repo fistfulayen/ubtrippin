@@ -39,17 +39,62 @@ else
   echo "⚠️  Parity check not found or still running"
 fi
 
-# 3. No unresolved review comments
+# 3. No unresolved review comments — full review cycle check
 echo ""
 echo "--- Code Reviews ---"
-REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/comments" --jq 'length' 2>/dev/null || echo "0")
-REVIEWS=$(gh api "repos/${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}/pulls/${PR}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
+REPO="${GITHUB_REPOSITORY:-fistfulayen/ubtrippin}"
+REVIEWS=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | length' 2>/dev/null || echo "0")
 if [ "$REVIEWS" -gt 0 ]; then
   fail "Has CHANGES_REQUESTED reviews"
 else
   pass "No blocking reviews"
 fi
-echo "   Inline review comments: $REVIEW_COMMENTS"
+
+# Check that review findings are addressed AND re-reviewed
+REVIEW_COMMENTS=$(gh api "repos/${REPO}/pulls/${PR}/comments" 2>/dev/null || echo "[]")
+COMMENT_COUNT=$(echo "$REVIEW_COMMENTS" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+
+if [ "$COMMENT_COUNT" -gt 0 ]; then
+  LAST_COMMIT_TIME=$(gh api "repos/${REPO}/pulls/${PR}/commits" --jq '.[-1].commit.committer.date' 2>/dev/null || echo "")
+
+  COMMENT_ANALYSIS=$(echo "$REVIEW_COMMENTS" | python3 -c "
+import sys, json
+comments = json.load(sys.stdin)
+commit_time = '${LAST_COMMIT_TIME}'
+if not commit_time or not comments:
+    print('unknown')
+    sys.exit()
+post_fix = [c for c in comments if c['created_at'] > commit_time]
+pre_fix = [c for c in comments if c['created_at'] <= commit_time]
+post_high = len([c for c in post_fix if any(k in c.get('body','').lower()[:200] for k in ['high', 'security-high'])])
+post_medium = len([c for c in post_fix if 'medium' in c.get('body','').lower()[:200]])
+if post_fix:
+    print(f'new_findings:{len(post_fix)}:{post_high}:{post_medium}')
+elif pre_fix:
+    print(f'awaiting_re_review:{len(pre_fix)}')
+else:
+    print('clean')
+" 2>/dev/null || echo "unknown")
+
+  if [[ "$COMMENT_ANALYSIS" == clean ]]; then
+    pass "No review findings"
+  elif [[ "$COMMENT_ANALYSIS" == unknown ]]; then
+    echo "⚠️  Could not determine review/commit timeline"
+  elif [[ "$COMMENT_ANALYSIS" == new_findings:* ]]; then
+    IFS=: read -r _ count high medium <<< "$COMMENT_ANALYSIS"
+    fail "Reviewers found $count new issues after fix commits ($high high, $medium medium) — address these"
+  elif [[ "$COMMENT_ANALYSIS" == awaiting_re_review:* ]]; then
+    IFS=: read -r _ pre_count <<< "$COMMENT_ANALYSIS"
+    POST_FIX_REVIEWS=$(gh api "repos/${REPO}/pulls/${PR}/reviews" --jq "[.[] | select(.submitted_at > \"${LAST_COMMIT_TIME}\")] | length" 2>/dev/null || echo "0")
+    if [ "$POST_FIX_REVIEWS" -gt 0 ]; then
+      pass "Fixes reviewed — $pre_count pre-fix comments, $POST_FIX_REVIEWS post-fix reviews"
+    else
+      fail "Fixes pushed but not yet re-reviewed ($pre_count findings addressed, awaiting reviewer confirmation)"
+    fi
+  fi
+else
+  pass "No inline review comments"
+fi
 
 # 4. Build passes locally
 echo ""
