@@ -374,7 +374,7 @@ function reassignDepartureDayHotels(rawSegments: RawSegment[]): void {
         // For metro alias matching, use just the city name (strip region like ", FL")
         const hotelCityName = hotelCity.split(',')[0].trim()
         const hotelMatchesSegment = segmentCities.some((segKey) => {
-          if (hotelKey === segKey || hotelKey.startsWith(segKey) || segKey.startsWith(hotelKey)) return true
+          if (hotelKey === segKey) return true
           // Metro alias: "Coconut Grove" → "miami", "Miami, FL" → "miami"
           const segCityName = segKey.replace(/\s+[a-z]{2}$/, '') // strip state codes like " fl"
           return resolveMetroAlias(hotelCityName) === resolveMetroAlias(segCityName)
@@ -391,9 +391,12 @@ function reassignDepartureDayHotels(rawSegments: RawSegment[]): void {
     }
 
     if (movedIndices.length > 0) {
-      const movedItems = movedIndices.map((idx) => segment.items[idx])
-      segment.items = segment.items.filter((_, idx) => !movedIndices.includes(idx))
-      nextSegment.items.unshift(...movedItems)
+      const movedSet = new Set(movedIndices)
+      const movedItems = segment.items.filter((_, idx) => movedSet.has(idx))
+      segment.items = segment.items.filter((_, idx) => !movedSet.has(idx))
+      nextSegment.items.push(...movedItems)
+      // Re-sort to maintain chronological order after insertion
+      nextSegment.items.sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
     }
   }
 }
