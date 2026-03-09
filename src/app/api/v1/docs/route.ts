@@ -425,6 +425,52 @@ Authorization: Bearer ubt_k1_abc123...
 
 ---
 
+## City Events & Exhibitions (Public)
+
+Discover curated events, exhibitions, festivals, and performances by city. No auth required.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/events | Get events for a city |
+
+### Query Parameters
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| city | string | ✅ | City slug, e.g. \`paris\`, \`new-york\`, \`tokyo\` |
+| from | string | — | Start date filter: YYYY-MM-DD |
+| to | string | — | End date filter: YYYY-MM-DD |
+| tier | string | — | \`major\`, \`medium\`, or \`local\` |
+| category | string | — | \`art\`, \`music\`, \`theater\`, \`food\`, \`festival\`, \`sports\`, \`architecture\`, \`sacred\`, \`market\`, \`other\` |
+
+### Example
+
+\`\`\`
+GET /api/v1/events?city=paris&from=2026-04-01&to=2026-04-07
+
+200 OK
+{
+  "city": { "slug": "paris", "name": "Paris", "country": "France" },
+  "events": [
+    {
+      "id": "uuid",
+      "title": "Monet at Musée d'Orsay",
+      "tier": "major",
+      "category": "art",
+      "venue": "Musée d'Orsay",
+      "start_date": "2026-03-01",
+      "end_date": "2026-06-30",
+      "description": "A major retrospective of Monet's water lily series."
+    }
+  ],
+  "segments": [{ "label": "Major Events", "events": [...] }]
+}
+\`\`\`
+
+Rate limit: 10 req/min per IP (no auth required).
+
+---
+
 ## City Guides
 
 | Method | Path | Description |
@@ -541,6 +587,7 @@ Authorization: Bearer ubt_k1_abc123...
 8. **Calendar sync:** \`GET /api/v1/calendar/token\` → iCal URL
 9. **Flight status:** \`GET /api/v1/items/:id/status\` → gate, delay, terminal
 10. **Upcoming events:** \`GET /api/v1/trips\` → filter items where kind = "ticket"
+11. **City events & exhibitions:** \`GET /api/v1/events?city=paris&from=2026-04-01\` (no auth)
 11. **Download ticket PDF:** \`GET /api/v1/trips/:id/items/:itemId/ticket-pdf\`
 
 ---

@@ -7,6 +7,7 @@ import { CollaboratorsSection } from '@/components/trips/collaborators-section'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
+import { getTripTimelineEventPreviews } from '@/lib/events/queries'
 import { getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
 import { ArrowLeft, Users } from 'lucide-react'
 import Link from 'next/link'
@@ -105,6 +106,10 @@ export default async function TripPage({ params }: TripPageProps) {
       })
     : null
   const timeline = attachWeatherToTimeline(buildTimeline(items || []), weather?.destinations ?? [])
+  const segmentEntries = timeline
+    .filter((entry) => entry.type === 'segment' && entry.segment != null)
+    .map((entry) => entry.segment!)
+  const segmentEvents = await getTripTimelineEventPreviews(supabase, segmentEntries)
 
   return (
     <div className="space-y-6">
@@ -145,7 +150,12 @@ export default async function TripPage({ params }: TripPageProps) {
         isOwner={isOwner}
       />
 
-      <MovementTimeline entries={timeline} allTrips={allTrips || []} currentUserId={user?.id} />
+      <MovementTimeline
+        entries={timeline}
+        allTrips={allTrips || []}
+        currentUserId={user?.id}
+        segmentEvents={segmentEvents}
+      />
 
       <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
     </div>

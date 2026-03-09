@@ -2,8 +2,10 @@
 
 import type { Trip } from '@/types/database'
 import type { TimelineEntry } from '@/lib/trips/city-segments'
-
+import type { CityEvent, TrackedCity } from '@/types/events'
+import { getWeatherForDate } from '@/lib/weather/item-weather'
 import { CitySegmentBlock } from './city-segment-block'
+import { TripEventsCard } from '@/components/events/trip-events-card'
 import { TransitionCard } from './transition-card'
 
 interface MovementTimelineProps {
@@ -11,6 +13,7 @@ interface MovementTimelineProps {
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
   currentUserId?: string
   readOnly?: boolean
+  segmentEvents?: Record<string, { city: TrackedCity; events: CityEvent[] }>
 }
 
 export function MovementTimeline({
@@ -18,6 +21,7 @@ export function MovementTimeline({
   allTrips,
   currentUserId,
   readOnly = false,
+  segmentEvents = {},
 }: MovementTimelineProps) {
   if (entries.length === 0) return null
 
@@ -39,14 +43,25 @@ export function MovementTimeline({
         }
 
         if (entry.type === 'segment' && entry.segment) {
+          const key = `${entry.segment.city}-${entry.segment.startDate}-${index}`
+          const preview = segmentEvents[key]
           return (
-            <CitySegmentBlock
-              key={`${entry.segment.city}-${entry.segment.startDate}-${index}`}
-              segment={entry.segment}
-              allTrips={allTrips}
-              currentUserId={currentUserId}
-              readOnly={readOnly}
-            />
+            <div key={key} className="space-y-3">
+              <CitySegmentBlock
+                segment={entry.segment}
+                allTrips={allTrips}
+                currentUserId={currentUserId}
+                readOnly={readOnly}
+              />
+              {preview ? (
+                <TripEventsCard
+                  city={preview.city}
+                  from={entry.segment.startDate}
+                  to={entry.segment.endDate}
+                  events={preview.events}
+                />
+              ) : null}
+            </div>
           )
         }
 
