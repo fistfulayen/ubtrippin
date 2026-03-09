@@ -64,6 +64,20 @@ commit_time = '${LAST_COMMIT_TIME}'
 if not commit_time or not comments:
     print('unknown')
     sys.exit()
+
+# Check for unreplied bot review comments (security-high, high, medium findings)
+bot_authors = {'gemini-code-assist[bot]', 'github-actions[bot]', 'coderabbitai[bot]'}
+finding_keywords = ['high', 'medium', 'security', 'bug', 'vulnerability', 'ssrf', 'xss', 'injection']
+bot_findings = [c for c in comments if c['user']['login'] in bot_authors
+                and any(k in c.get('body','').lower()[:300] for k in finding_keywords)]
+# A bot finding is 'replied' if another comment has in_reply_to pointing to it
+reply_targets = {c.get('in_reply_to_id') for c in comments if c.get('in_reply_to_id')}
+unreplied = [c for c in bot_findings if c['id'] not in reply_targets]
+
+if unreplied:
+    print(f'unreplied_findings:{len(unreplied)}')
+    sys.exit()
+
 post_fix = [c for c in comments if c['created_at'] > commit_time]
 pre_fix = [c for c in comments if c['created_at'] <= commit_time]
 post_high = len([c for c in post_fix if any(k in c.get('body','').lower()[:200] for k in ['high', 'security-high'])])
@@ -80,6 +94,9 @@ else:
     pass "No review findings"
   elif [[ "$COMMENT_ANALYSIS" == unknown ]]; then
     echo "⚠️  Could not determine review/commit timeline"
+  elif [[ "$COMMENT_ANALYSIS" == unreplied_findings:* ]]; then
+    IFS=: read -r _ unreplied_count <<< "$COMMENT_ANALYSIS"
+    fail "${unreplied_count} review finding(s) have no reply — address and reply before declaring merge-ready"
   elif [[ "$COMMENT_ANALYSIS" == new_findings:* ]]; then
     IFS=: read -r _ count high medium <<< "$COMMENT_ANALYSIS"
     fail "Reviewers found $count new issues after fix commits ($high high, $medium medium) — address these"
