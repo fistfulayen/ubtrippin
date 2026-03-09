@@ -1,5 +1,40 @@
 import type { FeedItem } from './types'
 
+/**
+ * Validate that a URL is safe to fetch: must be https and must resolve to a
+ * public hostname (not loopback/RFC-1918/metadata ranges).
+ * Throws if the URL is not acceptable.
+ */
+function assertSafeUrl(url: string): void {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    throw new Error(`Invalid URL: ${url}`)
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Unsafe URL scheme "${parsed.protocol}" — only https:// is allowed: ${url}`)
+  }
+  const host = parsed.hostname.toLowerCase()
+  // Block loopback, link-local, and cloud metadata endpoints
+  const blocked = [
+    /^localhost$/,
+    /^127\./,
+    /^::1$/,
+    /^0\.0\.0\.0$/,
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^169\.254\./,   // link-local / AWS metadata
+    /^fd[0-9a-f]{2}:/i, // ULA IPv6
+  ]
+  for (const pattern of blocked) {
+    if (pattern.test(host)) {
+      throw new Error(`Blocked private/metadata host: ${host}`)
+    }
+  }
+}
+
 interface ParsedFeedLike {
   items?: Array<Record<string, unknown>>
 }
@@ -67,6 +102,8 @@ function parseXmlItems(xml: string): FeedItem[] {
 }
 
 async function parseWithDependency(url: string): Promise<FeedItem[] | null> {
+  // URL safety already validated by the public callers; assert here as defence-in-depth.
+  assertSafeUrl(url)
   try {
     const imported = await importOptionalModule('rss-parser')
     if (!imported || typeof imported !== 'object' || !('default' in imported)) return null
@@ -100,6 +137,8 @@ async function parseWithDependency(url: string): Promise<FeedItem[] | null> {
 }
 
 export async function fetchFeedItems(url: string): Promise<FeedItem[]> {
+  assertSafeUrl(url)
+
   const parsed = await parseWithDependency(url)
   if (parsed) return parsed
 
@@ -119,6 +158,8 @@ export async function fetchFeedItems(url: string): Promise<FeedItem[]> {
 }
 
 export async function discoverFeedsFromPage(url: string): Promise<string[]> {
+  assertSafeUrl(url)
+
   const response = await fetch(url, {
     headers: {
       Accept: 'text/html,application/xhtml+xml',

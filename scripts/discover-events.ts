@@ -41,8 +41,7 @@ function parseArgs(argv: string[]): CliOptions {
   return { citySlug, all, dryRun }
 }
 
-async function loadCities(citySlug: string | null): Promise<PipelineCity[]> {
-  const supabase = createSecretClient()
+async function loadCities(citySlug: string | null, supabase: ReturnType<typeof createSecretClient>): Promise<PipelineCity[]> {
   let query = supabase
     .from('tracked_cities')
     .select('id, city, country, country_code, slug, timezone, last_refreshed_at')
@@ -62,7 +61,7 @@ async function loadCities(citySlug: string | null): Promise<PipelineCity[]> {
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const supabase = createSecretClient()
-  const cities = await loadCities(options.citySlug)
+  const cities = await loadCities(options.citySlug, supabase)
 
   for (const city of cities) {
     console.log(`[${city.city}] Reading yesterday's diary...`)

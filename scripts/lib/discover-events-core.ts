@@ -367,7 +367,7 @@ export async function runCityDiscovery(args: {
     const match = findDuplicate(candidate, existingEvents)
     if (match) {
       duplicateCount += 1
-      if (choosePreferredEvent(candidate, match.existing) === 'candidate' && !dryRun) {
+      if (choosePreferredEvent(candidate, match.existing) === 'candidate') {
         const venue = resolveVenue(candidate, venues)
         const quality = await scoreEventQuality({
           city: args.city,
@@ -375,31 +375,36 @@ export async function runCityDiscovery(args: {
           trackedVenue: venue,
         })
         if (quality.shouldInsert) {
-          const patch = {
-            title: candidate.title,
-            venue_name: candidate.venue_name,
-            venue_id: venue?.id ?? null,
-            venue_type: candidate.venue_type,
-            category: candidate.category,
-            description: candidate.description,
-            start_date: candidate.start_date,
-            end_date: candidate.end_date,
-            time_info: candidate.time_info,
-            significance_score: quality.score,
-            source: candidate.source,
-            source_url: candidate.source_url,
-            image_url: candidate.image_url,
-            price_info: candidate.price_info,
-            booking_url: candidate.booking_url,
-            tags: candidate.tags,
-            lineup: candidate.lineup,
-            event_tier: quality.tier,
-            last_verified_at: nowIso,
-            expires_at: isoDate(addDays(new Date(`${candidate.end_date ?? candidate.start_date}T00:00:00Z`), 1)),
-          }
+          if (dryRun) {
+            // Dry-run: count what would have been updated without writing anything
+            updated += 1
+          } else {
+            const patch = {
+              title: candidate.title,
+              venue_name: candidate.venue_name,
+              venue_id: venue?.id ?? null,
+              venue_type: candidate.venue_type,
+              category: candidate.category,
+              description: candidate.description,
+              start_date: candidate.start_date,
+              end_date: candidate.end_date,
+              time_info: candidate.time_info,
+              significance_score: quality.score,
+              source: candidate.source,
+              source_url: candidate.source_url,
+              image_url: candidate.image_url,
+              price_info: candidate.price_info,
+              booking_url: candidate.booking_url,
+              tags: candidate.tags,
+              lineup: candidate.lineup,
+              event_tier: quality.tier,
+              last_verified_at: nowIso,
+              expires_at: isoDate(addDays(new Date(`${candidate.end_date ?? candidate.start_date}T00:00:00Z`), 1)),
+            }
 
-          const { error } = await args.supabase.from('city_events').update(patch).eq('id', match.existing.id)
-          if (!error) updated += 1
+            const { error } = await args.supabase.from('city_events').update(patch).eq('id', match.existing.id)
+            if (!error) updated += 1
+          }
         }
       }
       continue

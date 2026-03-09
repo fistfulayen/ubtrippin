@@ -17,22 +17,48 @@ function getAllowedAdminEmails(): Set<string> {
   )
 }
 
+/**
+ * Build a minimal env for the discovery script — only the vars it actually needs.
+ * Never forward the full process.env to avoid leaking secrets the script doesn't use.
+ */
+function buildScriptEnv(): Record<string, string | undefined> {
+  const pick = (key: string): string | undefined => process.env[key]
+  return {
+    // Runtime essentials
+    PATH: pick('PATH'),
+    NODE_PATH: pick('NODE_PATH'),
+    HOME: pick('HOME'),
+    // Supabase (createSecretClient)
+    NEXT_PUBLIC_SUPABASE_URL: pick('NEXT_PUBLIC_SUPABASE_URL'),
+    SUPABASE_SECRET_KEY: pick('SUPABASE_SECRET_KEY'),
+    // AI quality scoring
+    OPENAI_API_KEY: pick('OPENAI_API_KEY'),
+    GEMINI_API_KEY: pick('GEMINI_API_KEY'),
+    // Web search
+    BRAVE_SEARCH_API_KEY: pick('BRAVE_SEARCH_API_KEY'),
+    BRAVE_API_KEY: pick('BRAVE_API_KEY'),
+  }
+}
+
 function launchRefresh(citySlug: string) {
   const repoRoot = process.cwd()
   const tsxBin = path.join(repoRoot, 'node_modules', '.bin', 'tsx')
   const args = [path.join(repoRoot, 'scripts', 'discover-events.ts'), '--city', citySlug]
+  // Cast required: spawn's env type demands ProcessEnv but we intentionally omit most vars.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scriptEnv = buildScriptEnv() as any
   const child = existsSync(tsxBin)
     ? spawn(tsxBin, args, {
         cwd: repoRoot,
         detached: true,
         stdio: 'ignore',
-        env: process.env,
+        env: scriptEnv,
       })
     : spawn(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['tsx', ...args], {
         cwd: repoRoot,
         detached: true,
         stdio: 'ignore',
-        env: process.env,
+        env: scriptEnv,
       })
   child.unref()
 }
@@ -49,20 +75,18 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: profile, error: profileError } = await auth.supabase
-    .from('profiles')
-    .select('email')
-    .eq('id', auth.userId)
-    .maybeSingle()
+  // Use the JWT/session email — not the user-writable profiles table — to prevent
+  // privilege escalation via a crafted profiles.email value.
+  const { data: { user }, error: userError } = await auth.supabase.auth.getUser()
 
-  if (profileError) {
+  if (userError || !user) {
     return NextResponse.json(
-      { error: { code: 'profile_lookup_failed', message: profileError.message } },
+      { error: { code: 'session_lookup_failed', message: userError?.message ?? 'Could not resolve authenticated user.' } },
       { status: 500 }
     )
   }
 
-  const email = profile?.email?.toLowerCase().trim()
+  const email = user.email?.toLowerCase().trim()
   if (!email || !allowedEmails.has(email)) {
     return NextResponse.json(
       { error: { code: 'forbidden', message: 'Only event pipeline admins can trigger a refresh.' } },
