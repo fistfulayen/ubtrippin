@@ -77,8 +77,8 @@ export function AddSenderForm() {
         </div>
       )}
 
-      <div className="flex gap-3">
-        <div className="flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex-[2] min-w-0">
           <Input
             type="email"
             placeholder="your.email@example.com"
@@ -87,18 +87,20 @@ export function AddSenderForm() {
             required
           />
         </div>
-        <div className="w-40">
-          <Input
-            type="text"
-            placeholder="Label (optional)"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
+        <div className="flex gap-3">
+          <div className="flex-1 sm:w-40 sm:flex-none">
+            <Input
+              type="text"
+              placeholder="Label (optional)"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </div>
+          <Button type="submit" disabled={loading} className="shrink-0">
+            <Plus className="mr-2 h-4 w-4" />
+            {loading ? 'Adding...' : 'Add'}
+          </Button>
         </div>
-        <Button type="submit" disabled={loading}>
-          <Plus className="mr-2 h-4 w-4" />
-          {loading ? 'Adding...' : 'Add'}
-        </Button>
       </div>
 
       <p className="text-xs text-gray-500">
