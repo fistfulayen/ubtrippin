@@ -15,7 +15,8 @@ vi.mock('@/lib/events/queries', () => ({
   })),
 }))
 
-import { GET, validateEventsQuery } from './route'
+import { GET } from './route'
+import { validateEventsQuery } from '@/lib/events/validate'
 
 describe('validateEventsQuery', () => {
   it('rejects invalid date formats', () => {
