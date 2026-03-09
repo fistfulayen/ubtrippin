@@ -19,6 +19,8 @@ export async function GET() {
     .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
 
+  console.log('[v1/families GET] userId:', auth.userId, 'memberships:', JSON.stringify(memberships), 'error:', error)
+
   if (error) {
     console.error('[v1/families GET] membership lookup failed', error)
     return NextResponse.json(
