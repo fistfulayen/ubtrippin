@@ -55,6 +55,46 @@ export function resolveAirportCity(code: string): ResolvedAirportCity | null {
   return AIRPORT_CITIES[code.trim().toUpperCase()] ?? null
 }
 
+/**
+ * Metro area aliases: city names / neighborhoods that belong to the same metro.
+ * Used to prevent false-positive hotel reassignment (e.g. Coconut Grove ≠ Miami
+ * by string, but same metro area).
+ */
+const METRO_ALIASES: Record<string, string> = {
+  'newark': 'new york',
+  'jersey city': 'new york',
+  'hoboken': 'new york',
+  'brooklyn': 'new york',
+  'queens': 'new york',
+  'bronx': 'new york',
+  'coconut grove': 'miami',
+  'surfside': 'miami',
+  'miami beach': 'miami',
+  'fort lauderdale': 'miami',
+  'coral gables': 'miami',
+  'orly': 'paris',
+  'roissy': 'paris',
+  'gatwick': 'london',
+  'stansted': 'london',
+  'luton': 'london',
+  'narita': 'tokyo',
+  'haneda': 'tokyo',
+  'san francisco': 'san francisco bay',
+  'oakland': 'san francisco bay',
+  'san jose': 'san francisco bay',
+  'berkeley': 'san francisco bay',
+  'palo alto': 'san francisco bay',
+}
+
+/**
+ * Resolve a city name to its metro canonical name if it's a known alias.
+ * Returns the canonical name (lowercase) or the input key unchanged.
+ */
+export function resolveMetroAlias(cityName: string): string {
+  const key = cityName.toLowerCase().replace(/[^a-z\s]+/g, '').trim()
+  return METRO_ALIASES[key] ?? key
+}
+
 export function isSameMetroArea(code1: string, code2: string): boolean {
   const left = resolveAirportCity(code1)
   const right = resolveAirportCity(code2)

@@ -89,8 +89,8 @@ describe('buildTimeline', () => {
         kind: 'hotel',
         start_date: '2026-03-13',
         end_date: '2026-03-14',
-        start_location: 'Austin, TX',
-        summary: 'The Stephen F Austin Royal Sonesta Hotel',
+        start_location: 'The Stephen F Austin Royal Sonesta Hotel',
+        summary: 'Hotel booking at The Stephen F Austin Royal Sonesta Hotel in Austin, TX',
       }),
       makeItem({
         provider: 'American',
@@ -234,3 +234,209 @@ describe('buildTimeline', () => {
     expect(segments[5].segment?.durationNights).toBe(0)
   })
 })
+
+describe('hotel segment assignment', () => {
+  it('moves hotel with check-in on departure day to destination segment', () => {
+    // Scenario: staying in NYC (no hotel), then flying to Austin where you have a hotel
+    // Hotel check-in date == flight departure date
+    const items: TripItem[] = [
+      // Flight arriving in NYC
+      makeItem({
+        provider: 'Spirit',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'MIA',
+        end_location: 'EWR',
+        details_json: {
+          departure_airport: 'MIA',
+          arrival_airport: 'EWR',
+          departure_local_time: '06:00',
+          arrival_local_time: '09:30',
+        },
+      }),
+      // Hotel in Austin — check-in same day as flight out of NYC
+      // Location is just the hotel name (no city)
+      makeItem({
+        kind: 'hotel',
+        start_date: '2026-03-13',
+        end_date: '2026-03-14',
+        start_location: 'The Stephen F Austin Royal Sonesta Hotel',
+        summary: 'Hotel booking',
+      }),
+      // Flight from NYC to Austin
+      makeItem({
+        provider: 'Spirit',
+        start_date: '2026-03-13',
+        end_date: '2026-03-13',
+        start_location: 'EWR',
+        end_location: 'AUS',
+        details_json: {
+          departure_airport: 'EWR',
+          arrival_airport: 'AUS',
+          departure_local_time: '09:00',
+          arrival_local_time: '12:15',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segments = timeline.filter((e) => e.type === 'segment')
+
+    // NYC segment should NOT contain the Austin hotel
+    const nycSegment = segments.find((e) => e.segment?.city === 'New York')
+    expect(nycSegment).toBeDefined()
+    expect(nycSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(false)
+
+    // Austin segment should contain the hotel
+    const austinSegment = segments.find((e) => e.segment?.city?.includes('Austin'))
+    expect(austinSegment).toBeDefined()
+    expect(austinSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
+  })
+
+  it('keeps hotel in departure segment when hotel city matches departure city', () => {
+    // Scenario: hotel in NYC with same-day evening flight (rare but valid)
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'LAX',
+        end_location: 'JFK',
+        details_json: {
+          departure_airport: 'LAX',
+          arrival_airport: 'JFK',
+          departure_local_time: '06:00',
+          arrival_local_time: '14:30',
+        },
+      }),
+      // Hotel in NYC — check-in same day as flight out, but hotel IS in NYC
+      makeItem({
+        kind: 'hotel',
+        start_date: '2026-03-12',
+        end_date: '2026-03-13',
+        start_location: 'The Plaza Hotel, New York, NY',
+        summary: 'Hotel in NYC',
+      }),
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-12',
+        end_date: '2026-03-12',
+        start_location: 'JFK',
+        end_location: 'ORD',
+        details_json: {
+          departure_airport: 'JFK',
+          arrival_airport: 'ORD',
+          departure_local_time: '20:00',
+          arrival_local_time: '22:00',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segments = timeline.filter((e) => e.type === 'segment')
+
+    // NYC segment should keep the hotel (it's clearly a NYC hotel)
+    const nycSegment = segments.find((e) => e.segment?.city?.includes('New York'))
+    expect(nycSegment).toBeDefined()
+    expect(nycSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
+  })
+
+  it('works when traveler has no hotels (staying with friends)', () => {
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'CDG',
+        end_location: 'JFK',
+        details_json: {
+          departure_airport: 'CDG',
+          arrival_airport: 'JFK',
+          departure_local_time: '10:00',
+          arrival_local_time: '13:00',
+        },
+      }),
+      // No hotel — staying with friends in NYC
+      // Just an activity
+      makeItem({
+        kind: 'activity',
+        start_date: '2026-03-11',
+        end_date: '2026-03-11',
+        start_location: 'Brooklyn, NY',
+        summary: 'Dinner with friends',
+      }),
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-14',
+        end_date: '2026-03-14',
+        start_location: 'JFK',
+        end_location: 'CDG',
+        details_json: {
+          departure_airport: 'JFK',
+          arrival_airport: 'CDG',
+          departure_local_time: '18:00',
+          arrival_local_time: '07:00',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segments = timeline.filter((e) => e.type === 'segment')
+
+    // Segment should exist with activity-derived city, even without hotel
+    // Brooklyn is a valid city from the activity location
+    const nycSegment = segments.find((e) => e.segment?.city?.includes('Brooklyn'))
+    expect(nycSegment).toBeDefined()
+    expect(nycSegment!.segment!.items).toHaveLength(1) // just the activity
+    expect(nycSegment!.segment!.anchorType).toBe('activity')
+  })
+})
+
+  it('keeps hotel in same metro area as departure (Coconut Grove / MIA)', () => {
+    // Same-day check-in + departure, but hotel is in departure metro area
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'ATL',
+        end_location: 'MIA',
+        details_json: {
+          departure_airport: 'ATL',
+          arrival_airport: 'MIA',
+          departure_local_time: '06:00',
+          arrival_local_time: '09:00',
+        },
+      }),
+      makeItem({
+        kind: 'hotel',
+        start_date: '2026-03-10',
+        end_date: '2026-03-11',
+        start_location: 'Mr. C Hotel, Coconut Grove, FL',
+        summary: 'Hotel in Coconut Grove',
+      }),
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'MIA',
+        end_location: 'LAX',
+        details_json: {
+          departure_airport: 'MIA',
+          arrival_airport: 'LAX',
+          departure_local_time: '22:00',
+          arrival_local_time: '01:00',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segments = timeline.filter((e) => e.type === 'segment')
+
+    // Hotel should stay in the Miami/Coconut Grove segment (same metro)
+    const miaSegment = segments.find((e) =>
+      e.segment?.city?.includes('Coconut Grove') || e.segment?.city?.includes('Miami')
+    )
+    expect(miaSegment).toBeDefined()
+    expect(miaSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
+  })

@@ -2,7 +2,7 @@ import type { TripItem, Json } from '@/types/database'
 import type { WeatherDestination } from '@/lib/weather/types'
 import { weatherCodeToEmoji, type TimelineWeatherDay } from '@/lib/weather/item-weather'
 import { looksLikeVenueName, normaliseToCity } from './assignment'
-import { isSameMetroArea, resolveAirportCity } from './airport-cities'
+import { isSameMetroArea, resolveAirportCity, resolveMetroAlias } from './airport-cities'
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -331,6 +331,76 @@ export function attachWeatherToTimeline(entries: TimelineEntry[], destinations: 
   })
 }
 
+/**
+ * A hotel's start_date is check-in day. If check-in falls on the same day as
+ * an outbound flight, the hotel almost certainly belongs at the destination,
+ * not the departure city (you check in after arriving, not before flying out).
+ *
+ * Exception: if the hotel's location clearly resolves to the departure city,
+ * keep it in the current segment (rare: same-day hotel + evening flight).
+ */
+function reassignDepartureDayHotels(rawSegments: RawSegment[]): void {
+  for (let i = 0; i < rawSegments.length; i++) {
+    const segment = rawSegments[i]
+    if (!segment.outgoing) continue
+    const nextSegment = rawSegments[i + 1]
+    if (!nextSegment) continue
+
+    const departureDate = segment.outgoing.date
+    const departureCity = resolveAirportCity(segment.outgoing.departure.code)
+    const movedIndices: number[] = []
+
+    for (let j = 0; j < segment.items.length; j++) {
+      const item = segment.items[j]
+      if (item.kind !== 'hotel') continue
+      if (item.start_date !== departureDate) continue
+
+      // Try to resolve the hotel's city
+      const hotelLocation = item.start_location ?? item.end_location
+      const hotelCity = hotelLocation ? deriveDisplayLocation(hotelLocation) : null
+
+      if (hotelCity && !looksLikeVenueName(hotelCity)) {
+        // Hotel has a resolvable city — check if it matches the segment's location
+        // Compare against both the departure airport AND the arrival airport
+        // (the segment could be "at" either city)
+        const hotelKey = cityKey(hotelCity)
+        const segmentCities: string[] = []
+        if (departureCity) segmentCities.push(cityKey(departureCity.city))
+        if (segment.incoming) {
+          const arrivalCity = resolveAirportCity(segment.incoming.arrival.code)
+          if (arrivalCity) segmentCities.push(cityKey(arrivalCity.city))
+        }
+
+        // For metro alias matching, use just the city name (strip region like ", FL")
+        const hotelCityName = hotelCity.split(',')[0].trim()
+        const hotelMatchesSegment = segmentCities.some((segKey) => {
+          if (hotelKey === segKey) return true
+          // Metro alias: "Coconut Grove" → "miami", "Miami, FL" → "miami"
+          const segCityName = segKey.replace(/\s+[a-z]{2}$/, '') // strip state codes like " fl"
+          return resolveMetroAlias(hotelCityName) === resolveMetroAlias(segCityName)
+        })
+
+        if (hotelMatchesSegment) {
+          // Hotel is at or near the segment's city — keep it
+          continue
+        }
+      }
+
+      // Hotel is unresolvable or at the destination — move it to the next segment
+      movedIndices.push(j)
+    }
+
+    if (movedIndices.length > 0) {
+      const movedSet = new Set(movedIndices)
+      const movedItems = segment.items.filter((_, idx) => movedSet.has(idx))
+      segment.items = segment.items.filter((_, idx) => !movedSet.has(idx))
+      nextSegment.items.push(...movedItems)
+      // Re-sort to maintain chronological order after insertion
+      nextSegment.items.sort((a, b) => (a.start_date ?? '').localeCompare(b.start_date ?? ''))
+    }
+  }
+}
+
 export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   const processed = firstPass(items)
   const rawSegments: RawSegment[] = []
@@ -355,6 +425,9 @@ export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   if (incoming || currentItems.length > 0) {
     rawSegments.push({ incoming, outgoing: null, items: currentItems })
   }
+
+  // Post-process: move hotels that check in on departure day to the next segment
+  reassignDepartureDayHotels(rawSegments)
 
   const segments = rawSegments.map(buildSegment)
   const timeline: TimelineEntry[] = []
