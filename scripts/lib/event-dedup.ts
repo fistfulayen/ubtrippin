@@ -121,10 +121,11 @@ export function findDuplicate<TExisting extends Pick<
       continue
     }
 
-    // Venue-anchored dedup: same venue + same date + lower title threshold (0.4)
+    // Venue-anchored dedup: same venue + same date + moderate title threshold (0.6)
     // Catches FR/EN translations like "Renoir et l'amour" / "Renoir and Love"
     // and variant titles like "Nan Goldin : This Will Not End Well" / "This Will Not End Well"
-    if (venueMatch && similarity >= 0.4 && candidate.venue_name && existing.venue_name) {
+    // Requires BOTH venue_name fields to be non-empty to avoid false positives
+    if (venueMatch && similarity >= 0.6 && candidate.venue_name && existing.venue_name) {
       if (!best || similarity > best.similarity) {
         best = { existing, similarity }
       }
@@ -155,7 +156,9 @@ export function dedupeCandidates(candidates: DiscoveredEventCandidate[]): {
       continue
     }
 
-    const keepCandidate = informationScore(candidate) > informationScore(match.existing)
+    // At low similarity (venue-anchored matches, < 0.8), always keep existing —
+    // never replace a known-good record based on fuzzy title matching
+    const keepCandidate = match.similarity >= 0.8 && informationScore(candidate) > informationScore(match.existing)
     if (keepCandidate) {
       const index = unique.findIndex((event) => event === match.existing)
       if (index >= 0) unique[index] = candidate

@@ -89,7 +89,7 @@ function buildCandidate(args: {
     source_url: args.sourceUrl,
     image_url: args.imageUrl ?? null,
     price_info: null,
-    booking_url: args.bookingUrl ?? args.sourceUrl,
+    booking_url: args.bookingUrl ?? (isSpecificEventUrl(args.sourceUrl) ? args.sourceUrl : null),
     tags: args.tags ?? [],
     lineup: null,
   }
