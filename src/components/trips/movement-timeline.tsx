@@ -2,7 +2,7 @@
 
 import type { Trip } from '@/types/database'
 import type { TimelineEntry } from '@/lib/trips/city-segments'
-import { getWeatherForDate } from '@/lib/weather/item-weather'
+
 import { CitySegmentBlock } from './city-segment-block'
 import { TransitionCard } from './transition-card'
 
@@ -26,13 +26,11 @@ export function MovementTimeline({
       {entries.map((entry, index) => {
         if (entry.type === 'transition' && entry.transition) {
           const nextSegment = entries.slice(index + 1).find((candidate) => candidate.type === 'segment')?.segment
-          const weather = nextSegment ? getWeatherForDate(nextSegment.weather?.daily, nextSegment.startDate) : null
           return (
             <TransitionCard
               key={`${entry.transition.date}-${entry.transition.departure.code}-${entry.transition.arrival.code}-${index}`}
               journey={entry.transition}
               nextSegmentCity={entry.nextSegmentCity ?? nextSegment?.city ?? entry.transition.arrival.city}
-              weather={weather}
               allTrips={allTrips}
               currentUserId={currentUserId}
               readOnly={readOnly}

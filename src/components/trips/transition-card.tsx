@@ -5,13 +5,12 @@ import { ChevronDown, ChevronUp, Clock, Plane } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Trip } from '@/types/database'
 import type { FlightJourney } from '@/lib/trips/city-segments'
-import type { TimelineWeatherDay } from '@/lib/weather/item-weather'
+
 import { TripItemCard } from './trip-item-card'
 
 interface TransitionCardProps {
   journey: FlightJourney
   nextSegmentCity: string
-  weather?: TimelineWeatherDay | null
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
   currentUserId?: string
   readOnly?: boolean
@@ -26,7 +25,6 @@ function stopLabel(journey: FlightJourney) {
 export function TransitionCard({
   journey,
   nextSegmentCity,
-  weather,
   allTrips,
   currentUserId,
   readOnly = false,
@@ -62,11 +60,6 @@ export function TransitionCard({
             </div>
           </div>
 
-          {weather ? (
-            <div className="rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm">
-              {weather.emoji} {Math.round(weather.high)}° / {Math.round(weather.low)}°
-            </div>
-          ) : null}
         </div>
 
         <button

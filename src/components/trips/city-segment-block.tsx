@@ -3,7 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDate, formatDateRange } from '@/lib/utils'
-import { weatherForItem, type CitySegment } from '@/lib/trips/city-segments'
+import type { CitySegment } from '@/lib/trips/city-segments'
 import type { Trip } from '@/types/database'
 import { TripItemCard } from './trip-item-card'
 
@@ -66,25 +66,15 @@ export function CitySegmentBlock({
           ) : null}
 
           <div className="space-y-3">
-            {segment.items.map((item) => {
-              const itemWeather = weatherForItem(segment, item)
-              return (
+            {segment.items.map((item) => (
                 <TripItemCard
                   key={item.id}
                   item={item}
                   allTrips={allTrips}
                   currentUserId={currentUserId}
                   readOnly={readOnly}
-                  metaChips={
-                    itemWeather ? (
-                      <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                        {itemWeather.emoji} {Math.round(itemWeather.high)}° / {Math.round(itemWeather.low)}°
-                      </span>
-                    ) : null
-                  }
                 />
-              )
-            })}
+            ))}
           </div>
         </div>
       </CardContent>
