@@ -196,10 +196,8 @@ export default async function SharePage({ params }: SharePageProps) {
     )
   }
 
+  // Parallel: auth check runs alongside weather fetch
   const sessionSupabase = await createClient()
-  const {
-    data: { user },
-  } = await sessionSupabase.auth.getUser()
 
   const obfuscatedItems = (items ?? []).map((item) => ({
     ...item,
@@ -209,8 +207,29 @@ export default async function SharePage({ params }: SharePageProps) {
   const travelers = (trip.travelers ?? []).map(obfuscateName)
   const itemCount = obfuscatedItems.length
 
-  let sharedWeather = items
-    ? await buildWeatherPayload({
+  // Start auth check early — don't block on it
+  const userPromise = sessionSupabase.auth.getUser()
+
+  // Build anonymous weather payload while auth resolves
+  const weatherItems = items?.map(
+    (item): WeatherTripItem => ({
+      id: item.id,
+      trip_id: trip.id,
+      kind: item.kind,
+      start_date: item.start_date,
+      end_date: item.end_date,
+      start_ts: item.start_ts,
+      end_ts: item.end_ts,
+      start_location: item.start_location,
+      end_location: item.end_location,
+      provider: item.provider,
+      summary: item.summary,
+      details_json: item.details_json,
+    })
+  )
+
+  const anonWeatherPromise = items
+    ? buildWeatherPayload({
         trip: {
           id: trip.id,
           user_id: '',
@@ -219,34 +238,28 @@ export default async function SharePage({ params }: SharePageProps) {
           end_date: trip.end_date,
           share_enabled: trip.share_enabled ?? false,
         },
-        items: items.map(
-          (item): WeatherTripItem => ({
-            id: item.id,
-            trip_id: trip.id,
-            kind: item.kind,
-            start_date: item.start_date,
-            end_date: item.end_date,
-            start_ts: item.start_ts,
-            end_ts: item.end_ts,
-            start_location: item.start_location,
-            end_location: item.end_location,
-            provider: item.provider,
-            summary: item.summary,
-            details_json: item.details_json,
-          })
-        ),
+        items: weatherItems!,
         unit: 'fahrenheit',
         includePacking: false,
       })
-    : null
+    : Promise.resolve(null)
 
+  // Wait for both in parallel
+  const [{ data: { user } }, anonWeather] = await Promise.all([userPromise, anonWeatherPromise])
+
+  let sharedWeather = anonWeather
   let showPacking = false
+
   if (user) {
-    const { data: accessibleTrip } = await sessionSupabase
-      .from('trips')
-      .select('id, user_id')
-      .eq('id', trip.id)
-      .maybeSingle()
+    // Parallel: trip access check + temperature unit fetch
+    const [{ data: accessibleTrip }, userUnit] = await Promise.all([
+      sessionSupabase
+        .from('trips')
+        .select('id, user_id')
+        .eq('id', trip.id)
+        .maybeSingle(),
+      getTemperatureUnit(user.id, sessionSupabase),
+    ])
 
     if (accessibleTrip) {
       const { data: ownerProfile } = await sessionSupabase
@@ -260,7 +273,7 @@ export default async function SharePage({ params }: SharePageProps) {
         tripId: trip.id,
         supabase: sessionSupabase,
         userId: user.id,
-        requestedUnit: await getTemperatureUnit(user.id, sessionSupabase),
+        requestedUnit: userUnit,
         includePacking: showPacking,
       })
     }

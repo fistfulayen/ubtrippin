@@ -54,46 +54,53 @@ export default async function TripPage({ params }: TripPageProps) {
     }
   }
 
-  const { data: items } = await supabase
-    .from('trip_items')
-    .select('*')
-    .eq('trip_id', id)
-    .order('start_date', { ascending: true })
-    .order('start_ts', { ascending: true })
-
-  // Get all user's trips for move item dialog
-  const { data: allTrips } = user
-    ? await supabase
-        .from('trips')
-        .select('id, title, start_date')
-        .order('start_date', { ascending: false })
-    : { data: null }
-
-  // Fetch collaborators (owner sees all via collab_owner_select RLS policy)
-  const { data: collaborators } = isOwner
-    ? await supabase
-        .from('trip_collaborators')
-        .select('id, user_id, role, invited_email, accepted_at, created_at')
-        .eq('trip_id', id)
-        .order('created_at', { ascending: true })
-    : { data: [] }
+  // Parallel: fetch items, all trips, collaborators, profile, and temp unit simultaneously
+  const [
+    { data: items },
+    { data: allTrips },
+    { data: collaborators },
+    { data: profileData },
+    userUnit,
+  ] = await Promise.all([
+    supabase
+      .from('trip_items')
+      .select('*')
+      .eq('trip_id', id)
+      .order('start_date', { ascending: true })
+      .order('start_ts', { ascending: true }),
+    user
+      ? supabase
+          .from('trips')
+          .select('id, title, start_date')
+          .order('start_date', { ascending: false })
+      : Promise.resolve({ data: null }),
+    isOwner
+      ? supabase
+          .from('trip_collaborators')
+          .select('id, user_id, role, invited_email, accepted_at, created_at')
+          .eq('trip_id', id)
+          .order('created_at', { ascending: true })
+      : Promise.resolve({ data: [] as never[] }),
+    user
+      ? supabase
+          .from('profiles')
+          .select('subscription_tier')
+          .eq('id', user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    user
+      ? getTemperatureUnit(user.id, supabase)
+      : Promise.resolve('fahrenheit' as const),
+  ])
 
   const canEdit = isOwner || collabRole === 'editor'
-
-  const { data: profileData } = user
-    ? await supabase
-        .from('profiles')
-        .select('subscription_tier')
-        .eq('id', user.id)
-        .maybeSingle()
-    : { data: null }
   const isPro = profileData?.subscription_tier === 'pro'
   const weather = user
     ? await getTripWeather({
         tripId: trip.id,
         supabase,
         userId: user.id,
-        requestedUnit: await getTemperatureUnit(user.id, supabase),
+        requestedUnit: userUnit,
         includePacking: isPro,
       })
     : null
