@@ -13,73 +13,68 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const { data: memberships, error } = await auth.supabase
+  // Step 1: Get membership rows (no join — isolate family_members RLS)
+  const { data: memberRows, error: memberError } = await auth.supabase
     .from('family_members')
-    .select('family_id, role, family:families(id, name, created_by, created_at, updated_at)')
+    .select('family_id, role')
     .eq('user_id', auth.userId)
     .not('accepted_at', 'is', null)
 
-  console.log('[v1/families GET] userId:', auth.userId, 'memberships:', JSON.stringify(memberships), 'error:', error)
+  console.log('[v1/families GET] step1 userId:', auth.userId, 'memberRows:', JSON.stringify(memberRows), 'error:', memberError)
 
-  if (error) {
-    console.error('[v1/families GET] membership lookup failed', error)
+  if (memberError) {
+    console.error('[v1/families GET] membership lookup failed', memberError)
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to load families.' } },
       { status: 500 }
     )
   }
 
-  const rows = (memberships ?? []) as Array<{
-    family_id: string
-    role: 'admin' | 'member'
-    family: Array<{
-      id: string
-      name: string
-      created_by: string
-      created_at: string
-      updated_at: string
-    }> | null
-  }>
-
-  const familyIds = rows.map((row) => row.family_id)
-  const memberCountMap = new Map<string, number>()
-
-  if (familyIds.length > 0) {
-    const { data: memberRows, error: countError } = await auth.supabase
-      .from('family_members')
-      .select('family_id')
-      .in('family_id', familyIds)
-      .not('accepted_at', 'is', null)
-
-    if (countError) {
-      console.error('[v1/families GET] member count lookup failed', countError)
-      return NextResponse.json(
-        { error: { code: 'internal_error', message: 'Failed to load families.' } },
-        { status: 500 }
-      )
-    }
-
-    for (const row of memberRows ?? []) {
-      const count = memberCountMap.get(row.family_id as string) ?? 0
-      memberCountMap.set(row.family_id as string, count + 1)
-    }
+  if (!memberRows || memberRows.length === 0) {
+    return NextResponse.json({ data: [] })
   }
 
-  const data = rows
-    .map((row) => {
-      const family = Array.isArray(row.family) ? row.family[0] : row.family
-      if (!family) return null
-      return {
-        id: family.id,
-        name: family.name,
-        created_by: family.created_by,
-        created_at: family.created_at,
-        updated_at: family.updated_at,
-        role: row.role,
-        member_count: memberCountMap.get(row.family_id) ?? 0,
-      }
-    })
-    .filter((row): row is NonNullable<typeof row> => row !== null)
+  const familyIds = memberRows.map((row) => row.family_id)
+  const roleMap = new Map(memberRows.map((row) => [row.family_id, row.role]))
+
+  // Step 2: Get family details (isolate families RLS)
+  const { data: families, error: familyError } = await auth.supabase
+    .from('families')
+    .select('id, name, created_by, created_at, updated_at')
+    .in('id', familyIds)
+
+  console.log('[v1/families GET] step2 families:', JSON.stringify(families), 'error:', familyError)
+
+  if (familyError) {
+    console.error('[v1/families GET] families lookup failed', familyError)
+    return NextResponse.json(
+      { error: { code: 'internal_error', message: 'Failed to load families.' } },
+      { status: 500 }
+    )
+  }
+
+  // Step 3: Get member counts
+  const memberCountMap = new Map<string, number>()
+  const { data: countRows } = await auth.supabase
+    .from('family_members')
+    .select('family_id')
+    .in('family_id', familyIds)
+    .not('accepted_at', 'is', null)
+
+  for (const row of countRows ?? []) {
+    const count = memberCountMap.get(row.family_id as string) ?? 0
+    memberCountMap.set(row.family_id as string, count + 1)
+  }
+
+  const data = (families ?? []).map((family) => ({
+    id: family.id,
+    name: family.name,
+    created_by: family.created_by,
+    created_at: family.created_at,
+    updated_at: family.updated_at,
+    role: roleMap.get(family.id) ?? 'member',
+    member_count: memberCountMap.get(family.id) ?? 0,
+  }))
 
   return NextResponse.json({ data })
 }
