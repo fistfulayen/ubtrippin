@@ -331,6 +331,56 @@ export function attachWeatherToTimeline(entries: TimelineEntry[], destinations: 
   })
 }
 
+/**
+ * A hotel's start_date is check-in day. If check-in falls on the same day as
+ * an outbound flight, the hotel almost certainly belongs at the destination,
+ * not the departure city (you check in after arriving, not before flying out).
+ *
+ * Exception: if the hotel's location clearly resolves to the departure city,
+ * keep it in the current segment (rare: same-day hotel + evening flight).
+ */
+function reassignDepartureDayHotels(rawSegments: RawSegment[]): void {
+  for (let i = 0; i < rawSegments.length; i++) {
+    const segment = rawSegments[i]
+    if (!segment.outgoing) continue
+    const nextSegment = rawSegments[i + 1]
+    if (!nextSegment) continue
+
+    const departureDate = segment.outgoing.date
+    const departureCity = resolveAirportCity(segment.outgoing.departure.code)
+    const movedIndices: number[] = []
+
+    for (let j = 0; j < segment.items.length; j++) {
+      const item = segment.items[j]
+      if (item.kind !== 'hotel') continue
+      if (item.start_date !== departureDate) continue
+
+      // Try to resolve the hotel's city
+      const hotelLocation = item.start_location ?? item.end_location
+      const hotelCity = hotelLocation ? deriveDisplayLocation(hotelLocation) : null
+
+      if (hotelCity && !looksLikeVenueName(hotelCity) && departureCity) {
+        // Hotel has a resolvable city — check if it matches the departure city
+        const hotelKey = cityKey(hotelCity)
+        const depKey = cityKey(departureCity.city)
+        if (hotelKey === depKey || hotelKey.startsWith(depKey) || depKey.startsWith(hotelKey)) {
+          // Hotel is at the departure city (same-day checkout scenario?) — keep it
+          continue
+        }
+      }
+
+      // Hotel is unresolvable or at the destination — move it to the next segment
+      movedIndices.push(j)
+    }
+
+    if (movedIndices.length > 0) {
+      const movedItems = movedIndices.map((idx) => segment.items[idx])
+      segment.items = segment.items.filter((_, idx) => !movedIndices.includes(idx))
+      nextSegment.items.unshift(...movedItems)
+    }
+  }
+}
+
 export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   const processed = firstPass(items)
   const rawSegments: RawSegment[] = []
@@ -355,6 +405,9 @@ export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   if (incoming || currentItems.length > 0) {
     rawSegments.push({ incoming, outgoing: null, items: currentItems })
   }
+
+  // Post-process: move hotels that check in on departure day to the next segment
+  reassignDepartureDayHotels(rawSegments)
 
   const segments = rawSegments.map(buildSegment)
   const timeline: TimelineEntry[] = []
