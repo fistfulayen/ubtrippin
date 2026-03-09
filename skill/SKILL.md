@@ -588,6 +588,57 @@ View and accept trip collaboration invite links.
 
 ---
 
+### City Events & Exhibitions (Public)
+
+Discover curated events, exhibitions, festivals, and performances by city — no auth required. Rate-limited to prevent abuse.
+
+#### Get City Events
+```
+GET /api/v1/events?city=paris
+GET /api/v1/events?city=paris&from=2026-04-01&to=2026-04-07
+GET /api/v1/events?city=paris&tier=major&category=art
+```
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| city | string | ✅ | City slug (e.g. `paris`, `new-york`, `tokyo`) |
+| from | string | — | Start date filter: `YYYY-MM-DD` |
+| to | string | — | End date filter: `YYYY-MM-DD` |
+| tier | string | — | `major`, `medium`, or `local` |
+| category | string | — | `art`, `music`, `theater`, `food`, `festival`, `sports`, `architecture`, `sacred`, `market`, `other` |
+
+**Response:**
+```json
+{
+  "city": { "slug": "paris", "name": "Paris", "country": "France" },
+  "events": [
+    {
+      "id": "uuid",
+      "title": "Monet at Musée d'Orsay",
+      "tier": "major",
+      "category": "art",
+      "venue": "Musée d'Orsay",
+      "start_date": "2026-03-01",
+      "end_date": "2026-06-30",
+      "description": "A major retrospective of Monet's water lily series.",
+      "source_url": null
+    }
+  ],
+  "segments": [
+    { "label": "Major Events", "events": [...] }
+  ]
+}
+```
+
+**Notes:**
+- No authentication required (public endpoint)
+- Rate-limited: 10 requests/minute per IP
+- Events are curated by the UB Trippin editorial pipeline — not real-time scraped
+
+---
+
 ### City Guides
 
 #### List Guides
