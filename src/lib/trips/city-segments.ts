@@ -285,6 +285,11 @@ function matchesWeatherCity(segmentCity: string, weatherCity: string): boolean {
   const right = cityKey(weatherCity)
   if (left === right || left.startsWith(right) || right.startsWith(left)) return true
 
+  // Metro aliases: "Newark" → "New York", "Surfside" → "Miami", etc.
+  const leftMetro = resolveMetroAlias(segmentCity)
+  const rightMetro = resolveMetroAlias(weatherCity)
+  if (leftMetro === rightMetro) return true
+
   // Weather extraction may return airport codes (e.g. "EWR") while segments
   // resolve to city names (e.g. "New York"). Try resolving the weather city
   // as an airport code and comparing.
