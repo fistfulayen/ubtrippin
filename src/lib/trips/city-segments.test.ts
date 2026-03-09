@@ -391,3 +391,52 @@ describe('hotel segment assignment', () => {
     expect(nycSegment!.segment!.anchorType).toBe('activity')
   })
 })
+
+  it('keeps hotel in same metro area as departure (Coconut Grove / MIA)', () => {
+    // Same-day check-in + departure, but hotel is in departure metro area
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'ATL',
+        end_location: 'MIA',
+        details_json: {
+          departure_airport: 'ATL',
+          arrival_airport: 'MIA',
+          departure_local_time: '06:00',
+          arrival_local_time: '09:00',
+        },
+      }),
+      makeItem({
+        kind: 'hotel',
+        start_date: '2026-03-10',
+        end_date: '2026-03-11',
+        start_location: 'Mr. C Hotel, Coconut Grove, FL',
+        summary: 'Hotel in Coconut Grove',
+      }),
+      makeItem({
+        provider: 'Delta',
+        start_date: '2026-03-10',
+        end_date: '2026-03-10',
+        start_location: 'MIA',
+        end_location: 'LAX',
+        details_json: {
+          departure_airport: 'MIA',
+          arrival_airport: 'LAX',
+          departure_local_time: '22:00',
+          arrival_local_time: '01:00',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segments = timeline.filter((e) => e.type === 'segment')
+
+    // Hotel should stay in the Miami/Coconut Grove segment (same metro)
+    const miaSegment = segments.find((e) =>
+      e.segment?.city?.includes('Coconut Grove') || e.segment?.city?.includes('Miami')
+    )
+    expect(miaSegment).toBeDefined()
+    expect(miaSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
+  })

@@ -2,7 +2,7 @@ import type { TripItem, Json } from '@/types/database'
 import type { WeatherDestination } from '@/lib/weather/types'
 import { weatherCodeToEmoji, type TimelineWeatherDay } from '@/lib/weather/item-weather'
 import { looksLikeVenueName, normaliseToCity } from './assignment'
-import { isSameMetroArea, resolveAirportCity } from './airport-cities'
+import { isSameMetroArea, resolveAirportCity, resolveMetroAlias } from './airport-cities'
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -359,12 +359,29 @@ function reassignDepartureDayHotels(rawSegments: RawSegment[]): void {
       const hotelLocation = item.start_location ?? item.end_location
       const hotelCity = hotelLocation ? deriveDisplayLocation(hotelLocation) : null
 
-      if (hotelCity && !looksLikeVenueName(hotelCity) && departureCity) {
-        // Hotel has a resolvable city — check if it matches the departure city
+      if (hotelCity && !looksLikeVenueName(hotelCity)) {
+        // Hotel has a resolvable city — check if it matches the segment's location
+        // Compare against both the departure airport AND the arrival airport
+        // (the segment could be "at" either city)
         const hotelKey = cityKey(hotelCity)
-        const depKey = cityKey(departureCity.city)
-        if (hotelKey === depKey || hotelKey.startsWith(depKey) || depKey.startsWith(hotelKey)) {
-          // Hotel is at the departure city (same-day checkout scenario?) — keep it
+        const segmentCities: string[] = []
+        if (departureCity) segmentCities.push(cityKey(departureCity.city))
+        if (segment.incoming) {
+          const arrivalCity = resolveAirportCity(segment.incoming.arrival.code)
+          if (arrivalCity) segmentCities.push(cityKey(arrivalCity.city))
+        }
+
+        // For metro alias matching, use just the city name (strip region like ", FL")
+        const hotelCityName = hotelCity.split(',')[0].trim()
+        const hotelMatchesSegment = segmentCities.some((segKey) => {
+          if (hotelKey === segKey || hotelKey.startsWith(segKey) || segKey.startsWith(hotelKey)) return true
+          // Metro alias: "Coconut Grove" → "miami", "Miami, FL" → "miami"
+          const segCityName = segKey.replace(/\s+[a-z]{2}$/, '') // strip state codes like " fl"
+          return resolveMetroAlias(hotelCityName) === resolveMetroAlias(segCityName)
+        })
+
+        if (hotelMatchesSegment) {
+          // Hotel is at or near the segment's city — keep it
           continue
         }
       }
