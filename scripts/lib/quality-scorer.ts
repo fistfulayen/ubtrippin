@@ -210,6 +210,79 @@ export async function scoreEventQuality(args: {
   }
 }
 
+export async function extractEventsFromPage(args: {
+  city: PipelineCity
+  sourceUrl: string
+  sourceName: string
+  pageText: string
+  maxEvents?: number
+}): Promise<Array<Partial<DiscoveredEventCandidate> & { isEvent: boolean }>> {
+  const maxEvents = args.maxEvents ?? 20
+  const truncated = args.pageText.slice(0, 12_000)
+  const today = new Date().toISOString().slice(0, 10)
+
+  if (truncated.length < 50) return []
+
+  try {
+    const result = await generateJson<{
+      events: Array<{
+        title: string
+        start_date: string
+        end_date?: string | null
+        venue_name?: string | null
+        time_info?: string | null
+        category?: string
+        description?: string | null
+        booking_url?: string | null
+        price_info?: string | null
+        lineup?: string[] | null
+      }>
+    }>([
+      {
+        role: 'system',
+        content: `You extract individual events from a web page about events in ${args.city.city}, ${args.city.country}.
+
+For each event, return: title, start_date (YYYY-MM-DD), end_date, venue_name, time_info, category (art|music|theater|food|festival|sports|architecture|sacred|market|other), description (1-2 sentences), booking_url, price_info, lineup (array of performer names for music).
+
+Rules:
+- Extract INDIVIDUAL events, not article summaries
+- Dates must be actual event dates (YYYY-MM-DD), NOT article publication dates
+- Only include events with dates on or after ${today}
+- If a date is ambiguous or missing, skip that event
+- Maximum ${maxEvents} events per page
+- If the page is not about specific events, return empty array
+
+Return JSON: { "events": [...] }`,
+      },
+      {
+        role: 'user',
+        content: truncated,
+      },
+    ])
+
+    return (result.events ?? []).slice(0, maxEvents).map((e) => ({
+      isEvent: true,
+      title: e.title,
+      start_date: e.start_date,
+      end_date: e.end_date ?? undefined,
+      venue_name: e.venue_name ?? null,
+      time_info: e.time_info ?? null,
+      category: (e.category as DiscoveredEventCandidate['category']) ?? 'other',
+      description: e.description ?? null,
+      booking_url: e.booking_url ?? args.sourceUrl,
+      price_info: e.price_info ?? null,
+      lineup: (e.lineup ?? []).map((name) => (typeof name === 'string' ? { name } : name)),
+      source: args.sourceName,
+      source_url: args.sourceUrl,
+      tags: [],
+      image_url: null,
+      venue_type: null,
+    }))
+  } catch {
+    return []
+  }
+}
+
 export async function extractEventFromText(args: {
   city: PipelineCity
   sourceName: string
