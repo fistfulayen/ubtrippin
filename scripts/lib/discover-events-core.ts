@@ -3,7 +3,9 @@ import { addDays } from 'date-fns'
 import { buildSearchQueries, searchBraveWeb } from './brave-search'
 import { choosePreferredEvent, dedupeCandidates, findDuplicate } from './event-dedup'
 import { adaptSearchPlan, getPreviousDiary, type DiaryRowLike } from './pipeline-diary'
-import { draftDiaryFromAi, extractEventFromText, scoreEventQuality } from './quality-scorer'
+import { extractArtistName, scoreArtistWithCrate } from './crate-scorer'
+import { fetchPageContent } from './page-fetcher'
+import { draftDiaryFromAi, extractEventFromText, extractEventsFromPage, scoreEventQuality } from './quality-scorer'
 import { fetchFeedItems } from './rss-fetcher'
 import { buildSourceUpdate, shouldSkipSource } from './source-tracker'
 import type {
@@ -161,33 +163,71 @@ async function sourceToCandidatesFromSearch(args: {
   const candidates: DiscoveredEventCandidate[] = []
 
   for (const result of results) {
-    const extracted = await extractEventFromText({
-      city: args.city,
-      sourceName: args.sourceName,
-      sourceUrl: result.url,
-      text: [result.title, result.description].join('\n'),
-      fallbackDate: extractFallbackDate(result),
-    })
+    // Deep extraction: fetch the actual page and extract multiple events
+    const page = await fetchPageContent(result.url)
 
-    const title = clampText(extracted.title ?? result.title, 200)
-    const startDate = parseDateText(extracted.start_date) ?? extractFallbackDate(result)
-    if (!extracted.isEvent || !title || !startDate) continue
+    if (page.ok && page.text.length > 200) {
+      const pageEvents = await extractEventsFromPage({
+        city: args.city,
+        sourceUrl: result.url,
+        sourceName: args.sourceName,
+        pageText: page.text,
+      })
 
-    candidates.push(
-      buildCandidate({
+      for (const extracted of pageEvents) {
+        const title = clampText(extracted.title ?? null, 200)
+        const startDate = parseDateText(extracted.start_date)
+        if (!title || !startDate) continue
+
+        // Only future events
+        if (startDate < new Date().toISOString().slice(0, 10)) continue
+
+        candidates.push(
+          buildCandidate({
+            city: args.city,
+            sourceName: args.sourceName,
+            sourceUrl: extracted.booking_url ?? result.url,
+            title,
+            description: extracted.description ?? result.description,
+            startDate,
+            endDate: parseDateText(extracted.end_date),
+            bookingUrl: extracted.booking_url ?? result.url,
+            imageUrl: extracted.image_url ?? null,
+            venueName: extracted.venue_name ?? null,
+            tags: extracted.tags ?? [],
+          })
+        )
+      }
+    } else {
+      // Fallback: single-event extraction from snippet
+      const extracted = await extractEventFromText({
         city: args.city,
         sourceName: args.sourceName,
         sourceUrl: result.url,
-        title,
-        description: extracted.description ?? result.description,
-        startDate,
-        endDate: parseDateText(extracted.end_date),
-        bookingUrl: extracted.booking_url ?? result.url,
-        imageUrl: extracted.image_url ?? null,
-        venueName: extracted.venue_name ?? null,
-        tags: extracted.tags ?? [],
+        text: [result.title, result.description].join('\n'),
+        fallbackDate: extractFallbackDate(result),
       })
-    )
+
+      const title = clampText(extracted.title ?? result.title, 200)
+      const startDate = parseDateText(extracted.start_date) ?? extractFallbackDate(result)
+      if (!extracted.isEvent || !title || !startDate) continue
+
+      candidates.push(
+        buildCandidate({
+          city: args.city,
+          sourceName: args.sourceName,
+          sourceUrl: result.url,
+          title,
+          description: extracted.description ?? result.description,
+          startDate,
+          endDate: parseDateText(extracted.end_date),
+          bookingUrl: extracted.booking_url ?? result.url,
+          imageUrl: extracted.image_url ?? null,
+          venueName: extracted.venue_name ?? null,
+          tags: extracted.tags ?? [],
+        })
+      )
+    }
   }
 
   return candidates
@@ -424,6 +464,38 @@ export async function runCityDiscovery(args: {
   }
 
   const { accepted, rejected } = applyQualityThreshold(scored)
+
+  // Crate music scoring: for music/festival events, research the artist and override score
+  for (const entry of accepted) {
+    const cat = entry.candidate.category
+    if (cat === 'music' || cat === 'festival') {
+      const lineup = Array.isArray(entry.candidate.lineup)
+        ? entry.candidate.lineup.map((l) => (typeof l === 'string' ? l : l.name))
+        : undefined
+      const artistName = extractArtistName(entry.candidate.title, lineup)
+      if (artistName) {
+        try {
+          const crate = await scoreArtistWithCrate({ artistName })
+          if (crate.crateScore > 0) {
+            entry.score = crate.crateScore
+            entry.tier = crate.crateScore >= 80 ? 'major' : crate.crateScore >= 60 ? 'medium' : 'local'
+            // Replace existing crate tags to prevent duplicates on re-processing
+            const baseTags = (entry.candidate.tags ?? []).filter(
+              (t) => !t.startsWith('reviewed:') && !t.startsWith('lastfm:')
+            )
+            entry.candidate.tags = [
+              ...baseTags,
+              ...crate.sources.map((s) => `reviewed:${s}`),
+              `lastfm:${crate.listenerCount}`,
+            ]
+          }
+        } catch {
+          // Crate scoring failed — keep existing AI score
+        }
+      }
+    }
+  }
+
   const rowsToInsert = accepted.map(({ candidate, score, tier }) => ({
     city_id: args.city.id,
     venue_id: resolveVenue(candidate, venues)?.id ?? null,
