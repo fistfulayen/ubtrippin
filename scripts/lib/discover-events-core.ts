@@ -89,10 +89,20 @@ function buildCandidate(args: {
     source_url: args.sourceUrl,
     image_url: args.imageUrl ?? null,
     price_info: null,
-    booking_url: args.bookingUrl ?? args.sourceUrl,
+    booking_url: args.bookingUrl ?? (isSpecificEventUrl(args.sourceUrl) ? args.sourceUrl : null),
     tags: args.tags ?? [],
     lineup: null,
   }
+}
+
+/** Reject generic search/listing page URLs — only keep URLs that look like specific event pages */
+function isSpecificEventUrl(url: string | null | undefined): boolean {
+  if (!url || !/^https?:\/\//i.test(url)) return false
+  // Reject known search/listing patterns
+  if (/songkick\.com\/metro-areas/i.test(url)) return false
+  if (/eventbrite\.com\/d\//i.test(url)) return false  // Eventbrite search pages
+  if (/\/search\?/i.test(url)) return false
+  return true
 }
 
 function sourceDuration(startedAt: number): number {
@@ -182,16 +192,25 @@ async function sourceToCandidatesFromSearch(args: {
         // Only future events
         if (startDate < new Date().toISOString().slice(0, 10)) continue
 
+        // Reject generic/article titles
+        const titleLower = title.toLowerCase()
+        if (/^\s*(concert|exhibition|event|show)\s*$/i.test(title)) continue
+        if (/\b(must-see|best of|top \d|guide to|what to do|things to do)\b/i.test(titleLower)) continue
+
+        // Strip source suffixes from titles (e.g. "Dream Nation 2026 | Music Festival Wizard")
+        const cleanTitle = title.replace(/\s*\|.*$/, '').trim()
+        if (!cleanTitle) continue
+
         candidates.push(
           buildCandidate({
             city: args.city,
             sourceName: args.sourceName,
             sourceUrl: extracted.booking_url ?? result.url,
-            title,
+            title: cleanTitle,
             description: extracted.description ?? result.description,
             startDate,
             endDate: parseDateText(extracted.end_date),
-            bookingUrl: extracted.booking_url ?? result.url,
+            bookingUrl: isSpecificEventUrl(extracted.booking_url) ? extracted.booking_url : (isSpecificEventUrl(result.url) ? result.url : null),
             imageUrl: extracted.image_url ?? null,
             venueName: extracted.venue_name ?? null,
             tags: extracted.tags ?? [],
@@ -208,9 +227,15 @@ async function sourceToCandidatesFromSearch(args: {
         fallbackDate: extractFallbackDate(result),
       })
 
-      const title = clampText(extracted.title ?? result.title, 200)
+      const rawTitle = clampText(extracted.title ?? result.title, 200)
       const startDate = parseDateText(extracted.start_date) ?? extractFallbackDate(result)
-      if (!extracted.isEvent || !title || !startDate) continue
+      if (!extracted.isEvent || !rawTitle || !startDate) continue
+
+      // Same proactive filters as deep extraction
+      if (/^\s*(concert|exhibition|event|show)\s*$/i.test(rawTitle)) continue
+      if (/\b(must-see|best of|top \d|guide to|what to do|things to do)\b/i.test(rawTitle.toLowerCase())) continue
+      const title = rawTitle.replace(/\s*\|.*$/, '').trim()
+      if (!title) continue
 
       candidates.push(
         buildCandidate({
@@ -221,7 +246,7 @@ async function sourceToCandidatesFromSearch(args: {
           description: extracted.description ?? result.description,
           startDate,
           endDate: parseDateText(extracted.end_date),
-          bookingUrl: extracted.booking_url ?? result.url,
+          bookingUrl: isSpecificEventUrl(extracted.booking_url) ? extracted.booking_url : (isSpecificEventUrl(result.url) ? result.url : null),
           imageUrl: extracted.image_url ?? null,
           venueName: extracted.venue_name ?? null,
           tags: extracted.tags ?? [],
