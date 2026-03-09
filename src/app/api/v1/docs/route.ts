@@ -431,7 +431,8 @@ Discover curated events, exhibitions, festivals, and performances by city. No au
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | /api/v1/events | Get events for a city |
+| GET | /api/v1/events | Get events for a city (public, no auth) |
+| POST | /api/v1/events/refresh | Trigger pipeline refresh for a city (admin only) |
 
 ### Query Parameters
 
@@ -468,6 +469,25 @@ GET /api/v1/events?city=paris&from=2026-04-01&to=2026-04-07
 \`\`\`
 
 Rate limit: 10 req/min per IP (no auth required).
+
+### POST /api/v1/events/refresh (Admin Only)
+
+Triggers an asynchronous event re-discovery run for a given city. Returns 202 immediately; pipeline runs in background.
+
+\`\`\`
+POST /api/v1/events/refresh
+Authorization: Bearer ubt_k1_abc123...
+Content-Type: application/json
+
+{ "citySlug": "paris" }
+
+202 Accepted
+{ "ok": true, "queued": true, "citySlug": "paris" }
+\`\`\`
+
+**Errors:** 400 (invalid slug), 403 (not in admin allowlist), 500 (misconfigured / launch failed).
+
+Admin allowlist is set via the \`EVENT_PIPELINE_ADMIN_EMAILS\` environment variable (comma-separated).
 
 ---
 
