@@ -79,7 +79,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [type, setType] = useState<FeedbackType>('general')
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageFiles, setImageFiles] = useState<File[]>([])
 
   const visibleItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -114,15 +114,15 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
     setSaving(true)
     setError(null)
 
-    if (imageFile) {
-      const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
-      if (!allowedTypes.has(imageFile.type)) {
-        setError('Image must be JPG, PNG, or WebP.')
+    const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+    for (const file of imageFiles) {
+      if (!allowedTypes.has(file.type)) {
+        setError('Images must be JPG, PNG, WebP, or GIF. SVG is not allowed.')
         setSaving(false)
         return
       }
-      if (imageFile.size > 5 * 1024 * 1024) {
-        setError('Image must be 5MB or smaller.')
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Each image must be 5MB or smaller.')
         setSaving(false)
         return
       }
@@ -133,8 +133,8 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
     formData.append('body', trimmedBody)
     formData.append('type', type)
     formData.append('page_url', typeof window !== 'undefined' ? window.location.pathname : '')
-    if (imageFile) {
-      formData.append('image', imageFile)
+    for (const file of imageFiles) {
+      formData.append('image', file)
     }
 
     let data: Omit<FeedbackBoardItem, 'author_name' | 'comment_count' | 'voted_by_me'> | null = null
@@ -175,7 +175,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
     setTitle('')
     setBody('')
     setType('general')
-    setImageFile(null)
+    setImageFiles([])
     setOpen(false)
     setSaving(false)
     showToast('Thanks! We read every piece of feedback.')
@@ -429,18 +429,60 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700" htmlFor="feedback-image">
-                Screenshot (optional)
+                Screenshots (optional)
               </label>
-              <Input
-                id="feedback-image"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(event) => {
-                  const file = event.target.files?.[0] ?? null
-                  setImageFile(file)
+              <div
+                className="rounded-md border-2 border-dashed border-gray-200 p-3 text-center text-sm text-gray-500 transition-colors hover:border-gray-300 focus-within:border-blue-400"
+                onPaste={(e) => {
+                  const items = e.clipboardData.items
+                  const newFiles: File[] = []
+                  for (const item of items) {
+                    if (item.type.startsWith('image/') && item.type !== 'image/svg+xml') {
+                      const file = item.getAsFile()
+                      if (file) newFiles.push(file)
+                    }
+                  }
+                  if (newFiles.length > 0) {
+                    e.preventDefault()
+                    setImageFiles((prev) => [...prev, ...newFiles].slice(0, 3))
+                  }
                 }}
-              />
-              <p className="text-xs text-gray-500">Max 1 image, 5MB, JPG/PNG/WebP.</p>
+                tabIndex={0}
+              >
+                <Input
+                  id="feedback-image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  className="mb-2"
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? [])
+                    setImageFiles((prev) => [...prev, ...files].slice(0, 3))
+                    event.target.value = ''
+                  }}
+                />
+                <p className="text-xs text-gray-400">Or paste from clipboard (⌘V / Ctrl+V). Max 3 images, 5MB each.</p>
+              </div>
+              {imageFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {imageFiles.map((file, i) => (
+                    <div key={`${file.name}-${i}`} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Screenshot ${i + 1}`}
+                        className="h-16 w-16 rounded border border-gray-200 object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setImageFiles((prev) => prev.filter((_, j) => j !== i))}
+                        className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] text-white opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}

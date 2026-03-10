@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
+const MAX_IMAGES = 3
 
 function normalizeFeedbackType(value: unknown): 'bug' | 'feature' | 'general' {
   if (value === 'bug' || value === 'feature' || value === 'general') return value
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   const body = (formData.get('body') as string | null)?.trim() ?? ''
   const type = normalizeFeedbackType(formData.get('type'))
   const pageUrl = (formData.get('page_url') as string | null)?.trim() || null
-  const maybeImage = formData.get('image')
+  const imageEntries = formData.getAll('image')
 
   if (!title || !body) {
     return NextResponse.json({ error: 'Title and details are required.' }, { status: 400 })
@@ -49,38 +50,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Too many submissions. Please try again later.' }, { status: 429 })
   }
 
-  let imageUrl: string | null = null
-  let imagePath: string | null = null
+  // Process up to MAX_IMAGES images
+  const imageFiles = imageEntries
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0)
+    .slice(0, MAX_IMAGES)
 
-  if (maybeImage instanceof File && maybeImage.size > 0) {
-    if (maybeImage.size > MAX_IMAGE_BYTES) {
-      return NextResponse.json({ error: 'Image must be 5MB or smaller.' }, { status: 400 })
+  const uploadedUrls: string[] = []
+  const uploadedPaths: string[] = []
+
+  for (const file of imageFiles) {
+    if (file.size > MAX_IMAGE_BYTES) {
+      return NextResponse.json({ error: 'Each image must be 5MB or smaller.' }, { status: 400 })
+    }
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      return NextResponse.json({ error: 'Images must be JPG, PNG, WebP, or GIF.' }, { status: 400 })
     }
 
-    if (!ALLOWED_IMAGE_TYPES.has(maybeImage.type)) {
-      return NextResponse.json({ error: 'Image must be JPG, PNG, or WebP.' }, { status: 400 })
-    }
-
-    const ext = extensionFromMimeType(maybeImage.type)
-    imagePath = `${user.id}/${crypto.randomUUID()}.${ext}`
+    const ext = extensionFromMimeType(file.type)
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`
 
     const { error: uploadError } = await supabase.storage
       .from('feedback-images')
-      .upload(imagePath, maybeImage, {
-        contentType: maybeImage.type,
-        upsert: false,
-      })
+      .upload(path, file, { contentType: file.type, upsert: false })
 
     if (uploadError) {
+      // Clean up any already-uploaded images
+      if (uploadedPaths.length > 0) {
+        await supabase.storage.from('feedback-images').remove(uploadedPaths)
+      }
       return NextResponse.json({ error: 'Could not upload image.' }, { status: 500 })
     }
 
+    uploadedPaths.push(path)
     const { data: publicUrlData } = supabase.storage
       .from('feedback-images')
-      .getPublicUrl(imagePath)
-
-    imageUrl = publicUrlData.publicUrl
+      .getPublicUrl(path)
+    uploadedUrls.push(publicUrlData.publicUrl)
   }
+
+  // Store first image in image_url for backward compatibility
+  const imageUrl = uploadedUrls[0] ?? null
 
   const { data, error: insertError } = await supabase
     .from('feedback')
@@ -96,8 +105,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError || !data) {
-    if (imagePath) {
-      await supabase.storage.from('feedback-images').remove([imagePath])
+    if (uploadedPaths.length > 0) {
+      await supabase.storage.from('feedback-images').remove(uploadedPaths)
     }
     return NextResponse.json({ error: 'Unable to submit feedback right now.' }, { status: 500 })
   }
