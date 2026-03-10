@@ -36,8 +36,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased">
+    <html lang="en" style={{ overflowX: 'hidden' }}>
+      <body className="font-sans antialiased overflow-x-hidden">
         {children}
         <Analytics />
         <ServiceWorkerRegistration />

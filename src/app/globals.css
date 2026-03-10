@@ -16,6 +16,10 @@
   --color-slate-800: oklch(0.279 0.029 260.03);
 }
 
+html {
+  overflow-x: hidden;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #1e293b;

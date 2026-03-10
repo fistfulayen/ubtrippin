@@ -20,6 +20,7 @@ interface FlightData {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     destination: {
       code: string
@@ -27,6 +28,7 @@ interface FlightData {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     scheduled_departure: string | null
     estimated_departure: string | null
@@ -109,6 +111,7 @@ export default async function FlightPage({ params }: FlightPageProps) {
           originCity={flight.origin.city}
           destinationCity={flight.destination.city}
           date={date}
+          aircraftType={flight.aircraft_type}
         />
         
         <div className="mt-8 space-y-6">

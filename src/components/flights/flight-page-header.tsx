@@ -6,6 +6,7 @@ interface FlightPageHeaderProps {
   originCity: string | null
   destinationCity: string | null
   date: string
+  aircraftType: string | null
 }
 
 export function FlightPageHeader({
@@ -14,6 +15,7 @@ export function FlightPageHeader({
   originCity,
   destinationCity,
   date,
+  aircraftType,
 }: FlightPageHeaderProps) {
   const formattedDate = new Date(date).toLocaleDateString('en-US', {
     weekday: 'long',
@@ -40,6 +42,10 @@ export function FlightPageHeader({
       </p>
       
       <p className="text-slate-500">{formattedDate}</p>
+      
+      {aircraftType && (
+        <p className="text-slate-400 text-sm mt-1">Aircraft: {aircraftType}</p>
+      )}
     </div>
   )
 }
