@@ -1,7 +1,4 @@
-'use client'
-
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Clock, Plane } from 'lucide-react'
+import { Clock, Plane } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Trip } from '@/types/database'
 import type { FlightJourney } from '@/lib/trips/city-segments'
@@ -29,8 +26,6 @@ export function TransitionCard({
   currentUserId,
   readOnly = false,
 }: TransitionCardProps) {
-  const [expanded, setExpanded] = useState(false)
-
   return (
     <Card className="border-dashed border-sky-200 bg-sky-50/70">
       <CardContent className="p-4">
@@ -62,28 +57,18 @@ export function TransitionCard({
 
         </div>
 
-        <button
-          type="button"
-          onClick={() => setExpanded((value) => !value)}
-          className="mt-4 flex items-center gap-1 text-sm font-medium text-sky-700 hover:text-sky-800"
-        >
-          {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          More info
-        </button>
-
-        {expanded ? (
-          <div className="mt-4 space-y-3">
-            {journey.legs.map((leg) => (
-              <TripItemCard
-                key={leg.id}
-                item={leg}
-                allTrips={allTrips}
-                currentUserId={currentUserId}
-                readOnly={readOnly}
-              />
-            ))}
-          </div>
-        ) : null}
+        <div className="mt-4 space-y-3">
+          {journey.legs.map((leg) => (
+            <TripItemCard
+              key={leg.id}
+              item={leg}
+              allTrips={allTrips}
+              currentUserId={currentUserId}
+              readOnly={readOnly}
+              defaultExpanded
+            />
+          ))}
+        </div>
       </CardContent>
     </Card>
   )
