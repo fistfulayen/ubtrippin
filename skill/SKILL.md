@@ -846,6 +846,24 @@ Lists recent delivery attempts with status codes.
 
 ---
 
+### Live Flight Status (Public)
+
+#### Flight Status
+```
+GET /api/v1/flights/:ident/:date/live
+```
+
+No authentication required. Returns live flight status including gate, terminal, delay, aircraft type, and times in UTC with timezone identifiers for local conversion.
+
+| Param | Type | Description |
+|-------|------|-------------|
+| ident | string | IATA flight identifier, e.g. `NK2893`, `B0301` |
+| date | string | Flight date: `YYYY-MM-DD` |
+
+Rate limit: 60 req/min per IP. Cached for 5 minutes.
+
+---
+
 ### Trains
 
 #### Train Status
