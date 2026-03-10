@@ -314,6 +314,7 @@ export async function runCityDiscovery(args: {
   if (venuesError) throw new Error(`Failed to load venues for ${args.city.slug}: ${venuesError.message}`)
   if (diariesError) throw new Error(`Failed to load diaries for ${args.city.slug}: ${diariesError.message}`)
 
+
   const sources = (sourcesData ?? []) as PipelineSource[]
   const venues = (venuesData ?? []) as PipelineVenue[]
   const previousDiary = getPreviousDiary((diariesData ?? []) as DiaryRowLike[], runDate)
