@@ -32,6 +32,8 @@ interface FeedbackBoardProps {
   initialItems: FeedbackBoardItem[]
   currentUserId: string
   currentUserName: string | null
+  avgResponseHours?: number | null
+  shippedCount?: number
 }
 
 type SortMode = 'votes' | 'newest'
@@ -52,7 +54,15 @@ const TYPE_FILTERS: Array<{ value: 'all' | FeedbackType; label: string }> = [
   { value: 'general', label: 'General' },
 ]
 
-export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: FeedbackBoardProps) {
+function formatResponseTime(hours: number): string {
+  if (hours < 1) return `${Math.round(hours * 60)}m`
+  if (hours < 24) return `${Math.round(hours)}h`
+  const days = hours / 24
+  if (days < 1.5) return '1 day'
+  return `${Math.round(days)} days`
+}
+
+export function FeedbackBoard({ initialItems, currentUserId, currentUserName, avgResponseHours, shippedCount }: FeedbackBoardProps) {
   const router = useRouter()
   const supabase = createClient()
 
@@ -228,6 +238,12 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName }: 
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Feedback</h1>
           <p className="text-gray-600">Share ideas, vote, and track what ships next.</p>
+          {avgResponseHours != null && shippedCount != null && shippedCount > 0 && (
+            <p className="mt-1 text-sm text-emerald-700">
+              ⚡ Avg. response time: <span className="font-semibold">{formatResponseTime(avgResponseHours)}</span>
+              <span className="text-gray-400"> · {shippedCount} shipped</span>
+            </p>
+          )}
         </div>
         <Button onClick={() => setOpen(true)}>
           <MessageSquarePlus className="mr-2 h-4 w-4" />
