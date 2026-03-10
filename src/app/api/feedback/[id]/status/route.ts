@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isFeedbackAdminEmail } from '@/lib/admin'
 import { createClient } from '@/lib/supabase/server'
 import { isValidUUID } from '@/lib/validation'
 
@@ -43,6 +44,10 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  if (!isFeedbackAdminEmail(user.email)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   const payload = (await request.json().catch(() => null)) as { status?: unknown } | null
   const status = typeof payload?.status === 'string' ? payload.status : ''
   if (!FEEDBACK_STATUSES.has(status)) {
@@ -59,10 +64,6 @@ export async function PATCH(
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  if (existing.user_id !== user.id) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   let nextImageUrl = existing.image_url
 
   if (existing.status !== 'shipped' && status === 'shipped' && existing.image_url) {
@@ -77,7 +78,6 @@ export async function PATCH(
     .from('feedback')
     .update({ status, image_url: nextImageUrl })
     .eq('id', id)
-    .eq('user_id', user.id)
     .select('id, user_id, type, title, body, image_url, status, votes, created_at, updated_at')
     .single()
 

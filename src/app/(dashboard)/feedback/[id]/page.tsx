@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { isFeedbackAdminEmail } from '@/lib/admin'
 import { FeedbackDetail } from '@/components/feedback/feedback-detail'
 import type { Feedback, FeedbackComment } from '@/types/database'
 import type { FeedbackBoardItem, FeedbackCommentItem } from '@/components/feedback/feedback-utils'
@@ -75,13 +76,15 @@ export default async function FeedbackDetailPage({ params }: FeedbackDetailPageP
     author_name: nameByUserId.get(comment.user_id) ?? null,
   }))
 
+  const canManageStatus = isFeedbackAdminEmail(user.email)
+
   return (
     <FeedbackDetail
       feedback={detail}
       comments={commentItems}
       currentUserId={user.id}
       currentUserName={nameByUserId.get(user.id) ?? null}
-      canManageStatus={user.id === feedback.user_id}
+      canManageStatus={canManageStatus}
     />
   )
 }

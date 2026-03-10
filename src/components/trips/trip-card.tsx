@@ -84,9 +84,21 @@ function hasFlightWithin48Hours(items?: TripItem[]): boolean {
   return false
 }
 
+export function getTripCardPlaceholderLabel(trip: Pick<Trip, 'primary_location' | 'title'>): string {
+  const location = trip.primary_location?.trim()
+  if (location) return location
+
+  const title = trip.title.trim()
+  if (!title) return 'Your next trip'
+
+  const parts = title.split('→').map((part) => part.trim()).filter(Boolean)
+  return parts.at(-1) ?? title
+}
+
 export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {
   const airlineLogos = getProviderLogos(trip.trip_items)
   const showStatusSummary = hasFlightWithin48Hours(trip.trip_items)
+  const placeholderLabel = getTripCardPlaceholderLabel(trip)
 
   return (
     <Link href={`/trips/${trip.id}`}>
@@ -97,7 +109,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
         )}
       >
         {/* Cover image */}
-        <div className="relative h-36 w-full bg-gradient-to-br from-[#f1f5f9] to-[#ffffff]">
+        <div className="relative h-36 w-full overflow-hidden bg-gradient-to-br from-[#eef2ff] via-[#e0e7ff] to-[#f8fafc]">
           {trip.cover_image_url && (
             <Image
               src={trip.cover_image_url}
@@ -107,6 +119,35 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
               sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               unoptimized
             />
+          )}
+          {!trip.cover_image_url && (
+            <>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.95),_transparent_55%)]" />
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(79,70,229,0.18),transparent_45%,rgba(15,23,42,0.08))]" />
+              <div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/60 blur-2xl" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/75 to-transparent" />
+              <div className="absolute inset-0 flex flex-col justify-between p-4">
+                <div className="flex justify-end">
+                  <span className="inline-flex items-center rounded-full border border-white/70 bg-white/75 px-2.5 py-1 text-[11px] font-medium text-indigo-700 shadow-sm backdrop-blur">
+                    No cover photo
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <div className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{placeholderLabel}</span>
+                  </div>
+                  <div>
+                    <p className="line-clamp-1 text-lg font-semibold tracking-tight text-slate-900">
+                      {placeholderLabel}
+                    </p>
+                    <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-600">
+                      {trip.is_demo ? 'Sample itinerary' : 'Trip overview'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
           {/* Provider logos */}
           {airlineLogos.length > 0 && (
