@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   const subscriptionTier = profile?.subscription_tier
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#ffffff]/50 to-[#f1f5f9]/30">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-b from-[#ffffff]/50 to-[#f1f5f9]/30">
       <DashboardNav user={user} profile={profile} />
       <UpgradeBanner subscriptionTier={subscriptionTier} />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
