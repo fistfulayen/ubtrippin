@@ -116,10 +116,27 @@ export function getLocalTimes(
     || (details.check_out_time as string) 
     || formatTime(item.end_ts)
   
-  return [startTime || '', endTime || '']
+  return [formatLocalTime(startTime) || '', formatLocalTime(endTime) || '']
 }
 
 /** Format a date-only string as "Mar 24" (short month + day, no year/weekday) */
+/**
+ * Format a time string (HH:MM or HH:MM:SS) using the browser's locale preference
+ * for 12h vs 24h display. Falls back to the original string if parsing fails.
+ * Only works client-side — server renders should pass raw times to client components.
+ */
+export function formatLocalTime(timeStr: string | null | undefined): string {
+  if (!timeStr) return ''
+  const parts = timeStr.split(':').map(Number)
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return timeStr
+  const date = new Date(2000, 0, 1, parts[0], parts[1])
+  try {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  } catch {
+    return timeStr
+  }
+}
+
 export function formatShortDate(date: string | null | undefined): string {
   if (!date) return ''
   const d = new Date(date + 'T00:00:00')
