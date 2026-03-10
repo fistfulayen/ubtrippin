@@ -91,8 +91,8 @@ export function getTripCardPlaceholderLabel(trip: Pick<Trip, 'primary_location' 
   const title = trip.title.trim()
   if (!title) return 'Your next trip'
 
-  const parts = title.split('→').map((part) => part.trim()).filter(Boolean)
-  return parts.at(-1) ?? title
+  const parts = title.split('→');
+  return (parts.length > 1 && parts.at(-1)!.trim()) || title;
 }
 
 export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {

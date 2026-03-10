@@ -7,9 +7,18 @@ function parseAdminEmails(raw: string | undefined): Set<string> {
   )
 }
 
-export function getConfiguredAdminEmails(primaryEnvVar: string, fallbackEnvVar = 'ADMIN_EMAILS'): Set<string> {
-  return parseAdminEmails(process.env[primaryEnvVar] ?? process.env[fallbackEnvVar])
-}
+export const getConfiguredAdminEmails = (() => {
+  const cache = new Map<string, Set<string>>();
+  return (primaryEnvVar: string, fallbackEnvVar = 'ADMIN_EMAILS'): Set<string> => {
+    const cacheKey = `${primaryEnvVar}|${fallbackEnvVar}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
+    const emails = parseAdminEmails(process.env[primaryEnvVar] ?? process.env[fallbackEnvVar]);
+    cache.set(cacheKey, emails);
+    return emails;
+  };
+})();
 
 export function isConfiguredAdminEmail(
   email: string | null | undefined,
