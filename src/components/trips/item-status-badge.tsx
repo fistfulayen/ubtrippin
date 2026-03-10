@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 import { RefreshCw } from 'lucide-react'
 
@@ -174,8 +174,27 @@ export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusU
     return () => clearInterval(timer)
   }, [loadStatus])
 
+  // Auto-refresh when there's no cached status — this creates the initial
+  // FlightAware lookup. Without this, the badge never appears because
+  // there's no cached row yet and the refresh button isn't visible.
+  const hasTriggeredAutoRefresh = useRef(false)
+  useEffect(() => {
+    if (!loading && !status && !hasTriggeredAutoRefresh.current) {
+      hasTriggeredAutoRefresh.current = true
+      void refreshStatus()
+    }
+  }, [loading, status, refreshStatus])
+
   // Don't show badge until we have actual status data from FlightAware
-  // (FlightAware only allows queries within 48h of departure)
+  if (loading || refreshing) {
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
+        <RefreshCw className="h-3 w-3 animate-spin" />
+        Checking flight status…
+      </div>
+    )
+  }
+
   if (!status || status.status === 'unknown') {
     return null
   }
