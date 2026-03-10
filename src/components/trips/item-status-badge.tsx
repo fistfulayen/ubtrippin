@@ -177,13 +177,17 @@ export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusU
   // Auto-refresh when there's no cached status — this creates the initial
   // FlightAware lookup. Without this, the badge never appears because
   // there's no cached row yet and the refresh button isn't visible.
+  // Auto-refresh when no real status exists (null or 'unknown').
+  // The GET /status endpoint returns { status: 'unknown' } when there's no
+  // cached row — that's truthy, so we must check the inner status field.
   const hasTriggeredAutoRefresh = useRef(false)
+  const needsRefresh = !status || status.status === 'unknown'
   useEffect(() => {
-    if (!loading && !status && !hasTriggeredAutoRefresh.current) {
+    if (!loading && needsRefresh && !hasTriggeredAutoRefresh.current) {
       hasTriggeredAutoRefresh.current = true
       void refreshStatus()
     }
-  }, [loading, status, refreshStatus])
+  }, [loading, needsRefresh, refreshStatus])
 
   // Don't show badge until we have actual status data from FlightAware
   if (loading || refreshing) {
