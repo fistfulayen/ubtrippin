@@ -79,6 +79,7 @@ function formatTimeInZone(isoString: string | null, timezone: string | null): st
   if (!isoString) return null
   try {
     const date = new Date(isoString)
+    if (isNaN(date.getTime())) return null
     const options: Intl.DateTimeFormatOptions = { 
       hour: 'numeric', 
       minute: '2-digit',

@@ -98,15 +98,10 @@ function calculateDelayMinutes(flight: Record<string, unknown>): number | null {
   }
 }
 
-/** Convert ICAO code to IATA display code. US airports: KMIA → MIA. Others: pass through or use code_iata. */
+/** Return IATA code if available, otherwise ICAO as-is. No heuristic stripping. */
 function toDisplayCode(icao: string | null, iata: string | null): string {
   if (iata) return iata
-  if (!icao) return ''
-  // US ICAO codes start with K + 3 letter IATA code
-  if (icao.length === 4 && icao.startsWith('K')) {
-    return icao.slice(1)
-  }
-  return icao
+  return icao ?? ''
 }
 
 function mapFlightStatus(
