@@ -354,7 +354,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
                 <span>{item.votes}</span>
               </button>
 
-              <div className="min-w-0 flex-1 space-y-3">
+              <div className="min-w-0 flex-1 space-y-3 overflow-hidden">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-semibold text-gray-900 break-words">{item.title}</h3>
                   <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', TYPE_BADGE_CLASS[item.type])}>
