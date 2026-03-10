@@ -164,15 +164,9 @@ export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusU
     if (status && onStatusUpdate) onStatusUpdate(status)
   }, [status, onStatusUpdate])
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        void loadStatus()
-      }
-    }, 2 * 60 * 1000)
-
-    return () => clearInterval(timer)
-  }, [loadStatus])
+  // No automatic polling — data refreshes only on page load or manual refresh.
+  // Background FlightAware calls are eliminated; the refresh endpoint returns
+  // cached data if checked within the last 5 minutes.
 
   // Auto-refresh when there's no cached status — this creates the initial
   // FlightAware lookup. Without this, the badge never appears because
