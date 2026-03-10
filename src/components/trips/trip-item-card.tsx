@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { getLocalTimes, formatShortDate, cn } from '@/lib/utils'
+import { getLocalTimes, formatShortDate, formatLocalTime, cn } from '@/lib/utils'
 import {
   Plane,
   Building,
@@ -332,8 +332,8 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                     return (
                       <span className="flex items-center gap-1">
                         <Clock className="h-3.5 w-3.5" />
-                        {item.start_date && formatShortDate(item.start_date)}{ci && `, ${ci}`}
-                        {item.end_date && ` → ${formatShortDate(item.end_date)}`}{co && `, ${co}`}
+                        {item.start_date && formatShortDate(item.start_date)}{ci && `, ${formatLocalTime(ci)}`}
+                        {item.end_date && ` → ${formatShortDate(item.end_date)}`}{co && `, ${formatLocalTime(co)}`}
                       </span>
                     )
                   }

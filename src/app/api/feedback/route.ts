@@ -38,6 +38,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Title and details are required.' }, { status: 400 })
   }
 
+  // Rate limiting: max 5 submissions per user per hour
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const { count: recentCount } = await supabase
+    .from('feedback')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .gte('created_at', oneHourAgo)
+  if (recentCount !== null && recentCount >= 5) {
+    return NextResponse.json({ error: 'Too many submissions. Please try again later.' }, { status: 429 })
+  }
+
   let imageUrl: string | null = null
   let imagePath: string | null = null
 
@@ -91,5 +102,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unable to submit feedback right now.' }, { status: 500 })
   }
 
-  return NextResponse.json({ data })
+  // Auto-upvote: creator's own feedback starts with their vote
+  await supabase.from('feedback_votes').insert({ feedback_id: data.id, user_id: user.id })
+  // Update vote count to reflect the auto-vote
+  await supabase.from('feedback').update({ votes: 1 }).eq('id', data.id)
+
+  return NextResponse.json({ data: { ...data, votes: 1 } })
 }

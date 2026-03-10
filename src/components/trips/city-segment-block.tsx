@@ -39,7 +39,9 @@ export function CitySegmentBlock({
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">City stay</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                {segment.isReturnHome ? 'Heading Home' : 'City stay'}
+              </p>
               <h3 className="mt-1 text-2xl font-semibold text-slate-950">
                 {flagEmoji(segment.countryCode)} {segment.city.toUpperCase()}
               </h3>
@@ -59,7 +61,7 @@ export function CitySegmentBlock({
             })()}
           </div>
 
-          {!hasHotel ? (
+          {!hasHotel && !segment.isReturnHome ? (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
               No accommodation details
             </div>

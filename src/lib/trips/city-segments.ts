@@ -32,6 +32,7 @@ export interface CitySegment {
   durationNights: number
   anchorType: 'hotel' | 'airport' | 'activity'
   items: TripItem[]
+  isReturnHome?: boolean
   weather?: {
     daily: TimelineWeatherDay[]
   }
@@ -459,6 +460,17 @@ export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   while (segmentIndex < segments.length) {
     timeline.push({ type: 'segment', segment: segments[segmentIndex] })
     segmentIndex += 1
+  }
+
+  // Detect round trips: if the last segment's city matches the first segment's city,
+  // mark it as "return home" so the UI shows "Heading Home" instead of "City Stay"
+  const allSegments = timeline.filter((entry) => entry.type === 'segment')
+  if (allSegments.length >= 2) {
+    const first = allSegments[0].segment
+    const last = allSegments[allSegments.length - 1].segment
+    if (first && last && first.city.toLowerCase() === last.city.toLowerCase()) {
+      last.isReturnHome = true
+    }
   }
 
   return timeline
