@@ -111,6 +111,7 @@ export default async function FlightPage({ params }: FlightPageProps) {
           originCity={flight.origin.city}
           destinationCity={flight.destination.city}
           date={date}
+          aircraftType={flight.aircraft_type}
         />
         
         <div className="mt-8 space-y-6">
