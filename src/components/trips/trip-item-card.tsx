@@ -36,6 +36,7 @@ import {
   Clock,
   Hash,
   Pencil,
+  Share2,
 } from 'lucide-react'
 import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -170,6 +171,23 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
     // Regenerate trip name in the background (fire-and-forget)
     fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
     router.refresh()
+  }
+
+  const handleShareFlight = async () => {
+    if (item.kind !== 'flight' || !details) return
+    
+    const flightDetails = details as FlightDetails
+    const flightNumber = flightDetails.flight_number
+    if (!flightNumber || !item.start_date) return
+    
+    const url = `https://www.ubtrippin.xyz/flights/${flightNumber}/${item.start_date}`
+    
+    try {
+      await navigator.clipboard.writeText(url)
+      // Could show a toast here, but keeping it simple
+    } catch {
+      // Ignore copy errors
+    }
   }
 
   const handleMove = async () => {
@@ -411,6 +429,19 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                     title="No source email for this item"
                   >
                     <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
+
+                {/* Share button for flights */}
+                {item.kind === 'flight' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={handleShareFlight}
+                    title="Share flight link"
+                  >
+                    <Share2 className="h-4 w-4" />
                   </Button>
                 )}
 
