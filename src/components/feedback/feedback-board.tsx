@@ -233,7 +233,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
   }
 
   return (
-    <div className="space-y-6 overflow-x-hidden">
+    <div className="space-y-6 overflow-x-hidden max-w-full">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Feedback</h1>
@@ -288,7 +288,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-gray-500">Sort:</span>
           <button
             type="button"
@@ -356,7 +356,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
 
               <div className="min-w-0 flex-1 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-semibold text-gray-900">{item.title}</h3>
+                  <h3 className="text-base font-semibold text-gray-900 break-words">{item.title}</h3>
                   <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', TYPE_BADGE_CLASS[item.type])}>
                     {TYPE_LABELS[item.type]}
                   </span>
@@ -365,7 +365,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
                   </span>
                 </div>
 
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 break-words">
                   {item.body.length > 100 ? `${item.body.slice(0, 100)}...` : item.body}
                 </p>
 
