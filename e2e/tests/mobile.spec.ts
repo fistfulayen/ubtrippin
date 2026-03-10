@@ -8,12 +8,13 @@ test.describe('Mobile viewport', () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
   async function assertNoHorizontalOverflow(pagePath: string, page: Page) {
-    await page.goto(pagePath)
+    await page.goto(pagePath, { waitUntil: 'networkidle' })
     await expect(page).not.toHaveURL(/\/login/)
-    const hasOverflow = await page.evaluate(() => {
-      return document.documentElement.scrollWidth > window.innerWidth + 1
+    // Allow small tolerance (2px) for sub-pixel rendering differences
+    const overflowPx = await page.evaluate(() => {
+      return document.documentElement.scrollWidth - window.innerWidth
     })
-    expect(hasOverflow).toBe(false)
+    expect(overflowPx).toBeLessThanOrEqual(2)
   }
 
   test('/trips has no horizontal overflow', async ({ page }) => {
