@@ -56,6 +56,8 @@ interface TripItemCardProps {
   currentUserId?: string
   readOnly?: boolean
   metaChips?: ReactNode
+  /** Start with details expanded (used for flight cards in transition view) */
+  defaultExpanded?: boolean
 }
 
 function loyaltyChip(loyaltyFlag: unknown): { text: string; className: string } | null {
@@ -137,9 +139,9 @@ function isWithin48Hours(item: { start_ts?: string | null; start_date?: string |
   return now >= dep - h48 && now <= endTime
 }
 
-export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, metaChips }: TripItemCardProps) {
+export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, metaChips, defaultExpanded }: TripItemCardProps) {
   const router = useRouter()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [liveStatus, setLiveStatus] = useState<StatusPayload | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
