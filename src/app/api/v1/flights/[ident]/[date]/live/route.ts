@@ -98,6 +98,17 @@ function calculateDelayMinutes(flight: Record<string, unknown>): number | null {
   }
 }
 
+/** Convert ICAO code to IATA display code. US airports: KMIA → MIA. Others: pass through or use code_iata. */
+function toDisplayCode(icao: string | null, iata: string | null): string {
+  if (iata) return iata
+  if (!icao) return ''
+  // US ICAO codes start with K + 3 letter IATA code
+  if (icao.length === 4 && icao.startsWith('K')) {
+    return icao.slice(1)
+  }
+  return icao
+}
+
 function mapFlightStatus(
   flight: Record<string, unknown>,
   delayMinutes: number | null
@@ -130,6 +141,7 @@ interface FlightApiResponse {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     destination: {
       code: string
@@ -137,6 +149,7 @@ interface FlightApiResponse {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     scheduled_departure: string | null
     estimated_departure: string | null
@@ -191,21 +204,23 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
 
     return {
       flight: {
-        ident: asString(first.ident) ?? ident,
+        ident: asString(first.ident_iata) ?? asString(first.ident) ?? ident,
         airline: asString(first.operator) ?? asString(first.operator_iata) ?? null,
         origin: {
-          code: asString(origin?.code) ?? '',
+          code: toDisplayCode(asString(origin?.code), asString(origin?.code_iata)),
           city: asString(origin?.city) ?? null,
-          name: asString(origin?.airport_name) ?? null,
+          name: asString(origin?.airport_name) ?? asString(origin?.name) ?? null,
           gate: asString(first.gate_origin) ?? null,
           terminal: asString(first.terminal_origin) ?? null,
+          timezone: asString(origin?.timezone) ?? null,
         },
         destination: {
-          code: asString(destination?.code) ?? '',
+          code: toDisplayCode(asString(destination?.code), asString(destination?.code_iata)),
           city: asString(destination?.city) ?? null,
-          name: asString(destination?.airport_name) ?? null,
+          name: asString(destination?.airport_name) ?? asString(destination?.name) ?? null,
           gate: asString(first.gate_destination) ?? null,
           terminal: asString(first.terminal_destination) ?? null,
+          timezone: asString(destination?.timezone) ?? null,
         },
         scheduled_departure: toIsoOrNull(first.scheduled_out),
         estimated_departure: toIsoOrNull(first.estimated_out) ?? toIsoOrNull(first.estimated_off),

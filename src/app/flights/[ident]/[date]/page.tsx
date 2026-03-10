@@ -20,6 +20,7 @@ interface FlightData {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     destination: {
       code: string
@@ -27,6 +28,7 @@ interface FlightData {
       name: string | null
       gate: string | null
       terminal: string | null
+      timezone: string | null
     }
     scheduled_departure: string | null
     estimated_departure: string | null

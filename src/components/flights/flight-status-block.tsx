@@ -1,4 +1,4 @@
-import { cn, formatTime } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 const STATUS_META: Record<string, { label: string; toneClass: string; message: string }> = {
   on_time: { 
@@ -57,6 +57,7 @@ interface FlightStatusBlockProps {
     name: string | null
     gate: string | null
     terminal: string | null
+    timezone: string | null
   }
   destination: {
     code: string
@@ -64,6 +65,7 @@ interface FlightStatusBlockProps {
     name: string | null
     gate: string | null
     terminal: string | null
+    timezone: string | null
   }
   scheduledDeparture: string | null
   estimatedDeparture: string | null
@@ -73,15 +75,19 @@ interface FlightStatusBlockProps {
   actualArrival: string | null
 }
 
-function formatTimeOnly(isoString: string | null): string | null {
+function formatTimeInZone(isoString: string | null, timezone: string | null): string | null {
   if (!isoString) return null
   try {
     const date = new Date(isoString)
-    return date.toLocaleTimeString('en-US', { 
+    const options: Intl.DateTimeFormatOptions = { 
       hour: 'numeric', 
       minute: '2-digit',
-      hour12: true 
-    })
+      hour12: true,
+    }
+    if (timezone) {
+      options.timeZone = timezone
+    }
+    return date.toLocaleTimeString('en-US', options)
   } catch {
     return null
   }
@@ -101,12 +107,15 @@ export function FlightStatusBlock({
 }: FlightStatusBlockProps) {
   const meta = STATUS_META[status] ?? STATUS_META.unknown
   
-  const depScheduled = formatTimeOnly(scheduledDeparture)
-  const depEstimated = formatTimeOnly(estimatedDeparture)
-  const depActual = formatTimeOnly(actualDeparture)
-  const arrScheduled = formatTimeOnly(scheduledArrival)
-  const arrEstimated = formatTimeOnly(estimatedArrival)
-  const arrActual = formatTimeOnly(actualArrival)
+  // Departure times in ORIGIN timezone, arrival times in DESTINATION timezone
+  const depTz = origin.timezone
+  const arrTz = destination.timezone
+  const depScheduled = formatTimeInZone(scheduledDeparture, depTz)
+  const depEstimated = formatTimeInZone(estimatedDeparture, depTz)
+  const depActual = formatTimeInZone(actualDeparture, depTz)
+  const arrScheduled = formatTimeInZone(scheduledArrival, arrTz)
+  const arrEstimated = formatTimeInZone(estimatedArrival, arrTz)
+  const arrActual = formatTimeInZone(actualArrival, arrTz)
 
   // Determine what time to show
   const depDisplay = depActual ?? depEstimated ?? depScheduled
