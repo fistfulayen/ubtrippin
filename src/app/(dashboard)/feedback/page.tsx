@@ -72,11 +72,23 @@ export default async function FeedbackPage() {
     voted_by_me: votedFeedbackIds.has(item.id),
   }))
 
+  // Compute average time-to-address for shipped feedback
+  const shippedItems = feedback.filter((f) => f.status === 'shipped' && f.updated_at && f.created_at)
+  let avgResponseHours: number | null = null
+  if (shippedItems.length > 0) {
+    const totalMs = shippedItems.reduce((sum, f) => {
+      return sum + (new Date(f.updated_at!).getTime() - new Date(f.created_at).getTime())
+    }, 0)
+    avgResponseHours = totalMs / shippedItems.length / (1000 * 60 * 60)
+  }
+
   return (
     <FeedbackBoard
       initialItems={items}
       currentUserId={user.id}
       currentUserName={nameByUserId.get(user.id) ?? null}
+      avgResponseHours={avgResponseHours}
+      shippedCount={shippedItems.length}
     />
   )
 }
