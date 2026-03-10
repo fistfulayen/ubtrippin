@@ -145,6 +145,9 @@ export async function POST(
   if (existingStatus?.last_checked_at) {
     const checkedAt = new Date(existingStatus.last_checked_at as string).getTime()
     if (!Number.isNaN(checkedAt) && Date.now() - checkedAt < STALENESS_MS) {
+      const cachedStatus = normalizeStatusRow(itemId, existingStatus as Record<string, unknown>)
+      // Strip raw_response — internal FA payload, never sent to clients
+      delete cachedStatus.raw_response
       return NextResponse.json({
         data: {
           item: {
@@ -158,7 +161,7 @@ export async function POST(
             end_ts: flightItem.end_ts,
             flight_number: extractFlightIdentFromDetails(flightItem.details_json),
           },
-          status: normalizeStatusRow(itemId, existingStatus as Record<string, unknown>),
+          status: cachedStatus,
         },
         meta: {
           cached: true,
@@ -246,6 +249,10 @@ export async function POST(
     }
   }
 
+  const freshStatus = normalizeStatusRow(itemId, savedStatus as Record<string, unknown>)
+  // Strip raw_response — internal FA payload, never sent to clients
+  delete freshStatus.raw_response
+
   return NextResponse.json({
     data: {
       item: {
@@ -259,7 +266,7 @@ export async function POST(
         end_ts: flightItem.end_ts,
         flight_number: extractFlightIdentFromDetails(flightItem.details_json),
       },
-      status: normalizeStatusRow(itemId, savedStatus as Record<string, unknown>),
+      status: freshStatus,
     },
     meta: {
       subscription_tier: isPro ? 'pro' : 'free',
