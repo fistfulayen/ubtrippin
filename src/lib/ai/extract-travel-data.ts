@@ -128,6 +128,15 @@ export async function extractTravelData(
 
     const result = JSON.parse(jsonMatch[0]) as ExtractionResult
 
+    // Basic output validation: reject unexpected top-level fields
+    const allowedTopFields = new Set(['doc_type', 'overall_confidence', 'items'])
+    for (const key of Object.keys(result)) {
+      if (!allowedTopFields.has(key)) {
+        console.warn(`[extract-travel-data] Unexpected field in AI response: ${key} — stripping`)
+        delete (result as unknown as Record<string, unknown>)[key]
+      }
+    }
+
     // Validate and normalize the result
     const context: DateNormalizationContext = {
       referenceDate: startOfUtcDay(new Date()),
