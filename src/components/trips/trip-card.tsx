@@ -1,9 +1,13 @@
+'use client'
+
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
-import { MapPin, Calendar, AlertCircle, User } from 'lucide-react'
+import { MapPin, Calendar, AlertCircle, User, Loader2 } from 'lucide-react'
 import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -99,13 +103,25 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
   const airlineLogos = getProviderLogos(trip.trip_items)
   const showStatusSummary = hasFlightWithin48Hours(trip.trip_items)
   const placeholderLabel = getTripCardPlaceholderLabel(trip)
+  const router = useRouter()
+  const [navigating, setNavigating] = useState(false)
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      setNavigating(true)
+      router.push(`/trips/${trip.id}`)
+    },
+    [router, trip.id]
+  )
 
   return (
-    <Link href={`/trips/${trip.id}`}>
+    <Link href={`/trips/${trip.id}`} onClick={handleClick}>
       <Card
         className={cn(
           'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:border-[#cbd5e1]',
-          isPast && 'opacity-75'
+          isPast && 'opacity-75',
+          navigating && 'ring-2 ring-indigo-400 shadow-md'
         )}
       >
         {/* Cover image */}
@@ -148,6 +164,15 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
                 </div>
               </div>
             </>
+          )}
+          {/* Loading overlay */}
+          {navigating && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 backdrop-blur-sm transition-opacity">
+              <div className="flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 shadow-sm">
+                <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                <span className="text-sm font-medium text-indigo-600">Loading trip…</span>
+              </div>
+            </div>
           )}
           {/* Provider logos */}
           {airlineLogos.length > 0 && (
