@@ -85,7 +85,14 @@ function formatTimeInZone(isoString: string | null, timezone: string | null): st
       hour12: true,
     }
     if (timezone) {
-      options.timeZone = timezone
+      // Validate timezone before use — invalid IANA string throws RangeError
+      try {
+        Intl.DateTimeFormat('en-US', { timeZone: timezone })
+        options.timeZone = timezone
+      } catch {
+        // Invalid timezone from FlightAware — fall back to UTC rather than blank
+        options.timeZone = 'UTC'
+      }
     }
     return date.toLocaleTimeString('en-US', options)
   } catch {
