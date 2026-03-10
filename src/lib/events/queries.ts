@@ -109,11 +109,13 @@ function toEvent(row: EventRow): CityEvent {
 
 function sortEvents(events: CityEvent[]): CityEvent[] {
   return [...events].sort((left, right) => {
+    // Chronological first — tonight to future
+    const dateDelta = left.start_date.localeCompare(right.start_date)
+    if (dateDelta !== 0) return dateDelta
+    // Within same date: tier then score
     const tierDelta = tierOrder[left.event_tier] - tierOrder[right.event_tier]
     if (tierDelta !== 0) return tierDelta
-    const scoreDelta = right.significance_score - left.significance_score
-    if (scoreDelta !== 0) return scoreDelta
-    return left.start_date.localeCompare(right.start_date)
+    return right.significance_score - left.significance_score
   })
 }
 
