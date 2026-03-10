@@ -425,6 +425,29 @@ Authorization: Bearer ubt_k1_abc123...
 
 ---
 
+## Live Flight Status (Public)
+
+Track any flight in real-time. No auth required. Designed for sharing.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/flights/:ident/:date/live | Live flight status with gate, terminal, delay, aircraft type |
+
+### Parameters
+
+| Param | Type | Description |
+|-------|------|-------------|
+| ident | string | IATA flight identifier, e.g. \`NK2893\`, \`B0301\` |
+| date | string | Flight date: \`YYYY-MM-DD\` |
+
+### Response
+
+Returns origin/destination with IATA codes, local timezone, gate, terminal, scheduled/estimated/actual times, delay minutes, aircraft type, and status. Times are UTC — use the included \`timezone\` fields to convert to local airport time.
+
+Rate limit: 60 requests/minute per IP. Data cached for 5 minutes.
+
+---
+
 ## City Events & Exhibitions (Public)
 
 Discover curated events, exhibitions, festivals, and performances by city. No auth required.
