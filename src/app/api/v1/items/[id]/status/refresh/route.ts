@@ -13,6 +13,7 @@ import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const FREE_DAILY_REFRESH_LIMIT = 3
+const STALENESS_MS = 5 * 60 * 1000 // 5 minutes — don't call FlightAware if data is fresher
 
 interface FlightItemRow {
   id: string
@@ -136,9 +137,39 @@ export async function POST(
 
   const { data: existingStatus } = await auth.supabase
     .from('trip_item_status')
-    .select('status, previous_status, status_changed_at')
+    .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
     .eq('item_id', itemId)
     .maybeSingle()
+
+  // Return cached data if checked within the last 5 minutes — avoid unnecessary FA API calls
+  if (existingStatus?.last_checked_at) {
+    const checkedAt = new Date(existingStatus.last_checked_at as string).getTime()
+    if (!Number.isNaN(checkedAt) && Date.now() - checkedAt < STALENESS_MS) {
+      return NextResponse.json({
+        data: {
+          item: {
+            id: flightItem.id,
+            trip_id: flightItem.trip_id,
+            provider: flightItem.provider,
+            summary: flightItem.summary,
+            start_date: flightItem.start_date,
+            end_date: flightItem.end_date,
+            start_ts: flightItem.start_ts,
+            end_ts: flightItem.end_ts,
+            flight_number: extractFlightIdentFromDetails(flightItem.details_json),
+          },
+          status: normalizeStatusRow(itemId, existingStatus as Record<string, unknown>),
+        },
+        meta: {
+          cached: true,
+          last_checked_at: existingStatus.last_checked_at,
+          subscription_tier: isPro ? 'pro' : 'free',
+          refreshes_today: isPro ? null : usedToday,
+          remaining_today: isPro ? null : Math.max(0, FREE_DAILY_REFRESH_LIMIT - usedToday),
+        },
+      })
+    }
+  }
 
   const latest = await getFlightStatus(lookup.ident, lookup.date)
   if (!latest) {
