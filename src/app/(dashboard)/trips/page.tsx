@@ -62,8 +62,11 @@ export default async function TripsPage() {
     .from('tracked_cities')
     .select('city, slug')
   const citySlugMap = new Map<string, string>()
+  const SAFE_SLUG = /^[a-z0-9-]+$/
   for (const tc of trackedCities ?? []) {
-    citySlugMap.set(tc.city.toLowerCase(), tc.slug)
+    if (SAFE_SLUG.test(tc.slug)) {
+      citySlugMap.set(tc.city.toLowerCase(), tc.slug)
+    }
   }
 
   const ownerIds = Array.from(
