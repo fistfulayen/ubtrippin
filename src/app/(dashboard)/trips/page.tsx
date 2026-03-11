@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
+import { normaliseToCity } from '@/lib/trips/assignment'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
@@ -56,6 +57,15 @@ export default async function TripsPage() {
     trips = refreshedTrips ?? []
   }
 
+  // Build a city→slug map for "What's on" links on trip cards
+  const { data: trackedCities } = await supabase
+    .from('tracked_cities')
+    .select('city, slug')
+  const citySlugMap = new Map<string, string>()
+  for (const tc of trackedCities ?? []) {
+    citySlugMap.set(tc.city.toLowerCase(), tc.slug)
+  }
+
   const ownerIds = Array.from(
     new Set((trips ?? []).map((trip) => trip.user_id).filter((ownerId) => ownerId && ownerId !== user?.id))
   )
@@ -106,6 +116,12 @@ export default async function TripsPage() {
   // Show first-trip celebration banner once, until dismissed
   const showFirstTripBanner = hasTrips && profile && !profile.onboarding_completed
   const firstTrip = trips?.[0]
+
+  function getEventsSlug(trip: { primary_location?: string | null }): string | undefined {
+    if (!trip.primary_location) return undefined
+    const city = normaliseToCity(trip.primary_location).toLowerCase()
+    return citySlugMap.get(city)
+  }
 
   return (
     <div className="space-y-8">
@@ -165,6 +181,7 @@ export default async function TripsPage() {
                         !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
                       }
                       ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
+                      eventsSlug={getEventsSlug(trip)}
                     />
                   )
                 })}
@@ -190,6 +207,7 @@ export default async function TripsPage() {
                         !shared && (trip.trip_items?.some((item: { needs_review: boolean }) => item.needs_review) ?? false)
                       }
                       ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
+                      eventsSlug={getEventsSlug(trip)}
                     />
                   )
                 })}
@@ -214,6 +232,7 @@ export default async function TripsPage() {
                       needsReview={false}
                       isPast
                       ownerName={shared ? ownerNameMap.get(trip.user_id) : undefined}
+                      eventsSlug={getEventsSlug(trip)}
                     />
                   )
                 })}

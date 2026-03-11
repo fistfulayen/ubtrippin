@@ -7,7 +7,7 @@ import { useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDateRange } from '@/lib/utils'
-import { MapPin, Calendar, AlertCircle, User, Loader2 } from 'lucide-react'
+import { MapPin, Calendar, CalendarDays, AlertCircle, User, Loader2 } from 'lucide-react'
 import type { Trip, Json } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
@@ -30,6 +30,7 @@ interface TripCardProps {
   needsReview?: boolean
   isPast?: boolean
   ownerName?: string
+  eventsSlug?: string
 }
 
 function getProviderLogos(items?: TripItem[]): string[] {
@@ -99,7 +100,7 @@ export function getTripCardPlaceholderLabel(trip: Pick<Trip, 'primary_location' 
   return parts.at(-1) ?? title
 }
 
-export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: TripCardProps) {
+export function TripCard({ trip, itemCount, needsReview, isPast, ownerName, eventsSlug }: TripCardProps) {
   const airlineLogos = getProviderLogos(trip.trip_items)
   const showStatusSummary = hasFlightWithin48Hours(trip.trip_items)
   const placeholderLabel = getTripCardPlaceholderLabel(trip)
@@ -238,6 +239,18 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName }: Tr
               <Calendar className="h-4 w-4 text-gray-400" />
               <span>{formatDateRange(trip.start_date, trip.end_date)}</span>
             </div>
+          )}
+
+          {/* What's on link */}
+          {eventsSlug && !isPast && (
+            <Link
+              href={`/cities/${eventsSlug}`}
+              onClick={(e) => e.stopPropagation()}
+              className="mt-2 inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 transition-colors"
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              What&apos;s on in {trip.primary_location?.split(',')[0]}
+            </Link>
           )}
 
           {/* Footer */}
