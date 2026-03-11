@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
+import { PublicNav } from '@/components/public-nav'
 import { FlightPageHeader } from '@/components/flights/flight-page-header'
 import { FlightStatusBlock } from '@/components/flights/flight-status-block'
 import { FlightProgressBar } from '@/components/flights/flight-progress-bar'
@@ -103,7 +104,8 @@ export default async function FlightPage({ params }: FlightPageProps) {
 
   return (
     <main className="min-h-screen bg-slate-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <PublicNav />
+      <div className="max-w-2xl mx-auto px-4 pt-20 pb-8">
         {/* Header */}
         <FlightPageHeader
           airline={flight.airline}
