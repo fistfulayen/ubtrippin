@@ -2,6 +2,7 @@ import { createGuide } from '../actions'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { CountrySelect } from './country-select'
 
 export default function NewGuidePage() {
   return (
@@ -36,33 +37,7 @@ export default function NewGuidePage() {
           />
         </div>
 
-        <div>
-          <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
-            Country
-          </label>
-          <input
-            id="country"
-            name="country"
-            type="text"
-            placeholder="France"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="country_code" className="block text-sm font-medium text-gray-700 mb-1">
-            Country code
-            <span className="ml-1 text-xs text-gray-400">(ISO 3166-1 alpha-2, e.g. &ldquo;FR&rdquo;)</span>
-          </label>
-          <input
-            id="country_code"
-            name="country_code"
-            type="text"
-            maxLength={2}
-            placeholder="FR"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
+        <CountrySelect />
 
         <div className="flex gap-3 pt-2">
           <Button type="submit" className="flex-1">
