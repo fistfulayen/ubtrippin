@@ -46,7 +46,7 @@ export async function updateSession(request: NextRequest) {
   const protectedPaths = ['/trips', '/inbox', '/settings']
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
-  )
+  ) && !request.nextUrl.pathname.startsWith('/trips/demo')
 
   if (isProtectedPath && !user) {
     const url = request.nextUrl.clone()
