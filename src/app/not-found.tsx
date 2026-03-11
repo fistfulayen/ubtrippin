@@ -3,15 +3,15 @@ import Image from 'next/image'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
 
-export default function NotFound() {
-  const popularCities = [
-    { name: 'Tokyo', emoji: '🇯🇵', href: '/cities' },
-    { name: 'Paris', emoji: '🇫🇷', href: '/cities' },
-    { name: 'New York', emoji: '🇺🇸', href: '/cities' },
-    { name: 'London', emoji: '🇬🇧', href: '/cities' },
-    { name: 'Bangkok', emoji: '🇹🇭', href: '/cities' },
-  ]
+const popularCities = [
+  { name: 'Tokyo', emoji: '🇯🇵', href: '/cities' },
+  { name: 'Paris', emoji: '🇫🇷', href: '/cities' },
+  { name: 'New York', emoji: '🇺🇸', href: '/cities' },
+  { name: 'London', emoji: '🇬🇧', href: '/cities' },
+  { name: 'Bangkok', emoji: '🇹🇭', href: '/cities' },
+]
 
+export default function NotFound() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <PublicNav />
@@ -30,7 +30,7 @@ export default function NotFound() {
             </div>
 
             <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-              <h1 className="text-4xl sm:text-5xl text-[#1e293b] leading-tight mb-4 font-bold tracking-tight">
+              <h1 className="text-4xl sm:text-5xl text-slate-800 leading-tight mb-4 font-bold tracking-tight">
                 Took a Wrong Turn?
               </h1>
               <p className="text-lg text-slate-500 leading-relaxed mb-8 max-w-xl">
@@ -39,20 +39,20 @@ export default function NotFound() {
               <div className="flex flex-col sm:flex-row items-center lg:items-start gap-4 mb-12">
                 <Link
                   href="/login"
-                  className="inline-flex items-center justify-center w-full sm:w-auto px-8 py-4 text-sm tracking-widest uppercase bg-[#1e293b] text-white hover:bg-[#312e81] transition-colors font-medium shadow-xl hover:scale-105"
+                  className="inline-flex items-center justify-center w-full sm:w-auto px-8 py-4 text-sm tracking-widest uppercase bg-slate-800 text-white hover:bg-indigo-800 transition-colors font-medium shadow-xl hover:scale-105"
                 >
                   Get Started Free
                 </Link>
                 <Link
                   href="/cities"
-                  className="text-[#1e293b] font-semibold underline underline-offset-4 hover:text-[#312e81] transition-colors py-4"
+                  className="text-slate-800 font-semibold underline underline-offset-4 hover:text-indigo-800 transition-colors py-4"
                 >
                   Browse Events Instead
                 </Link>
               </div>
 
               <div className="w-full max-w-md">
-                <h2 className="text-sm font-bold text-[#1e293b] mb-4 uppercase tracking-wide">
+                <h2 className="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wide">
                   Maybe you were looking for...
                 </h2>
                 <div className="flex flex-wrap justify-center lg:justify-start gap-4">
@@ -60,7 +60,7 @@ export default function NotFound() {
                     <Link
                       key={city.name}
                       href={city.href}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm border-2 border-[#cbd5e1] text-[#1e293b] hover:border-[#312e81] hover:bg-[#f8fafc] transition-colors font-medium rounded-lg"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm border-2 border-slate-200 text-slate-800 hover:border-indigo-800 hover:bg-slate-50 transition-colors font-medium rounded-lg"
                     >
                       <span>{city.emoji}</span>
                       {city.name}
