@@ -105,7 +105,7 @@ export default async function FlightPage({ params }: FlightPageProps) {
   return (
     <main className="min-h-screen bg-slate-50">
       <PublicNav />
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="max-w-2xl mx-auto px-4 pt-20 pb-8">
         {/* Header */}
         <FlightPageHeader
           airline={flight.airline}
