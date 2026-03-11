@@ -10,11 +10,11 @@ import {
   MapPin,
   Bookmark,
   CheckCircle2,
-  FileText,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CityGuide, GuideEntry } from '@/types/database'
 import { GuideShareToggle } from './guide-share-toggle'
+import { GuideMarkdownExport } from './guide-markdown-export'
 import { EntryActions } from './entry-actions'
 import { DeleteGuideButton } from './delete-guide-button'
 import { GuideMapSection } from '@/components/maps/guide-map-section'
@@ -196,17 +196,8 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
             shareUrl={shareUrl}
           />
 
-          {/* Export links */}
-          <a
-            href={`/api/v1/guides/${g.id}?format=md`}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Button variant="outline" size="sm">
-              <FileText className="h-3.5 w-3.5 mr-1.5" />
-              Markdown
-            </Button>
-          </a>
+          {/* Export markdown */}
+          <GuideMarkdownExport guide={g as CityGuide} entries={entries} />
 
           {/* Add entry */}
           <Link href={`/guides/${g.id}/add`}>

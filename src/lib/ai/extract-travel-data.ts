@@ -128,7 +128,13 @@ export async function extractTravelData(
 
     const result = JSON.parse(jsonMatch[0]) as ExtractionResult
 
-    // Basic output validation: reject unexpected top-level fields
+    // Basic output validation: strip unexpected top-level fields.
+    // Note: this protection is intentionally scoped to top-level keys only.
+    // Nested fields within items[n].details are variable by design (kind-specific)
+    // and are passed through to the normaliser which enforces the typed ExtractionResult
+    // structure. A prompt-injection payload surviving into a nested field would be stored
+    // as opaque detail data — not executed — and is subject to the sanitization pipeline
+    // applied at the point of user-facing output (PRD-044 Phase 2/2b).
     const allowedTopFields = new Set(['doc_type', 'overall_confidence', 'items'])
     for (const key of Object.keys(result)) {
       if (!allowedTopFields.has(key)) {
