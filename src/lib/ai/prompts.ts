@@ -120,6 +120,17 @@ Subject: {{subject}}
 {{attachments}}
 </email_content>`
 
+/**
+ * Sanitize untrusted email content before inserting into the prompt.
+ * Prevents tag-escape attacks where a crafted email body contains
+ * "</email_content>" to break out of the delimiter and inject instructions.
+ */
+function sanitizeEmailInput(input: string): string {
+  // Replace closing tag with a visually identical but non-functional form.
+  // The AI will still see the content; it just cannot close the container tag.
+  return input.replace(/<\/email_content>/gi, '<\\/email_content>')
+}
+
 export function buildExtractionPrompt(
   subject: string,
   body: string,
@@ -129,13 +140,13 @@ export function buildExtractionPrompt(
 
   let prompt = TRAVEL_EXTRACTION_USER_PROMPT
     .replace('{{today}}', today)
-    .replace('{{subject}}', subject || '(no subject)')
-    .replace('{{body}}', body || '(no body)')
+    .replace('{{subject}}', sanitizeEmailInput(subject || '(no subject)'))
+    .replace('{{body}}', sanitizeEmailInput(body || '(no body)'))
 
   if (attachmentText) {
     prompt = prompt.replace(
       '{{attachments}}',
-      `\nATTACHMENT CONTENT:\n${attachmentText}`
+      `\nATTACHMENT CONTENT:\n${sanitizeEmailInput(attachmentText)}`
     )
   } else {
     prompt = prompt.replace('{{attachments}}', '')

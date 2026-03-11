@@ -19,20 +19,28 @@ function guideToMarkdown(guide: CityGuide, entries: GuideEntry[]): string {
       )
     : ''
 
+  // Single pass: partition entries by status and group visited by category
+  const visited = new Map<string, GuideEntry[]>()
+  const toTry: GuideEntry[] = []
+  for (const entry of entries) {
+    if (entry.status === 'visited') {
+      const list = visited.get(entry.category) ?? []
+      list.push(entry)
+      visited.set(entry.category, list)
+    } else if (entry.status === 'to_try') {
+      toTry.push(entry)
+    }
+  }
+
+  const visitedCount = Array.from(visited.values()).reduce((sum, list) => sum + list.length, 0)
+
   const lines: string[] = []
   lines.push(`# ${flag} ${guide.city}${guide.country ? ` — ${guide.country}` : ''}`)
   lines.push(``)
-  lines.push(`*${entries.filter(e => e.status === 'visited').length} places · personal guide*`)
+  lines.push(`*${visitedCount} places · personal guide*`)
   lines.push(``)
 
-  const visited = entries.filter(e => e.status === 'visited')
-  const grouped = visited.reduce<Record<string, GuideEntry[]>>((acc, e) => {
-    if (!acc[e.category]) acc[e.category] = []
-    acc[e.category].push(e)
-    return acc
-  }, {})
-
-  for (const [category, catEntries] of Object.entries(grouped)) {
+  for (const [category, catEntries] of visited) {
     lines.push(`## ${category}`)
     lines.push(``)
     for (const entry of catEntries) {
@@ -50,7 +58,6 @@ function guideToMarkdown(guide: CityGuide, entries: GuideEntry[]): string {
     }
   }
 
-  const toTry = entries.filter(e => e.status === 'to_try')
   if (toTry.length > 0) {
     lines.push(`## 🔖 To Try`)
     lines.push(``)

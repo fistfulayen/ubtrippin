@@ -197,7 +197,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
           />
 
           {/* Export markdown */}
-          <GuideMarkdownExport guide={g as CityGuide} entries={(entries ?? []) as GuideEntry[]} />
+          <GuideMarkdownExport guide={g as CityGuide} entries={entries} />
 
           {/* Add entry */}
           <Link href={`/guides/${g.id}/add`}>

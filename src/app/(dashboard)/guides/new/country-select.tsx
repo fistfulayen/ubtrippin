@@ -98,6 +98,10 @@ export function CountrySelect() {
         <input
           id="country-search"
           type="text"
+          role="combobox"
+          aria-expanded={open && !selected && filtered.length > 0}
+          aria-controls="country-listbox"
+          aria-autocomplete="list"
           autoComplete="off"
           value={selected ? `${countryFlag(selected.code)} ${selected.name}` : search}
           onChange={(e) => {
@@ -128,9 +132,9 @@ export function CountrySelect() {
       </div>
 
       {open && !selected && filtered.length > 0 && (
-        <ul className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <ul id="country-listbox" role="listbox" className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
           {filtered.slice(0, 20).map((c) => (
-            <li key={c.code}>
+            <li key={c.code} role="option" aria-selected={false}>
               <button
                 type="button"
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left hover:bg-indigo-50"
