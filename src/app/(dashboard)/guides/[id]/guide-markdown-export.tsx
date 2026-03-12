@@ -9,7 +9,7 @@ interface GuideMarkdownExportProps {
   entries: GuideEntry[]
 }
 
-function guideToMarkdown(guide: CityGuide, entries: GuideEntry[]): string {
+export function guideToMarkdown(guide: CityGuide, entries: GuideEntry[]): string {
   const flag = guide.country_code
     ? String.fromCodePoint(
         ...guide.country_code

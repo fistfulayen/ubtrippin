@@ -48,6 +48,42 @@ export async function deleteGuide(guideId: string) {
   redirect('/guides')
 }
 
+export async function updateGuideMetadata(
+  guideId: string,
+  city: string,
+  country: string | null,
+  country_code: string | null
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const nextCity = city.trim()
+  const nextCountry = country?.trim() || null
+  const nextCountryCode = country_code?.trim().toUpperCase() || null
+
+  if (!nextCity) {
+    return { error: 'City is required.' }
+  }
+
+  const { error } = await supabase
+    .from('city_guides')
+    .update({
+      city: nextCity,
+      country: nextCountry,
+      country_code: nextCountryCode,
+    })
+    .eq('id', guideId)
+    .eq('user_id', user.id)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath(`/guides/${guideId}`)
+  return { ok: true }
+}
+
 export async function toggleGuidePublic(guideId: string, isPublic: boolean) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
