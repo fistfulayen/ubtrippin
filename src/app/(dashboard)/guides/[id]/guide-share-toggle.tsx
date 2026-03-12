@@ -9,9 +9,15 @@ interface Props {
   guideId: string
   isPublic: boolean
   shareUrl: string | null
+  showCopyButton?: boolean
 }
 
-export function GuideShareToggle({ guideId, isPublic, shareUrl }: Props) {
+export function GuideShareToggle({
+  guideId,
+  isPublic,
+  shareUrl,
+  showCopyButton = true,
+}: Props) {
   const [pending, setPending] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -51,7 +57,7 @@ export function GuideShareToggle({ guideId, isPublic, shareUrl }: Props) {
         )}
       </Button>
 
-      {isPublic && shareUrl && (
+      {showCopyButton && isPublic && shareUrl && (
         <Button variant="outline" size="sm" onClick={handleCopy}>
           {copied ? (
             <>

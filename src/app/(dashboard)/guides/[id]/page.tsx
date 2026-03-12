@@ -13,12 +13,10 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { CityGuide, GuideEntry } from '@/types/database'
-import { GuideShareToggle } from './guide-share-toggle'
-import { GuideMarkdownExport } from './guide-markdown-export'
 import { EntryActions } from './entry-actions'
-import { DeleteGuideButton } from './delete-guide-button'
 import { GuideMapSection } from '@/components/maps/guide-map-section'
-import { GuideCoverImageButton } from './guide-cover-image-button'
+import { GuideEditTitle } from './guide-edit-title'
+import { GuideHeaderActions } from './guide-header-actions'
 
 interface GuidePageProps {
   params: Promise<{ id: string }>
@@ -152,15 +150,6 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
     .filter((entry): entry is { id: string; name: string; category: string; latitude: number; longitude: number } => entry !== null)
   const hasMapEntries = mapEntries.length > 0
 
-  const flag = g.country_code
-    ? String.fromCodePoint(
-        ...g.country_code
-          .toUpperCase()
-          .split('')
-          .map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-      )
-    : null
-
   const shareUrl = g.share_token
     ? `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://ubtrippin.xyz'}/guide/${g.share_token}`
     : null
@@ -176,41 +165,20 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
       </Link>
 
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            {flag && <span className="text-2xl">{flag}</span>}
-            {g.city}
-          </h1>
-          {g.country && <p className="text-gray-500 mt-1">{g.country}</p>}
+          <GuideEditTitle
+            guideId={g.id}
+            city={g.city}
+            country={g.country}
+            countryCode={g.country_code}
+          />
           <p className="text-sm text-gray-400 mt-1">
             {entries.length} {entries.length === 1 ? 'place' : 'places'}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          {/* Share toggle */}
-          <GuideShareToggle
-            guideId={g.id}
-            isPublic={g.is_public}
-            shareUrl={shareUrl}
-          />
-
-          {/* Export markdown */}
-          <GuideMarkdownExport guide={g as CityGuide} entries={entries} />
-
-          {/* Add entry */}
-          <Link href={`/guides/${g.id}/add`}>
-            <Button size="sm">
-              <Plus className="h-3.5 w-3.5 mr-1.5" />
-              Add place
-            </Button>
-          </Link>
-
-          <GuideCoverImageButton guideId={g.id} currentImageUrl={g.cover_image_url} />
-
-          <DeleteGuideButton guideId={g.id} />
-        </div>
+        <GuideHeaderActions guide={g as CityGuide} entries={entries} shareUrl={shareUrl} />
       </div>
 
       {/* Filter tabs */}
@@ -299,7 +267,7 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
               href={shareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="underline hover:no-underline font-mono text-xs"
+              className="underline hover:no-underline font-mono text-xs break-all"
             >
               {shareUrl}
             </a>
