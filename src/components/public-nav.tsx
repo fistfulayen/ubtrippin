@@ -17,6 +17,7 @@ export function PublicNav() {
         </Link>
         <div className="hidden md:flex items-center gap-6 text-sm tracking-wide text-[#1e293b]">
           <Link href="/#features" className="hover:text-[#312e81] transition-colors">Features</Link>
+          <Link href="/demo" className="hover:text-[#312e81] transition-colors">Demo</Link>
           <Link href="/#pricing" className="hover:text-[#312e81] transition-colors">Pricing</Link>
           <Link href="/cities" className="hover:text-[#312e81] transition-colors">Events</Link>
           <Link href="/#agents" className="hover:text-[#312e81] transition-colors">For Agents</Link>

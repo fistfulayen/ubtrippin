@@ -9,6 +9,7 @@ const ContentSecurityPolicy = `
   img-src 'self' blob: data: https:;
   font-src 'self';
   connect-src 'self' https://*.supabase.co https://api.unsplash.com;
+  frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com;
   frame-ancestors 'none';
   base-uri 'self';
   form-action 'self';
@@ -49,6 +50,13 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+    ];
+  },
+  async redirects() {
+    return [
+      // PRD-049: Standard SaaS entry points
+      { source: '/signup', destination: '/login', permanent: true },
+      { source: '/pricing', destination: '/#pricing', permanent: true },
     ];
   },
 };
