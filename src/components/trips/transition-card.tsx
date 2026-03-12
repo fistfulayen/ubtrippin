@@ -1,5 +1,6 @@
 import { Clock, Plane } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { formatShortDate } from '@/lib/utils'
 import type { Trip } from '@/types/database'
 import type { FlightJourney } from '@/lib/trips/city-segments'
 
@@ -44,7 +45,7 @@ export function TransitionCard({
             </div>
 
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
-              <span>{journey.departure.code} {journey.departure.time || '--:--'} to {journey.arrival.code} {journey.arrival.time || '--:--'}</span>
+              <span>{journey.date ? `${formatShortDate(journey.date)}, ` : ''}{journey.departure.code} {journey.departure.time || '--:--'} to {journey.arrival.code} {journey.arrival.time || '--:--'}</span>
               <span>{stopLabel(journey)}</span>
               {journey.duration ? (
                 <span className="inline-flex items-center gap-1">
