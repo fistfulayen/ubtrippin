@@ -66,6 +66,11 @@ export async function updateGuideMetadata(
     return { error: 'City is required.' }
   }
 
+  // Validate country_code is exactly 2 ASCII alpha characters if provided
+  if (nextCountryCode && !/^[A-Z]{2}$/.test(nextCountryCode)) {
+    return { error: 'Invalid country code.' }
+  }
+
   const { error } = await supabase
     .from('city_guides')
     .update({

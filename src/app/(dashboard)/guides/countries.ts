@@ -63,7 +63,15 @@ export const COUNTRIES = [
 export type CountryOption = (typeof COUNTRIES)[number]
 
 export function countryFlag(code: string): string {
-  return String.fromCodePoint(
-    ...code.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-  )
+  // Guard against invalid codes to prevent RangeError
+  if (!code || !/^[a-zA-Z]{2}$/.test(code)) {
+    return ''
+  }
+  try {
+    return String.fromCodePoint(
+      ...code.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+    )
+  } catch {
+    return ''
+  }
 }

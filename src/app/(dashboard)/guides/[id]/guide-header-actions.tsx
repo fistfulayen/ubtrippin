@@ -50,7 +50,12 @@ export function GuideHeaderActions({
     if (!confirm('Delete this guide and all its entries? This cannot be undone.')) return
     setDeleting(true)
     setMobileMenuOpen(false)
-    await deleteGuide(guide.id)
+    try {
+      await deleteGuide(guide.id)
+    } catch (err) {
+      setDeleting(false)
+      alert('Failed to delete guide. Please try again.')
+    }
   }
 
   return (
