@@ -317,7 +317,7 @@ for item in data:
 # Commands
 cmd_trips_list() {
   local user_id="${1:-}"
-  local query="select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=20"
+  local query="select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=200"
   if [ -n "$user_id" ]; then
     query="${query}&user_id=eq.$(_urlencode "${user_id}")"
   fi
