@@ -445,52 +445,20 @@ cmd_items_search() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --date)
-        date="${2:-}"
-        if [ -z "$date" ]; then
-          echo "Error: --date requires YYYY-MM-DD" >&2
+      --date|--from|--to|--kind|--limit|--offset)
+        local arg_val="${2:-}"
+        if [ -z "$arg_val" ]; then
+          echo "Error: $1 requires an argument" >&2
           exit 1
         fi
-        shift 2
-        ;;
-      --from)
-        from_date="${2:-}"
-        if [ -z "$from_date" ]; then
-          echo "Error: --from requires YYYY-MM-DD" >&2
-          exit 1
-        fi
-        shift 2
-        ;;
-      --to)
-        to_date="${2:-}"
-        if [ -z "$to_date" ]; then
-          echo "Error: --to requires YYYY-MM-DD" >&2
-          exit 1
-        fi
-        shift 2
-        ;;
-      --kind)
-        kind="${2:-}"
-        if [ -z "$kind" ]; then
-          echo "Error: --kind requires a value" >&2
-          exit 1
-        fi
-        shift 2
-        ;;
-      --limit)
-        limit="${2:-}"
-        if [ -z "$limit" ]; then
-          echo "Error: --limit requires a value" >&2
-          exit 1
-        fi
-        shift 2
-        ;;
-      --offset)
-        offset="${2:-}"
-        if [ -z "$offset" ]; then
-          echo "Error: --offset requires a value" >&2
-          exit 1
-        fi
+        case "$1" in
+          --date)   date="$arg_val" ;;
+          --from)   from_date="$arg_val" ;;
+          --to)     to_date="$arg_val" ;;
+          --kind)   kind="$arg_val" ;;
+          --limit)  limit="$arg_val" ;;
+          --offset) offset="$arg_val" ;;
+        esac
         shift 2
         ;;
       *)
