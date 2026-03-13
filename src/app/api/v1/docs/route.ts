@@ -701,6 +701,10 @@ ubt selftest       # test API connectivity
 | \`ubt family loyalty lookup <id> <provider>\` | Family loyalty lookup |
 | \`ubt billing show\` | Current subscription |
 | \`ubt calendar get\` | iCal feed URL |
+| \`ubt collab list <trip_id>\` | List trip collaborators |
+| \`ubt collab invite <trip_id> <email> [role]\` | Invite collaborator |
+| \`ubt activation status\` | Account activation status |
+| \`ubt image search <query>\` | Search cover images |
 | \`ubt webhooks list\` | List registered webhooks |
 | \`ubt senders list\` | List allowed email senders |
 | \`ubt notifications list --unread\` | Unread notifications |

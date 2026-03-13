@@ -7,12 +7,14 @@ on:
       - 'src/app/api/**'
       - 'skill/SKILL.md'
       - 'mcp/src/**'
+      - 'cli/ubt'
   pull_request:
     branches: [main]
     paths:
       - 'src/app/api/**'
       - 'skill/SKILL.md'
       - 'mcp/src/**'
+      - 'cli/ubt'
 
 jobs:
   parity:
@@ -90,3 +92,10 @@ jobs:
         with:
           header: api-parity
           path: /tmp/parity-report.md
+
+  docs-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs coverage
+        run: bash scripts/ci/check-docs-coverage.sh
