@@ -147,6 +147,14 @@ jobs:
       - name: Verify all public tables have RLS
         run: bash scripts/check-rls.sh
 
+  cli-api-parity:
+    name: CLI API Parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: CLI must not bypass API for user-facing reads
+        run: bash scripts/ci/check-cli-no-direct-db.sh
+
   env-check:
     name: Environment Safety
     runs-on: ubuntu-latest
