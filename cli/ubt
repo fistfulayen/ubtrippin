@@ -324,6 +324,42 @@ cmd_trips_list() {
   
   local result=$(_curl "${API}/trips?${query}")
   
+  # Sort by relevance: active trips first, then upcoming, then past
+  result=$(echo "$result" | _python3c "
+import json, sys
+from datetime import date
+
+today = date.today().isoformat()
+trips = json.load(sys.stdin)
+if not isinstance(trips, list):
+    trips = trips.get('data', []) if isinstance(trips, dict) else []
+
+active = []    # today falls between start and end
+upcoming = []  # start_date > today
+past = []      # end_date < today (or start_date < today with no end)
+
+for t in trips:
+    sd = t.get('start_date') or ''
+    ed = t.get('end_date') or sd
+    if not sd:
+        past.append(t)
+    elif sd <= today <= ed:
+        active.append(t)
+    elif sd > today:
+        upcoming.append(t)
+    else:
+        past.append(t)
+
+# Active: sorted by start_date ascending (current trip first)
+active.sort(key=lambda t: t.get('start_date',''))
+# Upcoming: nearest first
+upcoming.sort(key=lambda t: t.get('start_date',''))
+# Past: most recent first
+past.sort(key=lambda t: t.get('start_date',''), reverse=True)
+
+print(json.dumps(active + upcoming + past))
+")
+
   if [ "${FORMAT:-pretty}" = "json" ]; then
     echo "$result" | _json
   else
