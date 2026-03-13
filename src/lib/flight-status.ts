@@ -294,7 +294,7 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
     // Pick the best flight instance: prefer not-yet-arrived over completed.
     // When multiple instances exist (e.g. yesterday's and today's), a user
     // asking about "today's flight" wants the upcoming one, not the landed one.
-    let best = asRecord(flights[0])
+    let best: Record<string, unknown> | null = null
     for (const f of flights) {
       const rec = asRecord(f)
       if (!rec) continue
