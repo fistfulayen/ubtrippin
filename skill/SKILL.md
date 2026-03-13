@@ -144,6 +144,52 @@ Returns weather forecasts for all trip destinations within the 16-day forecast w
 
 ### Items
 
+#### Search Items Across All Trips
+```
+GET /api/v1/items
+GET /api/v1/items?date=2026-03-13
+GET /api/v1/items?from=2026-03-13&to=2026-03-20&kind=flight&limit=25&offset=0
+```
+
+Searches trip items across all trips the authenticated user can access, including owned trips and accepted shared trips.
+
+Query params:
+- `date`: return items active on that date (`start_date <= date` and `end_date >= date`, with single-day items matching on `start_date`)
+- `from` / `to`: return items overlapping that range
+- `kind`: filter by item kind, such as `flight`, `hotel`, `train`, `activity`, `car_rental`, `restaurant`, `ticket`, `other`
+- `limit`: max results, default `50`, max `200`
+- `offset`: pagination offset
+
+Response:
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "trip_id": "uuid",
+      "trip_title": "Paris → Miami → Austin",
+      "kind": "flight",
+      "provider": "Spirit Airlines",
+      "summary": "Spirit Airlines flight 457 from Newark to Austin",
+      "start_date": "2026-03-13",
+      "end_date": "2026-03-13",
+      "start_ts": "2026-03-14T01:00:00Z",
+      "end_ts": "2026-03-14T05:10:00Z",
+      "start_location": "EWR",
+      "end_location": "AUS",
+      "details_json": {
+        "departure_local_time": "21:00",
+        "arrival_local_time": "00:10"
+      },
+      "status": "confirmed",
+      "created_at": "2026-03-01T12:00:00Z",
+      "updated_at": "2026-03-02T09:00:00Z"
+    }
+  ],
+  "meta": { "count": 1, "limit": 50, "offset": 0 }
+}
+```
+
 #### Get Single Item
 ```
 GET /api/v1/items/:id

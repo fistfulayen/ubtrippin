@@ -47,6 +47,6 @@ test.describe('Mobile viewport', () => {
     const response = await page.goto('/trips')
     expect(response?.status()).not.toBe(500)
     // Core content should be visible
-    await expect(page.getByRole('heading', { name: /trips/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Your Trips' })).toBeVisible()
   })
 })

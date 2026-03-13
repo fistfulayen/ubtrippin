@@ -273,6 +273,47 @@ for item in data:
 "
 }
 
+_format_item_search_results() {
+  _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+if isinstance(payload, dict):
+    if 'error' in payload:
+        print(f\"Error: {payload['error']['message']}\")
+        sys.exit(1)
+    data = payload.get('data', [])
+else:
+    data = payload
+
+if not data:
+    print('No items found.')
+    sys.exit(0)
+
+for item in data:
+    det = item.get('details_json') or {}
+    provider = item.get('provider') or ''
+    date = item.get('start_date') or ''
+    start_loc = item.get('start_location') or ''
+    end_loc = item.get('end_location') or ''
+    trip_title = item.get('trip_title') or '(untitled trip)'
+    kind = item.get('kind') or '?'
+
+    dep_time = det.get('departure_local_time') or ''
+    if not dep_time:
+        start_ts = item.get('start_ts') or ''
+        if isinstance(start_ts, str) and len(start_ts) >= 16:
+            dep_time = start_ts[11:16]
+
+    route = start_loc
+    if end_loc and end_loc != start_loc:
+        route = f'{route} → {end_loc}' if route else end_loc
+
+    print(f\"  {item.get('id','')}  {kind:<10} {provider:<20} {date:<10}  {dep_time:<5}  {route}\")
+    print(f\"             Trip: {trip_title}\")
+"
+}
+
 # Commands
 cmd_trips_list() {
   local user_id="${1:-}"
@@ -391,6 +432,75 @@ cmd_items_list() {
     echo "$items" | _json
   else
     echo "$items" | _format_items
+  fi
+}
+
+cmd_items_search() {
+  local date=""
+  local from_date=""
+  local to_date=""
+  local kind=""
+  local limit=""
+  local offset=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --date|--from|--to|--kind|--limit|--offset)
+        local arg_val="${2:-}"
+        if [ -z "$arg_val" ]; then
+          echo "Error: $1 requires an argument" >&2
+          exit 1
+        fi
+        case "$1" in
+          --date)   date="$arg_val" ;;
+          --from)   from_date="$arg_val" ;;
+          --to)     to_date="$arg_val" ;;
+          --kind)   kind="$arg_val" ;;
+          --limit)  limit="$arg_val" ;;
+          --offset) offset="$arg_val" ;;
+        esac
+        shift 2
+        ;;
+      *)
+        echo "Unknown option: $1" >&2
+        echo "Usage: ubt items search [--date YYYY-MM-DD] [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--kind flight|hotel|train|...] [--limit N]" >&2
+        exit 1
+        ;;
+    esac
+  done
+
+  local query=""
+  if [ -n "$date" ]; then
+    query="date=$(_urlencode "$date")"
+  fi
+  if [ -n "$from_date" ]; then
+    query="${query}${query:+&}from=$(_urlencode "$from_date")"
+  fi
+  if [ -n "$to_date" ]; then
+    query="${query}${query:+&}to=$(_urlencode "$to_date")"
+  fi
+  if [ -n "$kind" ]; then
+    query="${query}${query:+&}kind=$(_urlencode "$kind")"
+  fi
+  if [ -n "$limit" ]; then
+    query="${query}${query:+&}limit=$(_urlencode "$limit")"
+  fi
+  if [ -n "$offset" ]; then
+    query="${query}${query:+&}offset=$(_urlencode "$offset")"
+  fi
+
+  local url="${API_V1}/items"
+  if [ -n "$query" ]; then
+    url="${url}?${query}"
+  fi
+
+  local result
+  result=$(_api "$url")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+  else
+    echo "$result" | _format_item_search_results
   fi
 }
 
@@ -3430,6 +3540,7 @@ Commands:
   trips status <trip_id>                Show live statuses for trip flight/train items *
   trips merge <target> <source>         Merge source trip into target (deletes source) *
   items list <trip_id>                  List items in a trip
+  items search [--date Y-M-D] [--from Y-M-D] [--to Y-M-D] [--kind X] [--limit N]  Search items across all trips *
   items show <item_id>                  Show item details *
   items add <trip_id> --kind <k> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-date Y-M-D] [--end-date Y-M-D] [--start-location X] [--end-location X] [--details-json '{...}']  Add item *
   items update <item_id> [--summary X] [--start-location X] [--end-location X] [--status X]  Update item *
@@ -3507,6 +3618,7 @@ Examples:
   ubt trips rename <trip_id> "NYC + Boston"
   ubt trips status <trip_id>
   ubt trips merge <target_id> <source_id>
+  ubt items search --date 2026-03-13 --kind flight
   ubt items show <item_id>
   ubt items add <trip_id> --kind flight --summary "UA 101 SFO to JFK" --start-ts 2026-04-10T08:30:00Z
   ubt items update <item_id> --status confirmed
@@ -3563,6 +3675,7 @@ case "${1:-}" in
   items)
     case "${2:-}" in
       list) cmd_items_list "${3:?Usage: ubt items list <trip_id>}" ;;
+      search) shift 2; cmd_items_search "$@" ;;
       show) cmd_items_show "${3:?Usage: ubt items show <item_id>}" ;;
       add) shift 2; cmd_items_add "$@" ;;
       update) shift 2; cmd_items_update "$@" ;;

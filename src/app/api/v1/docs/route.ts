@@ -93,6 +93,7 @@ Authorization: Bearer ubt_k1_abc123...
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | /api/v1/items | Search items across all trips |
 | GET | /api/v1/items/:id | Get single item |
 | PATCH | /api/v1/items/:id | Update item |
 | DELETE | /api/v1/items/:id | Delete item |
@@ -120,6 +121,28 @@ Authorization: Bearer ubt_k1_abc123...
 | traveler_names | string[] | Up to 20 names, each max 200 chars |
 | details_json | object | Freeform metadata — seat, gate, room type, etc. (max 10KB) |
 | notes | string | User notes |
+
+### Search Items Across Trips
+
+\`\`\`
+GET /api/v1/items?date=2026-04-01&kind=flight
+Authorization: Bearer ubt_k1_abc123...
+
+200 OK
+{
+  "data": [
+    { "id": "uuid", "trip_id": "uuid", "kind": "flight", "summary": "AF276 CDG→NRT", "start_date": "2026-04-01", "trip_title": "Tokyo Trip", ... }
+  ],
+  "meta": { "count": 1, "limit": 50, "offset": 0 }
+}
+\`\`\`
+
+**Query parameters:**
+- \`date\` — Items active on this date (YYYY-MM-DD)
+- \`from\` / \`to\` — Date range (cannot combine with \`date\`)
+- \`kind\` — Filter by item kind (flight, hotel, train, etc.)
+- \`limit\` — Results per page (1–200, default 50)
+- \`offset\` — Pagination offset (default 0)
 
 ### Example: Add a Flight
 
