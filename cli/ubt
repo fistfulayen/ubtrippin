@@ -316,23 +316,17 @@ for item in data:
 
 # Commands
 cmd_trips_list() {
-  local user_id="${1:-}"
-  local query="select=id,title,start_date,end_date,primary_location,travelers&order=start_date.desc.nullslast&limit=200"
-  if [ -n "$user_id" ]; then
-    query="${query}&user_id=eq.$(_urlencode "${user_id}")"
-  fi
-  
-  local result=$(_curl "${API}/trips?${query}")
-  
+  local result
+  result=$(_api "${API_V1}/trips")
+
   # Sort by relevance: active trips first, then upcoming, then past
   result=$(echo "$result" | _python3c "
 import json, sys
 from datetime import date
 
 today = date.today().isoformat()
-trips = json.load(sys.stdin)
-if not isinstance(trips, list):
-    trips = trips.get('data', []) if isinstance(trips, dict) else []
+raw = json.load(sys.stdin)
+trips = raw.get('data', raw) if isinstance(raw, dict) else raw
 
 active = []    # today falls between start and end
 upcoming = []  # start_date > today
@@ -411,63 +405,72 @@ print(json.dumps(matches))
 cmd_trips_show() {
   local trip_id="$1"
   trip_id=$(_resolve_trip_id "$trip_id")
-  local trip_id_enc
-  trip_id_enc=$(_urlencode "$trip_id")
-  
-  # Get trip
-  local trip=$(_curl "${API}/trips?id=eq.${trip_id_enc}&select=*")
-  
-  # Also try partial match
-  if [ "$(echo "$trip" | _python3c 'import json,sys;print(len(json.load(sys.stdin)))' 2>/dev/null)" = "0" ]; then
-    trip=$(_curl "${API}/trips?id=like.${trip_id_enc}*&select=*")
-  fi
-  
-  # Get items
-  local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id_enc}&select=*&order=start_date,start_ts")
-  
+
+  local result
+  result=$(_api "${API_V1}/trips/$(_urlencode "${trip_id}")")
+
   if [ "${FORMAT:-pretty}" = "json" ]; then
-    _python3c "
+    echo "$result" | _python3c "
 import json, sys
-payload = json.load(sys.stdin)
-trip = payload.get('trip', [])
-items = payload.get('items', [])
-print(json.dumps({'trip': trip[0] if trip else None, 'items': items}, indent=2))
-" <<EOF
-{"trip": ${trip}, "items": ${items}}
-EOF
+raw = json.load(sys.stdin)
+trip = raw.get('data', raw) if isinstance(raw, dict) else raw
+print(json.dumps(trip, indent=2))
+" | _json
   else
-    echo "$trip" | _python3c "
+    echo "$result" | _python3c "
 import json, sys
-data = json.load(sys.stdin)
-if not data:
-    print('Trip not found.')
+raw = json.load(sys.stdin)
+t = raw.get('data', raw) if isinstance(raw, dict) else raw
+if not t or (isinstance(t, dict) and 'error' in t):
+    err = t.get('error', {}).get('message', 'Trip not found.') if isinstance(t, dict) else 'Trip not found.'
+    print(err)
     sys.exit(1)
-t = data[0]
 print(f\"Trip: {t.get('title','(unnamed)')}\")
 print(f\"  ID: {t['id']}\")
 dates = t.get('start_date','')
 if t.get('end_date'): dates += ' → ' + t['end_date']
 print(f\"  Dates: {dates}\")
 if t.get('primary_location'): print(f\"  Location: {t['primary_location']}\")
-if t.get('travelers'): print(f\"  Travelers: {', '.join(t['travelers'])}\")
+travelers = t.get('travelers') or []
+if travelers: print(f\"  Travelers: {', '.join(travelers)}\")
 print()
+items = t.get('items', [])
 "
-    echo "Items:"
-    echo "$items" | _format_items
+    # Extract and format items
+    echo "$result" | _python3c "
+import json, sys
+raw = json.load(sys.stdin)
+t = raw.get('data', raw) if isinstance(raw, dict) else raw
+items = t.get('items', []) if isinstance(t, dict) else []
+print(json.dumps(items))
+" | ( echo "Items:" ; _format_items )
   fi
 }
 
 cmd_items_list() {
   local trip_id="$1"
   trip_id=$(_resolve_trip_id "$trip_id")
-  local trip_id_enc
-  trip_id_enc=$(_urlencode "$trip_id")
-  local items=$(_curl "${API}/trip_items?trip_id=eq.${trip_id_enc}&select=*&order=start_date,start_ts")
-  
+
+  # Use trips/:id endpoint which returns items in the response
+  local result
+  result=$(_api "${API_V1}/trips/$(_urlencode "${trip_id}")")
+
   if [ "${FORMAT:-pretty}" = "json" ]; then
-    echo "$items" | _json
+    echo "$result" | _python3c "
+import json, sys
+raw = json.load(sys.stdin)
+t = raw.get('data', raw) if isinstance(raw, dict) else raw
+items = t.get('items', []) if isinstance(t, dict) else []
+print(json.dumps(items))
+" | _json
   else
-    echo "$items" | _format_items
+    echo "$result" | _python3c "
+import json, sys
+raw = json.load(sys.stdin)
+t = raw.get('data', raw) if isinstance(raw, dict) else raw
+items = t.get('items', []) if isinstance(t, dict) else []
+print(json.dumps(items))
+" | _format_items
   fi
 }
 
