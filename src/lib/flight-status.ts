@@ -132,7 +132,12 @@ function mapFlightStatus(
   const sourceStatus = asString(flight.status)
   if (!sourceStatus) return 'unknown'
 
-  switch (sourceStatus.toLowerCase()) {
+  const normalized = sourceStatus.toLowerCase().trim()
+
+  // Handle compound statuses like "Landed / Taxiing", "Landed / Gate Arrival"
+  const primary = normalized.split('/')[0].trim()
+
+  switch (primary) {
     case 'en route':
       return 'en_route'
     case 'landed':
@@ -257,12 +262,15 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
     return null
   }
 
+  // Widen window to cover evening flights that cross midnight UTC.
+  // A 9 PM ET flight on March 13 = 2 AM UTC March 14. Without the +12h buffer,
+  // we'd miss it and match yesterday's completed flight instead.
   const start = `${date}T00:00:00Z`
+  const endOfWindow = new Date(`${date}T00:00:00Z`)
+  endOfWindow.setUTCHours(endOfWindow.getUTCHours() + 36) // date + 36h covers all timezones
   // FlightAware rejects end bounds >2 days in the future and requires Z suffix (not +00:00).
-  // Cap end to min(end-of-day, now + 47h).
-  const endOfDay = new Date(`${date}T23:59:59Z`)
   const maxEnd = new Date(Date.now() + 47 * 60 * 60 * 1000)
-  const endDate = endOfDay < maxEnd ? endOfDay : maxEnd
+  const endDate = endOfWindow < maxEnd ? endOfWindow : maxEnd
   // FlightAware requires Z suffix and no milliseconds (e.g. 2026-03-06T20:00:00Z)
   const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
@@ -281,8 +289,30 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
     const payload = await response.json()
     const root = asRecord(payload)
     const flights = Array.isArray(root?.flights) ? root.flights : []
-    const first = asRecord(flights[0])
-    if (!first) return null
+    if (flights.length === 0) return null
+
+    // Pick the best flight instance: prefer not-yet-arrived over completed.
+    // When multiple instances exist (e.g. yesterday's and today's), a user
+    // asking about "today's flight" wants the upcoming one, not the landed one.
+    let best = asRecord(flights[0])
+    for (const f of flights) {
+      const rec = asRecord(f)
+      if (!rec) continue
+      const status = asString(rec.status)?.toLowerCase() ?? ''
+      const progress = asNumber(rec.progress_percent)
+      // If this flight hasn't completed (not landed, not 100%), prefer it
+      if (!status.startsWith('landed') && progress !== 100) {
+        best = rec
+        break
+      }
+    }
+    // If all flights are completed, fall back to the last one (most recent)
+    if (!best) {
+      const lastFlight = asRecord(flights[flights.length - 1])
+      if (!lastFlight) return null
+      best = lastFlight
+    }
+    const first = best
 
     const delayMinutes = calculateDelayMinutes(first)
 
