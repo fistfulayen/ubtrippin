@@ -45,7 +45,7 @@ export function TransitionCard({
             </div>
 
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
-              <span>{journey.date ? `${formatShortDate(journey.date)}, ` : ''}{journey.departure.code} {journey.departure.time || '--:--'} to {journey.arrival.code} {journey.arrival.time || '--:--'}</span>
+              <span>{journey.date ? `${formatShortDate(journey.date)}, ` : ''}{journey.departure.code} {journey.departure.time || '--:--'} to {journey.arrivalDate ? `${formatShortDate(journey.arrivalDate)}, ` : ''}{journey.arrival.code} {journey.arrival.time || '--:--'}</span>
               <span>{stopLabel(journey)}</span>
               {journey.duration ? (
                 <span className="inline-flex items-center gap-1">

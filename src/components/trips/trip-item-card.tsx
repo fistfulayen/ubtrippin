@@ -361,12 +361,14 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                   if (!item.start_ts && !det?.departure_local_time && !det?.check_in_time) return null
                   const [start, end] = getLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
                   const datePrefix = item.start_date ? formatShortDate(item.start_date) : ''
+                  const showArrivalDate = item.kind === 'flight' && item.end_date && item.start_date && item.end_date !== item.start_date
+                  const arrivalDateLabel = showArrivalDate ? formatShortDate(item.end_date) : ''
                   return (
                     <span className="flex items-center gap-1">
                       <Clock className="h-3.5 w-3.5" />
                       {datePrefix && `${datePrefix}, `}
                       {start}
-                      {end && ` - ${end}`}
+                      {end && (<>{showArrivalDate ? ` - ${arrivalDateLabel}, ` : ' - '}{end}</>)}
                     </span>
                   )
                 })()}

@@ -21,6 +21,7 @@ export interface FlightJourney {
   stopCodes: string[]
   legs: TripItem[]
   date: string
+  arrivalDate?: string
   duration?: string
 }
 
@@ -173,6 +174,10 @@ function firstPass(items: TripItem[]): Array<TripItem | FlightJourney> {
     const endTime = parseItemDateTime(legs[legs.length - 1], 'end')?.getTime() ?? startTime
     const stopCodes = buildStopCodes(legs)
 
+    const departureDate = legs[0].start_date
+    const lastLeg = legs[legs.length - 1]
+    const arrDate = lastLeg.end_date ?? lastLeg.start_date
+
     processed.push({
       type: 'flight-journey',
       departure,
@@ -180,7 +185,8 @@ function firstPass(items: TripItem[]): Array<TripItem | FlightJourney> {
       stops: stopCodes.length,
       stopCodes,
       legs,
-      date: legs[0].start_date,
+      date: departureDate,
+      arrivalDate: arrDate !== departureDate ? arrDate : undefined,
       duration: formatDuration(endTime - startTime),
     })
   }
