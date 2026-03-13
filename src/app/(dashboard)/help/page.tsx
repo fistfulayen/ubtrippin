@@ -220,43 +220,29 @@ const sections: HelpSection[] = [
     id: 'developers-agents',
     title: 'For Developers & Agents',
     searchText:
-      'rest api docs mcp server openclaw skill webhooks notifications integrations',
+      'rest api docs mcp server openclaw skill webhooks notifications integrations cli command line',
     content: (
       <>
         <p>
-          UBTRIPPIN is agent-friendly with REST APIs, MCP support, and webhook events.
+          UBTRIPPIN is agent-friendly with a REST API, CLI, MCP server, and webhook events.
         </p>
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            REST API reference:{' '}
             <a
-              href="https://github.com/fistfulayen/ubtrippin/blob/main/docs/API.md"
+              href="/api/v1/docs"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-500"
             >
-              docs/API.md <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+              API Reference <ExternalLink className="h-3.5 w-3.5" />
+            </a>{' '}
+            — full REST API docs with examples, CLI quickstart, and MCP setup
           </li>
           <li>
-            MCP server docs:{' '}
-            <a
-              href="https://github.com/fistfulayen/ubtrippin/blob/main/mcp/README.md"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-500"
-            >
-              mcp/README.md <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          </li>
-          <li>
-            OpenClaw skill and agent setup:{' '}
-            <a
-              href="/docs/agents"
-              className="text-indigo-600 hover:text-indigo-500"
-            >
-              Agent integration docs
-            </a>
+            <Link href="/docs/agents" className="text-indigo-600 hover:text-indigo-500">
+              Agent Integration Guide
+            </Link>{' '}
+            — setup guides for OpenClaw, Claude Desktop, Cursor, ChatGPT, and the REST API
           </li>
           <li>
             Webhook notifications:{' '}

@@ -18,11 +18,18 @@ This installs the full skill with all endpoints and agent workflows documented.
   "mcpServers": {
     "ubtrippin": {
       "command": "npx",
-      "args": ["ubtrippin-mcp"],
+      "args": ["-y", "ubtrippin-mcp"],
       "env": { "UBT_API_KEY": "ubt_k1_..." }
     }
   }
 }
+\`\`\`
+
+**CLI:**
+\`\`\`bash
+npm install -g ubtrippin-cli   # or clone the repo and use cli/ubt directly
+ubt login                     # authenticate with your API key
+ubt trips list                # you're in
 \`\`\`
 
 **For any agent with HTTP access:** Use the REST API below.
@@ -655,6 +662,55 @@ Admin allowlist is set via the \`EVENT_PIPELINE_ADMIN_EMAILS\` environment varia
 10. **Upcoming events:** \`GET /api/v1/trips\` → filter items where kind = "ticket"
 11. **City events & exhibitions:** \`GET /api/v1/events?city=paris&from=2026-04-01\` (no auth)
 11. **Download ticket PDF:** \`GET /api/v1/trips/:id/items/:itemId/ticket-pdf\`
+
+---
+
+## CLI Reference
+
+The \`ubt\` CLI wraps the REST API for terminal and agent use.
+
+### Setup
+
+\`\`\`bash
+ubt login          # prompts for API key, saves to ~/.ubt/config
+ubt whoami         # verify authentication
+ubt selftest       # test API connectivity
+\`\`\`
+
+### Core Commands
+
+| Command | Description |
+|---------|-------------|
+| \`ubt trips list\` | List all trips (owned + shared) |
+| \`ubt trips show <id>\` | Show trip details + items |
+| \`ubt trips search <query>\` | Search by title/location |
+| \`ubt trips create <title> --start Y-M-D --end Y-M-D\` | Create a trip |
+| \`ubt trips status <id>\` | Live statuses for trip flights/trains |
+| \`ubt items search --date Y-M-D --kind flight\` | Search items across all trips |
+| \`ubt items add <trip_id> --kind flight --summary "AF276 CDG→NRT" --start-ts ...\` | Add item to trip |
+| \`ubt items status <id>\` | Live status for a single item |
+| \`ubt items refresh <id>\` | Force-refresh live status |
+| \`ubt tickets list\` | List all tickets/events |
+| \`ubt guides list\` | List city guides |
+| \`ubt guides create <city> --country X\` | Create guide |
+| \`ubt guides entry add <id> --name X --category X\` | Add guide entry |
+| \`ubt trains status <number>\` | Real-time train status |
+| \`ubt profile show\` | Show profile + loyalty vault |
+| \`ubt profile loyalty lookup <provider>\` | Lookup loyalty by provider |
+| \`ubt family list\` | List families |
+| \`ubt family loyalty lookup <id> <provider>\` | Family loyalty lookup |
+| \`ubt billing show\` | Current subscription |
+| \`ubt calendar get\` | iCal feed URL |
+| \`ubt webhooks list\` | List registered webhooks |
+| \`ubt senders list\` | List allowed email senders |
+| \`ubt notifications list --unread\` | Unread notifications |
+
+### Options
+
+- \`FORMAT=json ubt ...\` — raw JSON output (for scripts/agents)
+- \`UBT_API_URL=...\` — override API base URL
+
+Full command list: \`ubt help\`
 
 ---
 
