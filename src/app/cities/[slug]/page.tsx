@@ -6,7 +6,6 @@ import { EventFeedbackForm } from '@/components/events/event-feedback-form'
 import { EventFilterBar } from '@/components/events/event-filter-bar'
 import { EventUpsellOverlay } from '@/components/events/event-upsell-overlay'
 import { PipelineTransparency } from '@/components/events/pipeline-transparency'
-import { PublicNav } from '@/components/public-nav'
 import {
   flagEmoji,
   getCityEventsPageData,
@@ -124,9 +123,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   const structuredData = buildStructuredData(data.city.city, visibleEvents.slice(0, 8))
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
-      <PublicNav />
-      <main className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
         <section className="relative min-h-[280px] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white sm:min-h-[320px]">
           <div className="absolute inset-0">
             {data.city.hero_image_url ? (
@@ -204,7 +201,6 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-      </main>
     </div>
   )
 }

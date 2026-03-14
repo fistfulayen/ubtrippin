@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { CityDirectoryCard } from '@/components/events/city-directory-card'
-import { PublicNav } from '@/components/public-nav'
 import { getItineraryCities, getTrackedCitiesWithEventCounts } from '@/lib/events/queries'
 
 export const metadata: Metadata = {
@@ -25,9 +24,7 @@ export default async function CitiesPage() {
   const itinerarySlugs = new Set(itineraryCities.map((city) => city.slug))
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
-      <PublicNav />
-      <main className="mx-auto max-w-7xl space-y-12 px-4 py-10 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl space-y-12 px-4 py-10 sm:px-6 lg:px-8">
         <section className="max-w-3xl space-y-4">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-indigo-700">City Events</p>
           <h1 className="font-serif text-5xl text-slate-950">Exceptional things worth leaving the hotel for.</h1>
@@ -61,7 +58,6 @@ export default async function CitiesPage() {
             ))}
           </div>
         </section>
-      </main>
     </div>
   )
 }
