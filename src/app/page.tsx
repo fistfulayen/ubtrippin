@@ -2,6 +2,16 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import {
+  Plane,
+  Users,
+  CreditCard,
+  CalendarSync,
+  MapPin,
+  UserPlus,
+  Ticket,
+  Radio,
+} from 'lucide-react'
 import { AgentTabs } from '@/components/agent-tabs'
 import { PublicNav } from '@/components/public-nav'
 import { PublicFooter } from '@/components/public-footer'
@@ -24,42 +34,42 @@ export default async function HomePage() {
 
   const features = [
     {
-      icon: '/airplane_icon.png',
+      Icon: Plane,
       title: 'All your bookings',
       body: 'Stop digging through email for that confirmation number. Forward your booking emails and everything appears — flights, hotels, trains, concerts, events, restaurants.',
     },
     {
-      icon: '/family_icon.png',
+      Icon: Users,
       title: 'Family sharing',
       body: "Traveling with family? Everyone sees everyone's trips. Forward an email and the whole family knows the plan.",
     },
     {
-      icon: '/loyalty_icon.png',
+      Icon: CreditCard,
       title: 'Loyalty vault',
       body: "All your frequent flyer and hotel numbers in one place. Encrypted, always at hand when you're booking.",
     },
     {
-      icon: '/calendar_icon.png',
+      Icon: CalendarSync,
       title: 'Calendar sync',
       body: 'Subscribe once. Your trips show up in your calendar with real-time flight and train status.',
     },
     {
-      icon: '/guides_icon.png',
+      Icon: MapPin,
       title: 'City guides',
       body: 'Remember that incredible coffee shop in Lisbon? Add it. Share your city favorites with friends.',
     },
     {
-      icon: '/collaborate_icon.png',
+      Icon: UserPlus,
       title: 'Collaborate',
       body: 'Invite co-travelers. Everyone can add and edit. Plan together.',
     },
     {
-      icon: '/ticket_icon.png',
+      Icon: Ticket,
       title: 'Concerts & events',
       body: 'Forward your Ticketmaster email. Venue, seats, performer, door time — all extracted. PDF tickets stored. Wallet links preserved.',
     },
     {
-      icon: '/flight_status_icon.png',
+      Icon: Radio,
       title: 'Live flight status',
       body: 'Real-time gate changes, delays, and cancellations via FlightAware. Updated automatically as departure approaches.',
     },
@@ -88,7 +98,7 @@ export default async function HomePage() {
                   href="/login"
                   className="inline-flex items-center gap-3 px-8 py-4 text-sm tracking-widest uppercase bg-[#1e293b] text-white hover:bg-[#312e81] transition-all font-medium shadow-xl hover:scale-105"
                 >
-                  <Image src="/airplane_icon.png" alt="" width={24} height={24} className="w-5 h-5 object-contain" />
+                  <Plane className="w-5 h-5" strokeWidth={1.5} />
                   Get started — it&apos;s free
                 </Link>
                 <a
@@ -182,14 +192,8 @@ export default async function HomePage() {
                   key={feat.title}
                   className="p-6 border-2 border-[#cbd5e1] hover:border-[#312e81] transition-colors bg-[#f8fafc] rounded-lg"
                 >
-                  <div className="w-20 h-20 mb-5 flex items-center justify-center">
-                    <Image
-                      src={feat.icon}
-                      alt=""
-                      width={80}
-                      height={80}
-                      className="w-20 h-20 object-contain"
-                    />
+                  <div className="w-14 h-14 mb-5 flex items-center justify-center rounded-lg bg-[#312e81]/5">
+                    <feat.Icon className="w-7 h-7 text-[#312e81]" strokeWidth={1.5} />
                   </div>
                   <h3 className="text-sm font-bold text-[#1e293b] mb-2 uppercase tracking-wide">{feat.title}</h3>
                   <p className="text-sm text-slate-500 leading-relaxed">{feat.body}</p>
