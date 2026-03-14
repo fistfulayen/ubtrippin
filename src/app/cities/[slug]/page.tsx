@@ -127,21 +127,25 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
       <PublicNav />
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-10 sm:px-6 lg:px-8">
-        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 px-6 py-8 text-white sm:px-8">
-          <div className="absolute inset-0 opacity-30">
+        <section className="relative min-h-[280px] overflow-hidden rounded-[2rem] border border-slate-200 bg-slate-950 text-white sm:min-h-[320px]">
+          <div className="absolute inset-0">
             {data.city.hero_image_url ? (
               <img src={data.city.hero_image_url} alt={data.city.city} className="h-full w-full object-cover" />
-            ) : null}
+            ) : (
+              <div className="h-full w-full bg-gradient-to-br from-slate-900 to-indigo-950" />
+            )}
           </div>
-          <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/85 to-indigo-950/70" />
-          <div className="relative max-w-3xl space-y-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-indigo-200">
-              {flagEmoji(data.city.country_code)} {data.city.country}
-            </p>
-            <h1 className="font-serif text-5xl">What&apos;s On in {data.city.city}</h1>
-            <p className="text-lg text-white/80">
-              {visibleEvents.length} curated picks between {from} and {to}.
-            </p>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/30 to-slate-950/10" />
+          <div className="relative flex min-h-[280px] flex-col justify-end px-6 py-8 sm:min-h-[320px] sm:px-8">
+            <div className="max-w-3xl space-y-4">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-white/75">
+                {flagEmoji(data.city.country_code)} {data.city.country}
+              </p>
+              <h1 className="font-serif text-5xl">What&apos;s On in {data.city.city}</h1>
+              <p className="text-lg text-white/80">
+                {visibleEvents.length} curated picks between {from} and {to}.
+              </p>
+            </div>
           </div>
         </section>
 
