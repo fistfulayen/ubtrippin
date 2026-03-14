@@ -4,7 +4,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Calendar, CalendarDays, MapPin, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { formatDateRange } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -280,7 +279,7 @@ export default async function SharePage({ params }: SharePageProps) {
     }
   }
 
-  const supabaseForHeroes = createSecretClient()
+  const supabaseForHeroes = await createClient()
   const weatherTimeline = attachWeatherToTimeline(buildTimeline(obfuscatedItems), sharedWeather?.destinations ?? [])
   const timeline = await attachCityHeroes(weatherTimeline, supabaseForHeroes)
 

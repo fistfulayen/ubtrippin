@@ -7,6 +7,22 @@ import type { CitySegment } from '@/lib/trips/city-segments'
 import type { Trip } from '@/types/database'
 import { TripItemCard } from './trip-item-card'
 
+// Allowed domains for hero images (Supabase storage buckets)
+const ALLOWED_HERO_DOMAINS = [
+  'cqijgtijuselspyzpphf.supabase.co',
+  'localhost',
+]
+
+function isValidHeroUrl(url: string | undefined): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return ALLOWED_HERO_DOMAINS.includes(parsed.hostname)
+  } catch {
+    return false
+  }
+}
+
 interface CitySegmentBlockProps {
   segment: CitySegment
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
@@ -32,7 +48,7 @@ export function CitySegmentBlock({
   readOnly = false,
 }: CitySegmentBlockProps) {
   const hasHotel = segment.items.some((item) => item.kind === 'hotel')
-  const hasHero = !!segment.heroImageUrl
+  const hasHero = isValidHeroUrl(segment.heroImageUrl)
 
   return (
     <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
