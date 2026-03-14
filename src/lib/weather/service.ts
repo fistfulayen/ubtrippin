@@ -3,7 +3,7 @@ import type { Database, Json } from '@/types/database'
 import { extractTripCities } from './cities'
 import { fetchForecast, hasTripCompleted, isTripWithinForecastWindow } from './forecast'
 import { geocodeCity } from './geocode'
-import { generatePackingSuggestions, unitSymbol } from './packing'
+import { unitSymbol } from './packing'
 import type {
   PackingList,
   TemperatureUnit,
@@ -16,6 +16,29 @@ import type {
 type DbClient = SupabaseClient<Database>
 type WeatherCacheRow = Database['public']['Tables']['trip_weather_cache']['Row']
 type WeatherCacheInsert = Database['public']['Tables']['trip_weather_cache']['Insert']
+type PrefetchedTripContext = {
+  start_date: string | null
+  end_date: string | null
+  primary_location: string | null
+  id?: string
+  user_id?: string
+  title?: string
+  share_enabled?: boolean
+}
+type PrefetchedTripItemContext = Array<{
+  kind: WeatherTripItem['kind']
+  start_date: string | null
+  end_date: string | null
+  start_location: string | null
+  end_location: string | null
+  id?: string
+  trip_id?: string | null
+  start_ts?: string | null
+  end_ts?: string | null
+  provider?: string | null
+  summary?: string | null
+  details_json?: Json
+}>
 
 interface WeatherCacheSelectQuery {
   eq: (column: string, value: string) => {
@@ -133,11 +156,47 @@ async function loadCache(tripId: string, supabase: DbClient): Promise<WeatherCac
   return (data ?? []) as WeatherCacheRow[]
 }
 
+function buildPrefetchedContext(params: {
+  tripId: string
+  userId: string
+  prefetchedTrip: PrefetchedTripContext
+  prefetchedItems: PrefetchedTripItemContext
+}): {
+  trip: WeatherTrip
+  items: WeatherTripItem[]
+} {
+  return {
+    trip: {
+      id: params.prefetchedTrip.id ?? params.tripId,
+      user_id: params.prefetchedTrip.user_id ?? params.userId,
+      title: params.prefetchedTrip.title ?? 'Trip',
+      start_date: params.prefetchedTrip.start_date,
+      end_date: params.prefetchedTrip.end_date,
+      share_enabled: params.prefetchedTrip.share_enabled,
+    },
+    items: params.prefetchedItems.map((item, index) => ({
+      id: item.id ?? `${params.tripId}-${index}`,
+      trip_id: item.trip_id ?? params.tripId,
+      kind: item.kind,
+      start_date: item.start_date ?? '',
+      end_date: item.end_date,
+      start_ts: item.start_ts ?? null,
+      end_ts: item.end_ts ?? null,
+      start_location: item.start_location,
+      end_location: item.end_location,
+      provider: item.provider ?? null,
+      summary: item.summary ?? null,
+      details_json: item.details_json ?? {},
+    })),
+  }
+}
+
 export async function buildWeatherPayload(params: {
   trip: WeatherTrip
   items: WeatherTripItem[]
   unit: TemperatureUnit
   includePacking: boolean
+  cachedPacking?: PackingList | null
 }): Promise<WeatherResponsePayload> {
   if (hasTripCompleted(params.trip.end_date)) {
     return {
@@ -240,15 +299,7 @@ export async function buildWeatherPayload(params: {
   }
 
   const tempRange = buildTempRange(destinations, params.unit)
-  const packing =
-    params.includePacking && tempRange
-      ? await generatePackingSuggestions({
-          tripTitle: params.trip.title,
-          destinations,
-          tempRange,
-          travelerCount: 1,
-        })
-      : null
+  const packing = params.includePacking && tempRange ? params.cachedPacking ?? null : null
 
   return {
     trip_id: params.trip.id,
@@ -272,8 +323,18 @@ export async function getTripWeather(params: {
   requestedUnit?: TemperatureUnit
   forceRefresh?: boolean
   includePacking: boolean
+  prefetchedTrip?: PrefetchedTripContext
+  prefetchedItems?: PrefetchedTripItemContext
 }): Promise<WeatherResponsePayload | null> {
-  const context = await loadTripContext(params.tripId, params.supabase)
+  const context =
+    params.prefetchedTrip && params.prefetchedItems
+      ? buildPrefetchedContext({
+          tripId: params.tripId,
+          userId: params.userId,
+          prefetchedTrip: params.prefetchedTrip,
+          prefetchedItems: params.prefetchedItems,
+        })
+      : await loadTripContext(params.tripId, params.supabase)
   if (!context) return null
 
   const { trip, items } = context
@@ -339,6 +400,8 @@ export async function getTripWeather(params: {
     )
 
   const freshCache = cacheMatches && cachedRows.length > 0 && cachedRows.every((row) => isCacheFresh(row.fetched_at))
+  const cachedPacking =
+    params.includePacking && cacheMatches ? parsePacking(cachedRows[0]?.packing_json ?? null) : null
 
   if (!params.forceRefresh && freshCache) {
     const destinations = cachedRows.map((row) => ({
@@ -358,7 +421,7 @@ export async function getTripWeather(params: {
       trip_title: trip.title,
       temp_range: buildTempRange(destinations, unit),
       destinations,
-      packing: params.includePacking ? parsePacking(cachedRows[0]?.packing_json ?? null) : null,
+      packing: cachedPacking,
       fetched_at: cachedRows[0]?.fetched_at ?? null,
       is_stale: false,
       unit,
@@ -372,6 +435,7 @@ export async function getTripWeather(params: {
     items,
     unit,
     includePacking: params.includePacking,
+    cachedPacking,
   })
   const destinations = refreshed.destinations
   const packing = refreshed.packing

@@ -1,3 +1,4 @@
+import { Suspense, cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { TripHeader } from '@/components/trips/trip-header'
@@ -9,6 +10,8 @@ import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
 import { getTripTimelineEventPreviews } from '@/lib/events/queries'
 import { getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
+import type { TemperatureUnit, WeatherResponsePayload } from '@/lib/weather/types'
+import type { Trip, TripItem } from '@/types/database'
 import { ArrowLeft, Users } from 'lucide-react'
 import Link from 'next/link'
 
@@ -16,19 +19,44 @@ interface TripPageProps {
   params: Promise<{ id: string }>
 }
 
+type TripListEntry = Pick<Trip, 'id' | 'title' | 'start_date'>
+type StreamedTrip = Trip
+type StreamedItem = TripItem
+
+const loadTripWeatherForStream = cache(async (params: {
+  tripId: string
+  userId: string
+  requestedUnit: TemperatureUnit
+  includePacking: boolean
+  trip: StreamedTrip
+  items: StreamedItem[]
+}) => {
+  const supabase = await createClient()
+
+  return getTripWeather({
+    tripId: params.tripId,
+    supabase,
+    userId: params.userId,
+    requestedUnit: params.requestedUnit,
+    includePacking: params.includePacking,
+    prefetchedTrip: params.trip,
+    prefetchedItems: params.items,
+  })
+})
+
 export default async function TripPage({ params }: TripPageProps) {
   const { id } = await params
   const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  const { data: trip, error } = await supabase
-    .from('trips')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const [
+    {
+      data: { user },
+    },
+    { data: trip, error },
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from('trips').select('*').eq('id', id).single(),
+  ])
 
   if (error || !trip) {
     notFound()
@@ -36,7 +64,6 @@ export default async function TripPage({ params }: TripPageProps) {
 
   const isOwner = trip.user_id === user?.id
 
-  // Fetch collaborator record if user is not owner (to get their role)
   let collabRole: string | null = null
   let inviterName: string | null = null
 
@@ -55,7 +82,6 @@ export default async function TripPage({ params }: TripPageProps) {
     }
   }
 
-  // Parallel: fetch items, all trips, collaborators, profile, and temp unit simultaneously
   const [
     { data: items },
     { data: allTrips },
@@ -96,24 +122,11 @@ export default async function TripPage({ params }: TripPageProps) {
 
   const canEdit = isOwner || collabRole === 'editor'
   const isPro = profileData?.subscription_tier === 'pro'
-  const weather = user
-    ? await getTripWeather({
-        tripId: trip.id,
-        supabase,
-        userId: user.id,
-        requestedUnit: userUnit,
-        includePacking: isPro,
-      })
-    : null
-  const timeline = attachWeatherToTimeline(buildTimeline(items || []), weather?.destinations ?? [])
-  const segmentEntries = timeline
-    .filter((entry) => entry.type === 'segment' && entry.segment != null)
-    .map((entry) => entry.segment!)
-  const segmentEvents = await getTripTimelineEventPreviews(supabase, segmentEntries)
+  const tripItems = items ?? []
+  const tripOptions = allTrips ?? []
 
   return (
     <div className="space-y-6">
-      {/* Back link */}
       <Link
         href="/trips"
         className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
@@ -122,42 +135,171 @@ export default async function TripPage({ params }: TripPageProps) {
         Back to trips
       </Link>
 
-      {/* "Shared by" notice for collaborators */}
       {!isOwner && inviterName && (
         <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-700">
           <Users className="h-4 w-4 shrink-0" />
           <span>
             Shared by <strong>{inviterName}</strong>
-            {collabRole === 'viewer' && ' — view only'}
+            {collabRole === 'viewer' && ' - view only'}
           </span>
         </div>
       )}
 
       {trip.is_demo && <DemoTripBanner />}
 
-      {/* Trip header with title, dates, location */}
       <TripHeader trip={trip} />
 
-      {/* Actions bar — show to owners and editors */}
       {canEdit && (
-        <TripActions trip={trip} allTrips={allTrips || []} isOwner={isOwner} isPro={isPro} />
+        <TripActions trip={trip} allTrips={tripOptions} isOwner={isOwner} isPro={isPro} />
       )}
 
-      {/* Collaborators section */}
       <CollaboratorsSection
         tripId={id}
-        collaborators={collaborators || []}
+        collaborators={collaborators ?? []}
         isOwner={isOwner}
       />
 
-      <MovementTimeline
-        entries={timeline}
-        allTrips={allTrips || []}
-        currentUserId={user?.id}
-        segmentEvents={segmentEvents}
-      />
+      <Suspense fallback={<TimelineSectionFallback />}>
+        <TimelineWithEventsAsync
+          trip={trip}
+          items={tripItems}
+          allTrips={tripOptions}
+          currentUserId={user?.id}
+          userUnit={userUnit}
+          isPro={isPro}
+        />
+      </Suspense>
 
-      <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
+      <Suspense fallback={<WeatherSectionFallback />}>
+        <WeatherSectionAsync
+          trip={trip}
+          items={tripItems}
+          userId={user?.id}
+          userUnit={userUnit}
+          isPro={isPro}
+        />
+      </Suspense>
     </div>
+  )
+}
+
+interface WeatherSectionAsyncProps {
+  trip: StreamedTrip
+  items: StreamedItem[]
+  userId?: string
+  userUnit: TemperatureUnit
+  isPro: boolean
+}
+
+async function WeatherSectionAsync({
+  trip,
+  items,
+  userId,
+  userUnit,
+  isPro,
+}: WeatherSectionAsyncProps) {
+  if (!userId) return null
+
+  const weather = await loadTripWeatherForStream({
+    tripId: trip.id,
+    userId,
+    requestedUnit: userUnit,
+    includePacking: isPro,
+    trip,
+    items,
+  })
+
+  return (
+    <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
+  )
+}
+
+interface TimelineWithEventsAsyncProps {
+  trip: StreamedTrip
+  items: StreamedItem[]
+  allTrips: TripListEntry[]
+  currentUserId?: string
+  userUnit: TemperatureUnit
+  isPro: boolean
+  weather?: WeatherResponsePayload | null
+}
+
+async function TimelineWithEventsAsync({
+  trip,
+  items,
+  allTrips,
+  currentUserId,
+  userUnit,
+  isPro,
+  weather,
+}: TimelineWithEventsAsyncProps) {
+  const resolvedWeather =
+    weather ??
+    (currentUserId
+      ? await loadTripWeatherForStream({
+          tripId: trip.id,
+          userId: currentUserId,
+          requestedUnit: userUnit,
+          includePacking: isPro,
+          trip,
+          items,
+        })
+      : null)
+
+  const timeline = attachWeatherToTimeline(buildTimeline(items), resolvedWeather?.destinations ?? [])
+  const segmentEntries = timeline
+    .filter((entry) => entry.type === 'segment' && entry.segment != null)
+    .map((entry) => entry.segment!)
+  const segmentEvents = currentUserId
+    ? await getTripTimelineEventPreviews(await createClient(), segmentEntries)
+    : {}
+
+  return (
+    <MovementTimeline
+      entries={timeline}
+      allTrips={allTrips}
+      currentUserId={currentUserId}
+      segmentEvents={segmentEvents}
+    />
+  )
+}
+
+function TimelineSectionFallback() {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div
+          key={index}
+          className="animate-pulse rounded-3xl border border-gray-200 bg-white p-5 shadow-sm"
+        >
+          <div className="h-4 w-24 rounded-full bg-gray-200" />
+          <div className="mt-4 h-8 w-52 rounded-lg bg-gray-200" />
+          <div className="mt-3 flex flex-wrap gap-3">
+            <div className="h-4 w-28 rounded-full bg-gray-200" />
+            <div className="h-4 w-36 rounded-full bg-gray-200" />
+            <div className="h-4 w-20 rounded-full bg-gray-200" />
+          </div>
+          <div className="mt-5 h-24 rounded-2xl bg-gray-200" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function WeatherSectionFallback() {
+  return (
+    <section className="space-y-4 rounded-[28px] border border-gray-200 bg-[#f7fbff] p-5 animate-pulse">
+      <div className="space-y-2">
+        <div className="h-6 w-52 rounded-lg bg-gray-200" />
+        <div className="h-4 w-72 rounded-lg bg-gray-200" />
+      </div>
+      <div className="h-24 rounded-2xl bg-gray-200" />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="h-40 rounded-2xl bg-gray-200" />
+        ))}
+      </div>
+      <div className="h-40 rounded-2xl bg-gray-200" />
+    </section>
   )
 }
