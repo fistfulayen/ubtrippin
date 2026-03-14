@@ -34,6 +34,7 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           # Auto-review PRs with security + correctness focus
           claude_args: >-
             --append-system-prompt "You are reviewing code for UB Trippin, a Next.js + Supabase travel app.
