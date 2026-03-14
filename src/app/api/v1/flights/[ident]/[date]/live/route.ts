@@ -167,10 +167,12 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
     return null
   }
 
+  // Use a 36-hour window from midnight UTC to capture flights that depart
+  // late evening local time (which crosses into the next UTC day).
+  // Example: 9 PM EDT on March 13 = 01:00 UTC March 14.
   const start = `${date}T00:00:00Z`
-  const endOfDay = new Date(`${date}T23:59:59Z`)
-  const maxEnd = new Date(Date.now() + 47 * 60 * 60 * 1000)
-  const endDate = endOfDay < maxEnd ? endOfDay : maxEnd
+  const startMs = new Date(start).getTime()
+  const endDate = new Date(startMs + 36 * 60 * 60 * 1000)
   const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
   
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
@@ -188,8 +190,26 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
 
     const payload = await response.json() as Record<string, unknown>
     const flights = Array.isArray(payload?.flights) ? payload.flights : []
-    const first = flights[0] as Record<string, unknown> | undefined
-    if (!first) return null
+    if (flights.length === 0) return null
+
+    // Pick the best matching flight: prefer the one whose scheduled_out is
+    // closest to the target date. This avoids returning an earlier same-day
+    // flight that has already landed when the intended flight departs late evening.
+    const targetMs = new Date(`${date}T12:00:00Z`).getTime() // midpoint of target date
+    let first = flights[0] as Record<string, unknown>
+    if (flights.length > 1) {
+      let bestDist = Infinity
+      for (const f of flights) {
+        const fl = f as Record<string, unknown>
+        const schedOut = asString(fl.scheduled_out)
+        if (!schedOut) continue
+        const dist = Math.abs(new Date(schedOut).getTime() - targetMs)
+        if (dist < bestDist) {
+          bestDist = dist
+          first = fl
+        }
+      }
+    }
 
     const delayMinutes = calculateDelayMinutes(first)
     const status = mapFlightStatus(first, delayMinutes)
