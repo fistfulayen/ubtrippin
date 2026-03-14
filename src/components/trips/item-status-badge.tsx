@@ -175,7 +175,13 @@ export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusU
   // The GET /status endpoint returns { status: 'unknown' } when there's no
   // cached row — that's truthy, so we must check the inner status field.
   const hasTriggeredAutoRefresh = useRef(false)
-  const needsRefresh = !status || status.status === 'unknown'
+  const isStale = (() => {
+    if (!status?.last_checked_at) return true
+    const checkedAt = new Date(status.last_checked_at).getTime()
+    if (Number.isNaN(checkedAt)) return true
+    return Date.now() - checkedAt > 5 * 60 * 1000 // stale if >5 minutes old
+  })()
+  const needsRefresh = !status || status.status === 'unknown' || isStale
   useEffect(() => {
     if (!loading && needsRefresh && !hasTriggeredAutoRefresh.current) {
       hasTriggeredAutoRefresh.current = true
