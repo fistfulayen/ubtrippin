@@ -172,7 +172,7 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
   // Example: 9 PM EDT on March 13 = 01:00 UTC March 14.
   const start = `${date}T00:00:00Z`
   const startMs = new Date(start).getTime()
-  const endDate = new Date(startMs + 36 * 60 * 60 * 1000)
+  const endDate = new Date(Math.min(startMs + 36 * 60 * 60 * 1000, Date.now() + 47 * 60 * 60 * 1000))
   const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
   
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
