@@ -125,18 +125,24 @@ export function FlightStatusBlock({
   const arrEstimated = formatTimeInZone(estimatedArrival, arrTz)
   const arrActual = formatTimeInZone(actualArrival, arrTz)
 
-  // Determine what time to show
-  const depDisplay = depActual ?? depEstimated ?? depScheduled
-  const arrDisplay = arrActual ?? arrEstimated ?? arrScheduled
-  
-  // Determine if delayed
-  const isDelayed = status === 'delayed' && (delayMinutes ?? 0) > 0
+  // Determine what time to show.
+  // Default: scheduled time (what the ticket says).
+  // If delayed and not yet departed: show estimated (the current expected time).
+  // Once departed/landed: revert to scheduled unless there was a delay,
+  // in which case show the actual departure but annotate with "originally".
+  const isDelayedStatus = status === 'delayed'
+  const depDisplay = isDelayedStatus
+    ? (depEstimated ?? depScheduled)
+    : (depScheduled ?? depActual)
+  const arrDisplay = isDelayedStatus
+    ? (arrEstimated ?? arrScheduled)
+    : (arrScheduled ?? arrActual)
   
   // Build delay message
   let delayMessage = ''
-  if (isDelayed && depScheduled && depEstimated && depScheduled !== depEstimated) {
+  if (isDelayedStatus && (delayMinutes ?? 0) > 0 && depScheduled && depEstimated && depScheduled !== depEstimated) {
     delayMessage = `Originally ${depScheduled} · Now ${depEstimated} · ${delayMinutes} min late`
-  } else if (isDelayed && (delayMinutes ?? 0) > 0) {
+  } else if (isDelayedStatus && (delayMinutes ?? 0) > 0) {
     delayMessage = `${delayMinutes} min late`
   }
 
@@ -146,7 +152,7 @@ export function FlightStatusBlock({
       <div className={cn('px-6 py-4 border-b', meta.toneClass)}>
         <div className="flex items-center justify-between">
           <span className="font-semibold text-lg">{meta.label}</span>
-          {isDelayed && delayMessage && (
+          {isDelayedStatus && delayMessage && (
             <span className="text-sm opacity-90">{delayMessage}</span>
           )}
         </div>
@@ -168,9 +174,14 @@ export function FlightStatusBlock({
               <p className="text-3xl font-light text-slate-400">--:--</p>
             )}
             
-            {depEstimated && depScheduled && depEstimated !== depScheduled && !actualDeparture && (
+            {isDelayedStatus && depScheduled && depEstimated && depScheduled !== depEstimated && (
               <p className="text-sm text-amber-600 mt-1">
                 Originally {depScheduled}
+              </p>
+            )}
+            {!isDelayedStatus && depActual && depScheduled && depActual !== depScheduled && (
+              <p className="text-sm text-slate-500 mt-1">
+                Departed {depActual}
               </p>
             )}
           </div>
@@ -196,9 +207,14 @@ export function FlightStatusBlock({
               <p className="text-3xl font-light text-slate-400">--:--</p>
             )}
             
-            {arrEstimated && arrScheduled && arrEstimated !== arrScheduled && !actualArrival && (
+            {isDelayedStatus && arrScheduled && arrEstimated && arrScheduled !== arrEstimated && (
               <p className="text-sm text-amber-600 mt-1">
                 Originally {arrScheduled}
+              </p>
+            )}
+            {!isDelayedStatus && arrActual && arrScheduled && arrActual !== arrScheduled && (
+              <p className="text-sm text-slate-500 mt-1">
+                Arrived {arrActual}
               </p>
             )}
           </div>
