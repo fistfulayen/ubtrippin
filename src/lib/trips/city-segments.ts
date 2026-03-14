@@ -34,6 +34,7 @@ export interface CitySegment {
   anchorType: 'hotel' | 'airport' | 'activity'
   items: TripItem[]
   isReturnHome?: boolean
+  heroImageUrl?: string
   weather?: {
     daily: TimelineWeatherDay[]
   }

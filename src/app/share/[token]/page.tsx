@@ -13,6 +13,7 @@ import { buildWeatherPayload, getTemperatureUnit, getTripWeather } from '@/lib/w
 import type { Json, TripItem } from '@/types/database'
 import type { WeatherTripItem } from '@/lib/weather/types'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
+import { attachCityHeroes } from '@/lib/trips/city-heroes'
 import { MovementTimeline } from '@/components/trips/movement-timeline'
 import { ShareTripButton } from './share-trip-button'
 
@@ -279,7 +280,9 @@ export default async function SharePage({ params }: SharePageProps) {
     }
   }
 
-  const timeline = attachWeatherToTimeline(buildTimeline(obfuscatedItems), sharedWeather?.destinations ?? [])
+  const supabaseForHeroes = createSecretClient()
+  const weatherTimeline = attachWeatherToTimeline(buildTimeline(obfuscatedItems), sharedWeather?.destinations ?? [])
+  const timeline = await attachCityHeroes(weatherTimeline, supabaseForHeroes)
 
   return (
     <div className="flex min-h-screen flex-col bg-[#ffffff]">

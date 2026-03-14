@@ -8,6 +8,7 @@ import { CollaboratorsSection } from '@/components/trips/collaborators-section'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
+import { attachCityHeroes } from '@/lib/trips/city-heroes'
 import { getTripTimelineEventPreviews } from '@/lib/events/queries'
 import { getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
 import type { TemperatureUnit, WeatherResponsePayload } from '@/lib/weather/types'
@@ -246,7 +247,9 @@ async function TimelineWithEventsAsync({
         })
       : null)
 
-  const timeline = attachWeatherToTimeline(buildTimeline(items), resolvedWeather?.destinations ?? [])
+  const supabaseForHeroes = await createClient()
+  const weatherTimeline = attachWeatherToTimeline(buildTimeline(items), resolvedWeather?.destinations ?? [])
+  const timeline = await attachCityHeroes(weatherTimeline, supabaseForHeroes)
   const segmentEntries = timeline
     .filter((entry) => entry.type === 'segment' && entry.segment != null)
     .map((entry) => entry.segment!)
