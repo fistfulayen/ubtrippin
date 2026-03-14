@@ -250,6 +250,7 @@ async function TimelineWithEventsAsync({
   const segmentEntries = timeline
     .filter((entry) => entry.type === 'segment' && entry.segment != null)
     .map((entry) => entry.segment!)
+
   const segmentEvents = currentUserId
     ? await getTripTimelineEventPreviews(await createClient(), segmentEntries)
     : {}
