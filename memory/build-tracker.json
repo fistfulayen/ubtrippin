@@ -1,0 +1,10 @@
+{
+  "pr-103": {
+    "pr_number": 103,
+    "title": "fix: show dashboard nav on /cities pages when logged in",
+    "branch": "fix/auth-aware-nav-cities",
+    "status": "ci_pending",
+    "url": "https://github.com/fistfulayen/ubtrippin/pull/103",
+    "created_at": "2026-03-14T14:40:00Z"
+  }
+}
