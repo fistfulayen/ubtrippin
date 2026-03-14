@@ -42,10 +42,10 @@ export default async function CitiesLayout({
   }
 
   return (
-    <>
+    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
       <PublicNav />
       <main>{children}</main>
       <PublicFooter />
-    </>
+    </div>
   )
 }
