@@ -192,23 +192,27 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
     const flights = Array.isArray(payload?.flights) ? payload.flights : []
     if (flights.length === 0) return null
 
-    // Pick the best matching flight: prefer the one whose scheduled_out is
-    // closest to the target date. This avoids returning an earlier same-day
-    // flight that has already landed when the intended flight departs late evening.
-    const targetMs = new Date(`${date}T12:00:00Z`).getTime() // midpoint of target date
+    // Pick the best matching flight for the URL date.
+    // Strategy: prefer a flight that hasn't landed yet (the one the user cares
+    // about). Among those, pick the latest scheduled_out. If ALL have landed,
+    // pick the latest scheduled_out (most recent departure that day).
     let first = flights[0] as Record<string, unknown>
     if (flights.length > 1) {
-      let bestDist = Infinity
-      for (const f of flights) {
+      const scored = flights.map((f) => {
         const fl = f as Record<string, unknown>
         const schedOut = asString(fl.scheduled_out)
-        if (!schedOut) continue
-        const dist = Math.abs(new Date(schedOut).getTime() - targetMs)
-        if (dist < bestDist) {
-          bestDist = dist
-          first = fl
-        }
-      }
+        const schedMs = schedOut ? new Date(schedOut).getTime() : 0
+        const hasLanded = !!(asString(fl.actual_on) || asString(fl.actual_in))
+        return { fl, schedMs, hasLanded }
+      })
+
+      // Separate into not-landed and landed
+      const notLanded = scored.filter((s) => !s.hasLanded)
+      const pool = notLanded.length > 0 ? notLanded : scored
+
+      // Pick the latest scheduled departure from the preferred pool
+      pool.sort((a, b) => b.schedMs - a.schedMs)
+      first = pool[0].fl
     }
 
     const delayMinutes = calculateDelayMinutes(first)
