@@ -51,6 +51,7 @@ import {
   GenericDetailsView,
 } from './item-details'
 import { ItemStatusBadge, type StatusPayload } from './item-status-badge'
+import { FlightItemCard } from './flight-item-card'
 
 interface TripItemCardProps {
   item: TripItem
@@ -142,6 +143,18 @@ function isWithin48Hours(item: { start_ts?: string | null; start_date?: string |
 }
 
 export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, metaChips, defaultExpanded }: TripItemCardProps) {
+  // Route flights to the dedicated flight card component
+  if (item.kind === 'flight') {
+    return (
+      <FlightItemCard
+        item={item}
+        allTrips={allTrips}
+        currentUserId={currentUserId}
+        readOnly={readOnly}
+      />
+    )
+  }
+
   const router = useRouter()
   const [expanded, setExpanded] = useState(defaultExpanded ?? false)
   const [liveStatus, setLiveStatus] = useState<StatusPayload | null>(null)
@@ -174,9 +187,8 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
     router.refresh()
   }
 
-  const flightPagePath = item.kind === 'flight'
-    ? buildFlightPageUrl(details as Record<string, unknown>, item.start_date)
-    : null
+  // Flight items are handled by FlightItemCard (early return above)
+  const flightPagePath: string | null = null
 
   const handleShareFlight = async () => {
     if (!flightPagePath) return
@@ -273,7 +285,6 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
               <div
                 className={cn(
                   'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                  item.kind === 'flight' && 'bg-blue-100 text-blue-600',
                   item.kind === 'hotel' && 'bg-purple-100 text-purple-600',
                   item.kind === 'train' && 'bg-green-100 text-green-600',
                   item.kind === 'car' && 'bg-[#f1f5f9] text-[#4f46e5]',
@@ -365,7 +376,7 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                   if (!item.start_ts && !det?.departure_local_time && !det?.check_in_time) return null
                   const [start, end] = getLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
                   const datePrefix = item.start_date ? formatShortDate(item.start_date) : ''
-                  const showArrivalDate = item.kind === 'flight' && item.end_date && item.start_date && item.end_date !== item.start_date
+                  const showArrivalDate = false
                   const arrivalDateLabel = showArrivalDate ? formatShortDate(item.end_date) : ''
                   return (
                     <span className="flex items-center gap-1">
@@ -398,29 +409,6 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                 )}
               </div>
 
-              {item.kind === 'flight' && isWithin48Hours(item) && (
-                <>
-                  <ItemStatusBadge
-                    itemId={item.id}
-                    scheduledDeparture={
-                      typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
-                    }
-                    startTs={item.start_ts}
-                    onStatusUpdate={setLiveStatus}
-                  />
-                  {flightPagePath && (
-                    <Link
-                      href={flightPagePath}
-                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                      target="_blank"
-                    >
-                      <Plane className="h-3 w-3" />
-                      Track live & share →
-                    </Link>
-                  )}
-                </>
-              )}
-
               {item.kind === 'train' && isWithin48Hours(item) && (
                 <TrainStatusBadge itemId={item.id} />
               )}
@@ -449,19 +437,6 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                     title="No source email for this item"
                   >
                     <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
-
-                {/* Share button for flights */}
-                {item.kind === 'flight' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={handleShareFlight}
-                    title="Share flight link"
-                  >
-                    <Share2 className="h-4 w-4" />
                   </Button>
                 )}
 
@@ -524,27 +499,6 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
 
               {expanded && (
                 <div className="mt-3">
-                  {item.kind === 'flight' && (
-                    <>
-                      <FlightDetailsView
-                        details={details as FlightDetails}
-                        liveOverrides={liveStatus ? {
-                          departure_terminal: liveStatus.terminal,
-                          departure_gate: liveStatus.gate,
-                        } : undefined}
-                      />
-                      {flightPagePath && !isWithin48Hours(item) && (
-                        <Link
-                          href={flightPagePath}
-                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                          target="_blank"
-                        >
-                          <Plane className="h-3 w-3" />
-                          View live flight page →
-                        </Link>
-                      )}
-                    </>
-                  )}
                   {item.kind === 'hotel' && (
                     <HotelDetailsView
                       details={details as HotelDetails}
