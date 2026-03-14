@@ -147,7 +147,7 @@ function mapFlightStatus(
     case 'delayed':
       return 'delayed'
     case 'taxiing':
-      return 'arrived'
+      return (delayMinutes ?? 0) > 0 ? 'delayed' : 'on_time'
     case 'gate arrival':
       return 'arrived'
     case 'boarding':
@@ -155,7 +155,8 @@ function mapFlightStatus(
     case 'unknown':
       return 'unknown'
     default:
-      console.warn(`[flight-status] unmapped FA status: "${sourceStatus}" (primary: "${primary}")`)
+      const safe = (s: string) => s.replace(/[\r\n]/g, ' ').slice(0, 64)
+      console.warn(`[flight-status] unmapped FA status: "${safe(sourceStatus)}" (primary: "${safe(primary)}")`)
       return 'unknown'
   }
 }
