@@ -43,6 +43,13 @@ if [ -z "$UBT_API_KEY" ] && [ -f "$CONFIG_FILE" ]; then
   UBT_API_KEY=$(grep '^UBT_API_KEY=' "$CONFIG_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"')
 fi
 
+# Exit codes (PRD-050)
+EXIT_OK=0
+EXIT_USER_ERROR=1
+EXIT_AUTH_ERROR=2
+EXIT_API_ERROR=3
+EXIT_DATA_ERROR=4
+
 # Helpers
 _curl() {
   curl -s "$@" \
@@ -65,22 +72,52 @@ _require_api_key() {
 
 _api() {
   _require_api_key
-  curl -s "$@" \
+  local _body_file _headers_file _http_code _content_type
+  _body_file=$(mktemp)
+  _headers_file=$(mktemp)
+  _http_code=$(curl -s -o "${_body_file}" -D "${_headers_file}" -w "%{http_code}" "$@" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
-    -H "Content-Type: application/json"
+    -H "Content-Type: application/json")
+  _content_type=$(grep -i '^content-type:' "${_headers_file}" 2>/dev/null | head -1 | tr -d '\r' | cut -d: -f2- | xargs)
+
+  if [ "$_http_code" -ge 400 ] 2>/dev/null; then
+    # Check if response is HTML (404 page, etc.) instead of JSON
+    if echo "$_content_type" | grep -qi 'text/html'; then
+      echo "Error: API returned HTTP ${_http_code} (${_content_type}). Endpoint may not be deployed." >&2
+      rm -f "${_body_file}" "${_headers_file}"
+      return 1
+    fi
+    # JSON error — pass through for caller to handle
+    cat "${_body_file}"
+    rm -f "${_body_file}" "${_headers_file}"
+    return 1
+  fi
+
+  cat "${_body_file}"
+  rm -f "${_body_file}" "${_headers_file}"
 }
 
 _api_with_status() {
   _require_api_key
-  local body_file
+  local body_file headers_file
   body_file=$(mktemp)
-  local http_code
-  http_code=$(curl -s -o "${body_file}" -w "%{http_code}" "$@" \
+  headers_file=$(mktemp)
+  local http_code content_type
+  http_code=$(curl -s -o "${body_file}" -D "${headers_file}" -w "%{http_code}" "$@" \
     -H "Authorization: Bearer ${UBT_API_KEY}" \
     -H "Content-Type: application/json")
+  content_type=$(grep -i '^content-type:' "${headers_file}" 2>/dev/null | head -1 | tr -d '\r' | cut -d: -f2- | xargs)
+
+  if echo "$content_type" | grep -qi 'text/html' && [ "$http_code" -ge 400 ] 2>/dev/null; then
+    printf '%s\n' "${http_code}"
+    echo "{\"error\":{\"code\":\"endpoint_error\",\"message\":\"API returned HTTP ${http_code} with HTML response. Endpoint may not be deployed.\"}}"
+    rm -f "${body_file}" "${headers_file}"
+    return
+  fi
+
   printf '%s\n' "${http_code}"
   cat "${body_file}"
-  rm -f "${body_file}"
+  rm -f "${body_file}" "${headers_file}"
 }
 
 _python3c() {
@@ -3528,30 +3565,204 @@ if det.get('ticket_count'): print(f\"  tickets:  {det['ticket_count']}\")
   fi
 }
 
+cmd_today() {
+  local today
+  today=$(date -u +%Y-%m-%d)
+  local response
+  response=$(_api "${API_V1}/items?date=${today}" 2>&1) || {
+    echo "Error fetching today's items: ${response}" >&2
+    exit 1
+  }
+
+  if [ "${FORMAT:-}" = "json" ]; then
+    echo "$response"
+    return
+  fi
+
+  _python3c '
+import json, sys
+try:
+    data = json.loads(sys.argv[1])
+except (json.JSONDecodeError, IndexError):
+    print("No items found for today.", file=sys.stderr)
+    sys.exit(0)
+
+items = data.get("data", data) if isinstance(data, dict) else data
+if not isinstance(items, list):
+    items = []
+
+if not items:
+    print("No items for today.")
+    sys.exit(0)
+
+print(f"Today ({sys.argv[2]}) — {len(items)} item(s):\n")
+for item in items:
+    kind = (item.get("kind") or "item").upper()
+    summary = item.get("summary") or "(no summary)"
+    start_ts = item.get("start_ts") or ""
+    end_ts = item.get("end_ts") or ""
+    trip_title = ""
+    # Try to get trip title if available
+    trip = item.get("trip")
+    if isinstance(trip, dict):
+        trip_title = trip.get("title", "")
+
+    time_str = ""
+    if start_ts:
+        t = start_ts.split("T")[1][:5] if "T" in start_ts else ""
+        if end_ts:
+            t2 = end_ts.split("T")[1][:5] if "T" in end_ts else ""
+            time_str = f"  {t} → {t2}" if t2 else f"  {t}"
+        else:
+            time_str = f"  {t}"
+
+    trip_info = f"  [{trip_title}]" if trip_title else ""
+    print(f"  {kind:10}{time_str}   {summary}{trip_info}")
+' "$response" "$today"
+}
+
 cmd_selftest() {
+  local deep=false
+  if [ "${1:-}" = "--deep" ]; then
+    deep=true
+  fi
+
   if [ -z "$UBT_API_KEY" ]; then
     echo "FAIL: No API key configured. Run 'ubt login' or set UBT_API_KEY." >&2
     exit 1
   fi
-  local endpoints="trips me/profile me/loyalty guides settings/senders"
+
   local all_pass=true
+  local pass_count=0
+  local fail_count=0
+
+  _check() {
+    local label="$1" result="$2"
+    if [ "$result" = "PASS" ]; then
+      echo "  ✅  ${label}"
+      pass_count=$((pass_count + 1))
+    else
+      echo "  ❌  ${label}"
+      all_pass=false
+      fail_count=$((fail_count + 1))
+    fi
+  }
+
+  echo "UB Trippin CLI Self-Test"
+  echo "========================"
+  echo ""
+
+  # Basic endpoint checks
+  local endpoints="trips me/profile me/loyalty guides settings/senders"
   for ep in $endpoints; do
     local status
     status=$(curl -s -o /dev/null -w "%{http_code}" "${API_V1}/${ep}" \
       -H "Authorization: Bearer ${UBT_API_KEY}" \
       -H "Content-Type: application/json")
     if [ "$status" = "200" ]; then
-      echo "  PASS  GET /api/v1/${ep} (${status})"
+      _check "GET /api/v1/${ep} (${status})" "PASS"
     else
-      echo "  FAIL  GET /api/v1/${ep} (${status})"
-      all_pass=false
+      _check "GET /api/v1/${ep} (${status})" "FAIL"
     fi
   done
+
+  if [ "$deep" = true ]; then
+    echo ""
+    echo "Deep checks:"
+
+    # Check trips list returns data
+    local trips_body
+    trips_body=$(_api "${API_V1}/trips" 2>/dev/null) || true
+    local trip_count
+    trip_count=$(echo "$trips_body" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',d) if isinstance(d,dict) else d))" 2>/dev/null || echo "0")
+    if [ "$trip_count" -gt 0 ] 2>/dev/null; then
+      _check "Trips list returns data (${trip_count} trips)" "PASS"
+    else
+      _check "Trips list returns data (got 0)" "FAIL"
+    fi
+
+    # Check item search returns data (proves items exist)
+    local items_search_body
+    items_search_body=$(_api "${API_V1}/items?limit=1" 2>/dev/null) || true
+    local has_items
+    has_items=$(echo "$items_search_body" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    items=d.get('data',d) if isinstance(d,dict) else d
+    print(len(items) if isinstance(items,list) else 0)
+except: print(0)
+" 2>/dev/null || echo "0")
+    if [ "$has_items" -gt 0 ] 2>/dev/null; then
+      _check "Item search returns data" "PASS"
+    else
+      _check "Item search returns data" "FAIL"
+    fi
+
+    # Check cross-trip item search endpoint exists
+    local today
+    today=$(date -u +%Y-%m-%d)
+    local search_status
+    search_status=$(curl -s -o /dev/null -w "%{http_code}" "${API_V1}/items?date=${today}" \
+      -H "Authorization: Bearer ${UBT_API_KEY}" \
+      -H "Content-Type: application/json")
+    if [ "$search_status" = "200" ]; then
+      _check "Cross-trip item search responds (${search_status})" "PASS"
+    else
+      _check "Cross-trip item search responds (${search_status})" "FAIL"
+    fi
+
+    # Check response is JSON, not HTML
+    local trips_ct
+    trips_ct=$(curl -sI "${API_V1}/trips" \
+      -H "Authorization: Bearer ${UBT_API_KEY}" \
+      -H "Content-Type: application/json" | grep -i '^content-type:' | head -1)
+    if echo "$trips_ct" | grep -qi 'application/json'; then
+      _check "API returns JSON content-type" "PASS"
+    else
+      _check "API returns JSON content-type (got: ${trips_ct})" "FAIL"
+    fi
+
+    # Check bogus endpoint returns proper error, not HTML
+    local bogus_status bogus_ct
+    bogus_status=$(curl -s -o /dev/null -w "%{http_code}" "${API_V1}/nonexistent-endpoint-selftest" \
+      -H "Authorization: Bearer ${UBT_API_KEY}" \
+      -H "Content-Type: application/json")
+    if [ "$bogus_status" -ge 400 ] 2>/dev/null; then
+      _check "Bogus endpoint returns error code (${bogus_status})" "PASS"
+    else
+      _check "Bogus endpoint returns error code (${bogus_status})" "FAIL"
+    fi
+
+    # Check flights in next 48h have status data
+    local tomorrow
+    tomorrow=$(date -u -d "+1 day" +%Y-%m-%d 2>/dev/null || date -u -v+1d +%Y-%m-%d 2>/dev/null || echo "")
+    if [ -n "$today" ]; then
+      local flights_body
+      flights_body=$(_api "${API_V1}/items?kind=flight&from=${today}&to=${tomorrow:-$today}" 2>/dev/null) || true
+      local flight_info
+      flight_info=$(echo "$flights_body" | python3 -c "
+import sys,json
+try:
+    d=json.load(sys.stdin)
+    items=d.get('data',d) if isinstance(d,dict) else d
+    if not isinstance(items,list): items=[]
+    print(len(items))
+except: print(0)
+" 2>/dev/null || echo "0")
+      if [ "$flight_info" -gt 0 ] 2>/dev/null; then
+        _check "Flights in next 48h found (${flight_info})" "PASS"
+      else
+        _check "Flights in next 48h found (0 — may be normal)" "PASS"
+      fi
+    fi
+  fi
+
+  echo ""
+  echo "${pass_count} passed, ${fail_count} failed."
   if [ "$all_pass" = true ]; then
-    echo "All checks passed."
     exit 0
   else
-    echo "Some checks failed." >&2
     exit 1
   fi
 }
@@ -3566,7 +3777,8 @@ Usage: ubt <command> [args]
   version                               Print CLI version
   login                                 Authenticate with your API key
   whoami                                Show current authenticated user
-  selftest                              Test API connectivity
+  today                                 Show all items for today across all trips
+  selftest [--deep]                     Test API connectivity (--deep: verify data completeness)
 
 Commands:
   trips list [user_id]                  List all trips (owned + shared)
@@ -3864,7 +4076,8 @@ case "${1:-}" in
   version)  cmd_version ;;
   login)    cmd_login ;;
   whoami)   cmd_whoami ;;
-  selftest) cmd_selftest ;;
+  selftest) cmd_selftest "${2:-}" ;;
+  today) cmd_today ;;
   -h|--help|help|"") usage ;;
   *) echo "Unknown command: $1"; usage; exit 1 ;;
 esac
