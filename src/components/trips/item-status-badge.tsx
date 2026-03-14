@@ -18,14 +18,38 @@ type LiveStatus =
   | 'arrived'
   | 'unknown'
 
+export type { LiveStatus }
+
 export interface StatusPayload {
   status: LiveStatus
   delay_minutes: number | null
   gate: string | null
   terminal: string | null
   estimated_departure: string | null
+  estimated_arrival: string | null
   previous_status: LiveStatus | null
   last_checked_at: string | null
+  // Extended flight fields (from FlightAware)
+  departure_gate: string | null
+  departure_terminal: string | null
+  arrival_gate: string | null
+  arrival_terminal: string | null
+  baggage_claim: string | null
+  aircraft_type: string | null
+  tail_number: string | null
+  operator: string | null
+  operator_iata: string | null
+  codeshares: string[] | null
+  actual_off: string | null
+  actual_out: string | null
+  actual_on: string | null
+  actual_in: string | null
+  actual_departure: string | null
+  actual_arrival: string | null
+  inbound_fa_flight_id: string | null
+  inbound_origin: string | null
+  inbound_ident: string | null
+  inbound_estimated_in: string | null
 }
 
 interface ItemStatusBadgeProps {
@@ -70,16 +94,40 @@ function asStatusPayload(value: unknown): StatusPayload | null {
       ? row.delay_minutes
       : null
 
+  const str = (key: string): string | null => typeof row[key] === 'string' ? row[key] : null
+  const strArr = (key: string): string[] | null => Array.isArray(row[key]) ? row[key] as string[] : null
+
   return {
     status: status as LiveStatus,
     delay_minutes: delayMinutes,
-    gate: typeof row.gate === 'string' ? row.gate : null,
-    terminal: typeof row.terminal === 'string' ? row.terminal : null,
-    estimated_departure: typeof row.estimated_departure === 'string' ? row.estimated_departure : null,
+    gate: str('gate'),
+    terminal: str('terminal'),
+    estimated_departure: str('estimated_departure'),
+    estimated_arrival: str('estimated_arrival'),
     previous_status: typeof row.previous_status === 'string' && row.previous_status in STATUS_META
       ? (row.previous_status as LiveStatus)
       : null,
-    last_checked_at: typeof row.last_checked_at === 'string' ? row.last_checked_at : null,
+    last_checked_at: str('last_checked_at'),
+    departure_gate: str('departure_gate') ?? str('gate'),
+    departure_terminal: str('departure_terminal') ?? str('terminal'),
+    arrival_gate: str('arrival_gate'),
+    arrival_terminal: str('arrival_terminal'),
+    baggage_claim: str('baggage_claim'),
+    aircraft_type: str('aircraft_type'),
+    tail_number: str('tail_number'),
+    operator: str('operator'),
+    operator_iata: str('operator_iata'),
+    codeshares: strArr('codeshares'),
+    actual_off: str('actual_off'),
+    actual_out: str('actual_out'),
+    actual_on: str('actual_on'),
+    actual_in: str('actual_in'),
+    actual_departure: str('actual_departure') ?? str('actual_out') ?? str('actual_off'),
+    actual_arrival: str('actual_arrival') ?? str('actual_in') ?? str('actual_on'),
+    inbound_fa_flight_id: str('inbound_fa_flight_id'),
+    inbound_origin: str('inbound_origin'),
+    inbound_ident: str('inbound_ident'),
+    inbound_estimated_in: str('inbound_estimated_in'),
   }
 }
 
@@ -120,6 +168,70 @@ function toLocalTime(utcIso: string, offsetMs: number): string {
   const h = local.getUTCHours()
   const m = local.getUTCMinutes().toString().padStart(2, '0')
   return `${h}:${m}`
+}
+
+/**
+ * Hook for flight status data — used by FlightItemCard for richer rendering.
+ * Loads cached status on mount, auto-refreshes if unknown/stale.
+ */
+export function useFlightStatus({
+  itemId,
+  autoRefreshOnUnknown = true,
+}: {
+  itemId: string
+  autoRefreshOnUnknown?: boolean
+}) {
+  const [status, setStatus] = useState<StatusPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const loadStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/v1/items/${itemId}/status`, { cache: 'no-store' })
+      if (!response.ok) return
+      const payload = await response.json()
+      setStatus(asStatusPayload(payload?.data?.status))
+    } finally {
+      setLoading(false)
+    }
+  }, [itemId])
+
+  const refreshStatus = useCallback(async () => {
+    setRefreshing(true)
+    try {
+      const response = await fetch(`/api/v1/items/${itemId}/status/refresh`, { method: 'POST' })
+      if (response.ok) {
+        const payload = await response.json()
+        setStatus(asStatusPayload(payload?.data?.status))
+      } else {
+        await loadStatus()
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }, [itemId, loadStatus])
+
+  useEffect(() => {
+    void loadStatus()
+  }, [loadStatus])
+
+  const hasTriggeredAutoRefresh = useRef(false)
+  const isStale = useMemo(() => {
+    if (!status?.last_checked_at) return true
+    const checkedAt = new Date(status.last_checked_at).getTime()
+    if (Number.isNaN(checkedAt)) return true
+    return Date.now() - checkedAt > 5 * 60 * 1000
+  }, [status])
+  const needsRefresh = autoRefreshOnUnknown && (!status || status.status === 'unknown' || isStale)
+
+  useEffect(() => {
+    if (!loading && needsRefresh && !hasTriggeredAutoRefresh.current) {
+      hasTriggeredAutoRefresh.current = true
+      void refreshStatus()
+    }
+  }, [loading, needsRefresh, refreshStatus])
+
+  return { status, loading, refreshing, refreshStatus }
 }
 
 export function ItemStatusBadge({ itemId, scheduledDeparture, startTs, onStatusUpdate }: ItemStatusBadgeProps) {
