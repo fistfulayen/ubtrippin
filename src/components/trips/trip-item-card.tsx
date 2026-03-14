@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
+import { buildFlightIdent, buildFlightPageUrl } from '@/lib/flight-ident'
 import {
   FlightDetailsView,
   HotelDetailsView,
@@ -173,20 +174,23 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
     router.refresh()
   }
 
+  const flightPagePath = item.kind === 'flight'
+    ? buildFlightPageUrl(details as Record<string, unknown>, item.start_date)
+    : null
+
   const handleShareFlight = async () => {
-    if (item.kind !== 'flight' || !details) return
+    if (!flightPagePath) return
     
-    const flightDetails = details as FlightDetails
-    const flightNumber = flightDetails.flight_number
-    if (!flightNumber || !item.start_date) return
-    
-    const url = `https://www.ubtrippin.xyz/flights/${flightNumber}/${item.start_date}`
+    const url = `https://www.ubtrippin.xyz${flightPagePath}`
     
     try {
-      await navigator.clipboard.writeText(url)
-      // Could show a toast here, but keeping it simple
+      if (navigator.share) {
+        await navigator.share({ title: item.summary ?? 'Flight', url })
+      } else {
+        await navigator.clipboard.writeText(url)
+      }
     } catch {
-      // Ignore copy errors
+      // User cancelled share or copy failed — ignore
     }
   }
 
@@ -395,14 +399,26 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
               </div>
 
               {item.kind === 'flight' && isWithin48Hours(item) && (
-                <ItemStatusBadge
-                  itemId={item.id}
-                  scheduledDeparture={
-                    typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
-                  }
-                  startTs={item.start_ts}
-                  onStatusUpdate={setLiveStatus}
-                />
+                <>
+                  <ItemStatusBadge
+                    itemId={item.id}
+                    scheduledDeparture={
+                      typeof details?.departure_local_time === 'string' ? details.departure_local_time : undefined
+                    }
+                    startTs={item.start_ts}
+                    onStatusUpdate={setLiveStatus}
+                  />
+                  {flightPagePath && (
+                    <Link
+                      href={flightPagePath}
+                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      target="_blank"
+                    >
+                      <Plane className="h-3 w-3" />
+                      Track live & share →
+                    </Link>
+                  )}
+                </>
               )}
 
               {item.kind === 'train' && isWithin48Hours(item) && (
@@ -509,13 +525,25 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
               {expanded && (
                 <div className="mt-3">
                   {item.kind === 'flight' && (
-                    <FlightDetailsView
-                      details={details as FlightDetails}
-                      liveOverrides={liveStatus ? {
-                        departure_terminal: liveStatus.terminal,
-                        departure_gate: liveStatus.gate,
-                      } : undefined}
-                    />
+                    <>
+                      <FlightDetailsView
+                        details={details as FlightDetails}
+                        liveOverrides={liveStatus ? {
+                          departure_terminal: liveStatus.terminal,
+                          departure_gate: liveStatus.gate,
+                        } : undefined}
+                      />
+                      {flightPagePath && !isWithin48Hours(item) && (
+                        <Link
+                          href={flightPagePath}
+                          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                          target="_blank"
+                        >
+                          <Plane className="h-3 w-3" />
+                          View live flight page →
+                        </Link>
+                      )}
+                    </>
                   )}
                   {item.kind === 'hotel' && (
                     <HotelDetailsView
