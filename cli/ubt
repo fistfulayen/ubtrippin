@@ -351,6 +351,31 @@ for item in data:
 "
 }
 
+_format_import_preview() {
+  _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+trips = payload.get('trips', [])
+if not trips:
+    print('No importable trips found.')
+    sys.exit(0)
+
+for idx, trip in enumerate(trips, 1):
+    location = trip.get('primary_location') or ''
+    dates = trip.get('start_date') or ''
+    if trip.get('end_date') and trip.get('end_date') != trip.get('start_date'):
+        dates += ' → ' + trip['end_date']
+    print(f\"[{idx}] {trip.get('name', '(untitled trip)')}  {dates}  {location}\")
+    for item in trip.get('items', []):
+        badge = ' [duplicate]' if item.get('is_duplicate') else ''
+        route = ' → '.join([x for x in [item.get('start_location'), item.get('end_location')] if x])
+        print(f\"    - {item.get('kind','item')}: {item.get('summary') or '(no summary)'}{badge}\")
+        if route:
+            print(f\"      {route}\")
+"
+}
+
 # Commands
 cmd_trips_list() {
   local result
@@ -578,6 +603,91 @@ cmd_items_search() {
   else
     echo "$result" | _format_item_search_results
   fi
+}
+
+cmd_import_ics() {
+  local file_path="${1:?Usage: ubt import ics <file>}"
+  _require_api_key
+
+  if [ ! -f "$file_path" ]; then
+    echo "Error: File not found: $file_path" >&2
+    exit 1
+  fi
+
+  local preview_body preview_headers preview_status
+  preview_body=$(mktemp)
+  preview_headers=$(mktemp)
+  preview_status=$(curl -s -o "${preview_body}" -D "${preview_headers}" -w "%{http_code}" \
+    -X POST "${API_V1}/import/ics" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -F "file=@${file_path};type=text/calendar")
+
+  if [ "${preview_status}" -ge 400 ] 2>/dev/null; then
+    cat "${preview_body}" | _json
+    rm -f "${preview_body}" "${preview_headers}"
+    exit 1
+  fi
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    cat "${preview_body}" | _json
+  else
+    echo "Preview:"
+    cat "${preview_body}" | _format_import_preview
+    local fresh_count duplicate_count
+    fresh_count=$(cat "${preview_body}" | _python3c "import json,sys; d=json.load(sys.stdin); print(max(0, int(d.get('item_count', 0)) - int(d.get('deduped_item_count', 0))))")
+    duplicate_count=$(cat "${preview_body}" | _python3c "import json,sys; d=json.load(sys.stdin); print(int(d.get('deduped_item_count', 0)))")
+    echo ""
+    echo "New items: ${fresh_count}"
+    if [ "${duplicate_count}" -gt 0 ] 2>/dev/null; then
+      echo "Duplicates that will be skipped: ${duplicate_count}"
+    fi
+    if [ "${fresh_count}" -eq 0 ] 2>/dev/null; then
+      echo "Nothing new to import."
+      rm -f "${preview_body}" "${preview_headers}"
+      return 0
+    fi
+  fi
+
+  local confirm
+  read -r -p "Import these trips? [y/N]: " confirm
+  case "${confirm}" in
+    y|Y|yes|YES) ;;
+    *)
+      echo "Import cancelled."
+      rm -f "${preview_body}" "${preview_headers}"
+      return 0
+      ;;
+  esac
+
+  local confirm_body confirm_headers confirm_status
+  confirm_body=$(mktemp)
+  confirm_headers=$(mktemp)
+  confirm_status=$(curl -s -o "${confirm_body}" -D "${confirm_headers}" -w "%{http_code}" \
+    -X POST "${API_V1}/import/ics?confirm=true" \
+    -H "Authorization: Bearer ${UBT_API_KEY}" \
+    -F "file=@${file_path};type=text/calendar")
+
+  if [ "${confirm_status}" -ge 400 ] 2>/dev/null; then
+    cat "${confirm_body}" | _json
+    rm -f "${preview_body}" "${preview_headers}" "${confirm_body}" "${confirm_headers}"
+    exit 1
+  fi
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    cat "${confirm_body}" | _json
+  else
+    cat "${confirm_body}" | _python3c "
+import json, sys
+d = json.load(sys.stdin)
+created = d.get('created', {})
+print(f\"Imported {created.get('trips', 0)} trip(s) and {created.get('items', 0)} item(s).\")
+skipped = d.get('skipped_duplicates', 0)
+if skipped:
+    print(f\"Skipped {skipped} duplicate event(s).\")
+"
+  fi
+
+  rm -f "${preview_body}" "${preview_headers}" "${confirm_body}" "${confirm_headers}"
 }
 
 cmd_tables() {
@@ -3816,6 +3926,7 @@ Commands:
   activation status                     Show activation/onboarding status *
   calendar get                          Get your iCal feed URL *
   calendar regen                        Regenerate calendar token (invalidates old URL) *
+  import ics <file>                     Preview and import trips from an .ics file *
   image search <query>                  Search Unsplash for cover images *
   senders list                          List allowed email senders *
   senders add <email> [label]           Add an allowed sender *
@@ -3884,6 +3995,7 @@ Examples:
   ubt billing show
   ubt activation status
   ubt calendar get
+  ubt import ics ./tripit-export.ics
   ubt senders list
   ubt webhooks list
   ubt webhooks add https://example.com/webhooks/ubt --events item.created,item.updated
@@ -3979,6 +4091,12 @@ case "${1:-}" in
       get)   cmd_calendar_get ;;
       regen) cmd_calendar_regen ;;
       *)     usage ;;
+    esac
+    ;;
+  import)
+    case "${2:-}" in
+      ics) cmd_import_ics "${3:?Usage: ubt import ics <file>}" ;;
+      *)   usage ;;
     esac
     ;;
   senders)

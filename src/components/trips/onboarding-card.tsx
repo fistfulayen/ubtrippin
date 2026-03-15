@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 function CopyButton({ text }: { text: string }) {
@@ -60,6 +60,13 @@ export function OnboardingCard() {
             See a demo trip →
           </Link>
 
+          <Link href="/settings#import-trips">
+            <Button variant="outline" size="sm">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload ICS File
+            </Button>
+          </Link>
+
           <div className="flex justify-center py-2">
             <Image
               src="/envelope_icon.png"
@@ -72,6 +79,9 @@ export function OnboardingCard() {
 
           <p className="text-sm text-gray-600">
             Works with flights, hotels, trains, rental cars and more.
+          </p>
+          <p className="text-sm text-gray-600">
+            Or upload an ICS calendar export from TripIt, Google Calendar, or Outlook.
           </p>
           <p className="text-xs text-gray-500">
             💡 Make sure to add your email in{' '}

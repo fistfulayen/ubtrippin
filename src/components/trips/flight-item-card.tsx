@@ -362,6 +362,19 @@ export function FlightItemCard({
     router.refresh()
   }
 
+  // Compute gate-to-gate duration
+  const durationLabel = (() => {
+    const depIso = item.start_ts
+    const arrIso = item.end_ts
+    if (!depIso || !arrIso) return null
+    const diffMs = new Date(arrIso).getTime() - new Date(depIso).getTime()
+    if (diffMs <= 0 || isNaN(diffMs)) return null
+    const totalMin = Math.round(diffMs / 60000)
+    const h = Math.floor(totalMin / 60)
+    const m = totalMin % 60
+    return h > 0 ? `${h}h ${m}m` : `${m}m`
+  })()
+
   const departureMeta = formatAirportMeta(departureTerminal, departureGate)
   const arrivalMeta = baggageClaim && (liveStatus?.status === 'landed' || liveStatus?.status === 'arrived')
     ? `Baggage Claim ${baggageClaim}`
@@ -575,7 +588,12 @@ export function FlightItemCard({
                 <p className="mt-1 text-xs font-medium uppercase tracking-wide text-gray-400">{departureTime.label}</p>
               </div>
 
-              <div className="pt-8 text-lg font-semibold text-indigo-600">→</div>
+              <div className="flex flex-col items-center pt-6 gap-1">
+                <span className="text-lg font-semibold text-indigo-600">→</span>
+                {durationLabel && (
+                  <span className="text-xs text-gray-400 whitespace-nowrap">{durationLabel}</span>
+                )}
+              </div>
 
               <div className="min-w-0 text-right">
                 <p className="text-2xl font-bold text-gray-900">{flightDetails.arrival_airport ?? 'ARR'}</p>

@@ -23,6 +23,9 @@
       }
     ],
     "paths": {
+      "ical.js": [
+        "./vendor/ical.js/index"
+      ],
       "@/*": [
         "./src/*"
       ]

@@ -157,6 +157,35 @@ export interface Database {
           created_at?: string
         }
       }
+      import_history: {
+        Row: {
+          id: string
+          user_id: string
+          provider: string
+          provider_item_id: string | null
+          trip_id: string | null
+          item_id: string | null
+          imported_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          provider: string
+          provider_item_id?: string | null
+          trip_id?: string | null
+          item_id?: string | null
+          imported_at?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          provider?: string
+          provider_item_id?: string | null
+          trip_id?: string | null
+          item_id?: string | null
+          imported_at?: string | null
+        }
+      }
       trips: {
         Row: {
           id: string
