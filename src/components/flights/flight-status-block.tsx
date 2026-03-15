@@ -1,3 +1,4 @@
+import { Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const STATUS_META: Record<string, { label: string; toneClass: string; message: string }> = {
@@ -138,6 +139,20 @@ export function FlightStatusBlock({
     ? (arrEstimated ?? arrScheduled)
     : (arrScheduled ?? arrActual)
   
+  // Compute gate-to-gate duration from the best available times (ISO/UTC)
+  const depIso = actualDeparture ?? estimatedDeparture ?? scheduledDeparture
+  const arrIso = actualArrival ?? estimatedArrival ?? scheduledArrival
+  let durationLabel: string | null = null
+  if (depIso && arrIso) {
+    const diffMs = new Date(arrIso).getTime() - new Date(depIso).getTime()
+    if (diffMs > 0 && !isNaN(diffMs)) {
+      const totalMin = Math.round(diffMs / 60000)
+      const h = Math.floor(totalMin / 60)
+      const m = totalMin % 60
+      durationLabel = h > 0 ? `${h}h ${m}m` : `${m}m`
+    }
+  }
+
   // Build delay message
   let delayMessage = ''
   if (isDelayedStatus && (delayMinutes ?? 0) > 0 && depScheduled && depEstimated && depScheduled !== depEstimated) {
@@ -158,6 +173,14 @@ export function FlightStatusBlock({
         </div>
         <p className="text-sm mt-1 opacity-80">{meta.message}</p>
       </div>
+      
+      {/* Flight duration */}
+      {durationLabel && (
+        <div className="flex items-center justify-center gap-2 py-3 border-b border-slate-100 text-sm text-slate-500">
+          <Clock className="w-4 h-4" strokeWidth={1.5} />
+          <span>{durationLabel} gate to gate</span>
+        </div>
+      )}
       
       {/* Departure / Arrival columns */}
       <div className="grid grid-cols-2 divide-x divide-slate-100">
