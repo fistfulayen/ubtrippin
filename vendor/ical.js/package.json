@@ -1,6 +1,0 @@
-{
-  "name": "ical.js",
-  "version": "0.0.0-local",
-  "main": "index.js",
-  "types": "index.d.ts"
-}
