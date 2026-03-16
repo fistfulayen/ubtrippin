@@ -57,6 +57,8 @@ const nextConfig: NextConfig = {
       // PRD-049: Standard SaaS entry points
       { source: '/signup', destination: '/login', permanent: true },
       { source: '/pricing', destination: '/#pricing', permanent: true },
+      { source: '/blog', destination: '/dispatches', permanent: true },
+      { source: '/blog/:slug', destination: '/dispatches/:slug', permanent: true },
     ];
   },
 };
