@@ -11,6 +11,7 @@ import { sanitizeItem, sanitizeItemInput } from '@/lib/api/sanitize'
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
+import { logTripEvent, scheduleTripNotificationProcessing, type TripUpdateChange } from '@/lib/notifications/trip-events'
 
 export async function GET(
   request: NextRequest,
@@ -103,6 +104,20 @@ async function fetchTripSummary(tripId: string, userId: string) {
   return data
 }
 
+interface MeaningfulItemFields {
+  trip_id: string | null
+  kind: string | null
+  provider: string | null
+  summary: string | null
+  start_date: string | null
+  end_date: string | null
+  start_ts: string | null
+  end_ts: string | null
+  status: string | null
+  start_location: string | null
+  end_location: string | null
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -157,7 +172,20 @@ export async function PATCH(
   // 6. Verify ownership
   const { data: existing } = await supabase
     .from('trip_items')
-    .select('id')
+    .select(`
+      id,
+      trip_id,
+      kind,
+      provider,
+      summary,
+      start_date,
+      end_date,
+      start_ts,
+      end_ts,
+      status,
+      start_location,
+      end_location
+    `)
     .eq('id', itemId)
     .eq('user_id', auth.userId)
     .single()
@@ -247,6 +275,37 @@ export async function PATCH(
     }).catch((err) => console.error('[webhooks] item.updated dispatch failed:', err))
   }
 
+  const meaningfulChanges = buildMeaningfulItemChanges(
+    existing as MeaningfulItemFields,
+    updatedItem as MeaningfulItemFields
+  )
+
+  if (meaningfulChanges.length > 0 && updatedItem.trip_id) {
+    const { data: actorProfile } = await supabase
+      .from('profiles')
+      .select('full_name, email')
+      .eq('id', auth.userId)
+      .maybeSingle()
+
+    const actorName = actorProfile?.full_name || actorProfile?.email || 'Someone'
+
+    try {
+      await logTripEvent(
+        supabase,
+        updatedItem.trip_id,
+        auth.userId,
+        'item_updated',
+        {
+          actor_name: actorName,
+          changes: meaningfulChanges,
+        }
+      )
+      scheduleTripNotificationProcessing(auth.userId, updatedItem.trip_id)
+    } catch (err) {
+      console.error('[items/[id]/trip-update-log]', err)
+    }
+  }
+
   return NextResponse.json({ data: sanitizeItem(updatedItem as Record<string, unknown>) })
 }
 
@@ -322,4 +381,60 @@ export async function DELETE(
   }
 
   return new NextResponse(null, { status: 204 })
+}
+
+function buildMeaningfulItemChanges(
+  before: MeaningfulItemFields,
+  after: MeaningfulItemFields
+): TripUpdateChange[] {
+  const changes: TripUpdateChange[] = []
+  const itemLabel = formatTripUpdateItemSummary(after.kind, after.summary, after.provider)
+
+  if (
+    before.start_date !== after.start_date ||
+    before.end_date !== after.end_date ||
+    before.start_ts !== after.start_ts ||
+    before.end_ts !== after.end_ts
+  ) {
+    changes.push({
+      kind: 'dates_updated',
+      summary: `Updated dates for ${itemLabel}`,
+    })
+  }
+
+  if (before.status !== after.status) {
+    changes.push({
+      kind: 'status_updated',
+      summary: `Changed status to ${(after.status || 'unknown').replace(/_/g, ' ')} for ${itemLabel}`,
+    })
+  }
+
+  if (
+    before.start_location !== after.start_location ||
+    before.end_location !== after.end_location
+  ) {
+    changes.push({
+      kind: 'location_updated',
+      summary: `Updated route for ${itemLabel}`,
+    })
+  }
+
+  return changes
+}
+
+function formatTripUpdateItemSummary(
+  kind: string | null | undefined,
+  summary: string | null | undefined,
+  provider: string | null | undefined
+) {
+  if (summary?.trim()) {
+    return summary.trim()
+  }
+
+  const kindLabel = kind ? kind.replace(/_/g, ' ') : 'trip item'
+  if (provider?.trim()) {
+    return `${provider.trim()} ${kindLabel}`
+  }
+
+  return kindLabel
 }
