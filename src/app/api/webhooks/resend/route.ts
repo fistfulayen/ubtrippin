@@ -24,6 +24,8 @@ import { trackFirstForward, trackTripCreated } from '@/lib/activation'
 import { applyEmailLoyaltyFlag } from '@/lib/loyalty-flag'
 import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
 import { resolveProviderKey } from '@/lib/loyalty-matching'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
+import { logTripEvent, scheduleTripNotificationProcessing } from '@/lib/notifications/trip-events'
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
@@ -176,6 +178,8 @@ export async function POST(request: NextRequest) {
     const userProfile = Array.isArray(profilesData)
       ? profilesData[0] as { email: string; full_name: string | null } | undefined
       : profilesData as { email: string; full_name: string | null } | null
+    const actorName = userProfile?.full_name?.trim() || senderName || userProfile?.email || 'Someone'
+    const notificationSupabase = await createUserScopedClient(userId)
 
     // ── Soft usage gate: check monthly extraction limit ───────────────────────
     const extractionCheck = await checkExtractionLimit(userId, supabase)
@@ -438,6 +442,7 @@ export async function POST(request: NextRequest) {
 
       // Process extracted items - all items from same email go to same trip
       const createdItems: { tripId: string; itemId: string }[] = []
+      const notificationTripIds = new Set<string>()
       const tripsToUpdate = new Map<string, { items: typeof extractionResult.items }>()
 
       // Determine trip assignment using the first item, then use same trip for all
@@ -650,6 +655,27 @@ export async function POST(request: NextRequest) {
         }
 
         createdItems.push({ tripId: confirmedTripId, itemId: tripItem.id })
+        notificationTripIds.add(confirmedTripId)
+
+        try {
+          await logTripEvent(
+            notificationSupabase,
+            confirmedTripId,
+            userId,
+            'item_added',
+            {
+              actor_name: actorName,
+              changes: [
+                {
+                  kind: 'item_added',
+                  summary: `Added ${formatTripUpdateItemSummary(item.kind, item.summary, item.provider)}`,
+                },
+              ],
+            }
+          )
+        } catch (tripUpdateError) {
+          console.error('[webhooks/resend trip-update-log]', tripUpdateError)
+        }
       }
 
       // Update trip dates and info for affected trips
@@ -718,6 +744,10 @@ export async function POST(request: NextRequest) {
           extractionResult.items,
           supabase
         )
+      }
+
+      for (const notifiedTripId of notificationTripIds) {
+        scheduleTripNotificationProcessing(userId, notifiedTripId)
       }
 
       return NextResponse.json({
@@ -1083,6 +1113,23 @@ function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
     'pnr',
   ]
   return bookingSignals.some((signal) => haystack.includes(signal))
+}
+
+function formatTripUpdateItemSummary(
+  kind: string | null | undefined,
+  summary: string | null | undefined,
+  provider: string | null | undefined
+) {
+  if (summary?.trim()) {
+    return summary.trim()
+  }
+
+  const kindLabel = kind ? kind.replace(/_/g, ' ') : 'trip item'
+  if (provider?.trim()) {
+    return `${provider.trim()} ${kindLabel}`
+  }
+
+  return kindLabel
 }
 
 function looksLikeRecommendationEmail(subject: string, bodyText: string): boolean {

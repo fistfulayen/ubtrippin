@@ -16,6 +16,7 @@ import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { applyNoVaultEntryFlag } from '@/lib/loyalty-flag'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
+import { logTripEvent, scheduleTripNotificationProcessing } from '@/lib/notifications/trip-events'
 
 const ITEM_SELECT = `id,
        trip_id,
@@ -168,16 +169,40 @@ export async function POST(
     })
   }
 
-  // 8. Fire notification to trip owner when a collaborator adds an item
-  if (isEditor && item) {
-    // Get collaborator's display name
+  let actorName = 'Someone'
+  if (item) {
     const { data: actorProfile } = await supabase
       .from('profiles')
       .select('full_name, email')
       .eq('id', auth.userId)
       .maybeSingle()
 
-    const actorName = actorProfile?.full_name || actorProfile?.email || 'A collaborator'
+    actorName = actorProfile?.full_name || actorProfile?.email || actorName
+
+    try {
+      await logTripEvent(
+        supabase,
+        tripId,
+        auth.userId,
+        'item_added',
+        {
+          actor_name: actorName,
+          changes: [
+            {
+              kind: 'item_added',
+              summary: `Added ${formatTripUpdateItemSummary(item.kind, item.summary, item.provider)}`,
+            },
+          ],
+        }
+      )
+      scheduleTripNotificationProcessing(auth.userId, tripId)
+    } catch (err) {
+      console.error('[items/trip-update-log]', err)
+    }
+  }
+
+  // 8. Fire notification to trip owner when a collaborator adds an item
+  if (isEditor && item) {
     const summary = clean.summary || `${clean.kind} entry`
 
     void (async () => {
@@ -223,4 +248,21 @@ export async function POST(
     { data: sanitizeItem(item as Record<string, unknown>) },
     { status: 201 }
   )
+}
+
+function formatTripUpdateItemSummary(
+  kind: string | null | undefined,
+  summary: string | null | undefined,
+  provider: string | null | undefined
+) {
+  if (summary?.trim()) {
+    return summary.trim()
+  }
+
+  const kindLabel = kind ? kind.replace(/_/g, ' ') : 'trip item'
+  if (provider?.trim()) {
+    return `${provider.trim()} ${kindLabel}`
+  }
+
+  return kindLabel
 }

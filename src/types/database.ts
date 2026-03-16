@@ -20,6 +20,7 @@ export interface Database {
           full_name: string | null
           avatar_url: string | null
           calendar_token: string | null
+          notification_preferences: Json
           created_at: string
           updated_at: string
           // Billing columns (added in 20260228000001_stripe_billing)
@@ -37,6 +38,7 @@ export interface Database {
           full_name?: string | null
           avatar_url?: string | null
           calendar_token?: string | null
+          notification_preferences?: Json
           created_at?: string
           updated_at?: string
           subscription_tier?: string | null
@@ -53,6 +55,7 @@ export interface Database {
           full_name?: string | null
           avatar_url?: string | null
           calendar_token?: string | null
+          notification_preferences?: Json
           created_at?: string
           updated_at?: string
           subscription_tier?: string | null
@@ -446,6 +449,35 @@ export interface Database {
           user_id?: string
           storage_path?: string
           generated_at?: string
+        }
+      }
+      trip_update_log: {
+        Row: {
+          id: string
+          trip_id: string
+          actor_id: string
+          event_type: string
+          event_data: Json
+          created_at: string
+          notified_at: string | null
+        }
+        Insert: {
+          id?: string
+          trip_id: string
+          actor_id: string
+          event_type: string
+          event_data?: Json
+          created_at?: string
+          notified_at?: string | null
+        }
+        Update: {
+          id?: string
+          trip_id?: string
+          actor_id?: string
+          event_type?: string
+          event_data?: Json
+          created_at?: string
+          notified_at?: string | null
         }
       }
       extraction_examples: {
