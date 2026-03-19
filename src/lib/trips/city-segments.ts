@@ -446,6 +446,18 @@ export function buildTimeline(items: TripItem[]): TimelineEntry[] {
   let segmentIndex = 0
 
   for (const transition of transitions) {
+    // If the next unprocessed segment departs via this transition but has no
+    // incoming flight (e.g. first segment of the trip), render it before the
+    // transition so items appear in chronological order.
+    if (
+      segmentIndex < segments.length &&
+      rawSegments[segmentIndex]?.outgoing === transition &&
+      rawSegments[segmentIndex]?.incoming === null
+    ) {
+      timeline.push({ type: 'segment', segment: segments[segmentIndex] })
+      segmentIndex += 1
+    }
+
     const nextSegment =
       segments[segmentIndex] && rawSegments[segmentIndex]?.incoming === transition
         ? segments[segmentIndex]

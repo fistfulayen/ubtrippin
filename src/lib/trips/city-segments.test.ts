@@ -467,6 +467,40 @@ describe('attachWeatherToTimeline — metro aliases', () => {
     expect(result[0].segment?.weather?.daily?.[0].high).toBe(60)
   })
 
+  it('pre-flight segment items appear before the transition', () => {
+    // Car rental Mar 26, flight Mar 29 — segment should render before the flight
+    const items: TripItem[] = [
+      makeItem({
+        kind: 'car_rental',
+        start_date: '2026-03-26',
+        end_date: '2026-03-29',
+        start_location: 'Milan Airport Malpensa T1',
+        end_location: 'Turin Airport',
+        summary: 'Car rental: Fiat Panda',
+      }),
+      makeItem({
+        kind: 'flight',
+        start_date: '2026-03-29',
+        end_date: '2026-03-29',
+        start_location: 'TRN',
+        end_location: 'CDG',
+        details_json: {
+          departure_airport: 'TRN',
+          arrival_airport: 'CDG',
+          departure_local_time: '10:20',
+          arrival_local_time: '11:50',
+        },
+      }),
+    ]
+    const timeline = buildTimeline(items)
+    // The segment containing the car rental should come before the flight transition
+    const segmentIdx = timeline.findIndex((e) => e.type === 'segment' && e.segment?.items.some((i) => i.kind === 'car_rental'))
+    const transitionIdx = timeline.findIndex((e) => e.type === 'transition')
+    expect(segmentIdx).toBeGreaterThanOrEqual(0)
+    expect(transitionIdx).toBeGreaterThanOrEqual(0)
+    expect(segmentIdx).toBeLessThan(transitionIdx)
+  })
+
   it('matches Surfside weather to Miami segment', () => {
     const entries = [makeEntry('Miami', '2026-03-08', '2026-03-09')]
     const destinations = [makeDestination('Surfside', [makeForecastDay('2026-03-08', 2, 82, 72)])]
