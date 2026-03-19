@@ -471,7 +471,7 @@ describe('attachWeatherToTimeline — metro aliases', () => {
     // Car rental Mar 26, flight Mar 29 — segment should render before the flight
     const items: TripItem[] = [
       makeItem({
-        kind: 'car_rental',
+        kind: 'car',
         start_date: '2026-03-26',
         end_date: '2026-03-29',
         start_location: 'Milan Airport Malpensa T1',
@@ -494,7 +494,7 @@ describe('attachWeatherToTimeline — metro aliases', () => {
     ]
     const timeline = buildTimeline(items)
     // The segment containing the car rental should come before the flight transition
-    const segmentIdx = timeline.findIndex((e) => e.type === 'segment' && e.segment?.items.some((i) => i.kind === 'car_rental'))
+    const segmentIdx = timeline.findIndex((e) => e.type === 'segment' && e.segment?.items.some((i) => i.kind === 'car'))
     const transitionIdx = timeline.findIndex((e) => e.type === 'transition')
     expect(segmentIdx).toBeGreaterThanOrEqual(0)
     expect(transitionIdx).toBeGreaterThanOrEqual(0)
