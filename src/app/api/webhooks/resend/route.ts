@@ -126,11 +126,14 @@ export async function POST(request: NextRequest) {
       null
 
     // Look up user by sender email in allowed_senders
+    // Use .limit(1) + .maybeSingle() instead of .single() to handle edge case
+    // where the same email appears in multiple allowed_senders rows (e.g. duplicate accounts).
     const { data: allowedSender } = await supabase
       .from('allowed_senders')
       .select('user_id, profiles(id, email, full_name)')
       .eq('email', fromEmail.toLowerCase())
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     // Store the raw email with content from API
     const { data: sourceEmail, error: insertError } = await supabase
