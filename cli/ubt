@@ -304,7 +304,9 @@ for item in data:
     if end_loc and end_loc != start_loc:
         loc_str += ' → ' + end_loc
     
-    print(f\"  {item['id']}  {kind:<10} {provider:<20} {date}  {time_str:<15} {loc_str}\")
+    flight_num = det.get('flight_number') or det.get('train_number') or ''
+    provider_str = f'{provider} {flight_num}'.strip() if flight_num else provider
+    print(f\"  {item['id']}  {kind:<10} {provider_str:<28} {date}  {time_str:<15} {loc_str}\")
     if summary:
         print(f\"           {summary}\")
 "
@@ -346,7 +348,9 @@ for item in data:
     if end_loc and end_loc != start_loc:
         route = f'{route} → {end_loc}' if route else end_loc
 
-    print(f\"  {item.get('id','')}  {kind:<10} {provider:<20} {date:<10}  {dep_time:<5}  {route}\")
+    flight_num = det.get('flight_number') or det.get('train_number') or ''
+    provider_str = f'{provider} {flight_num}'.strip() if flight_num else provider
+    print(f\"  {item.get('id','')}  {kind:<10} {provider_str:<28} {date:<10}  {dep_time:<5}  {route}\")
     print(f\"             Trip: {trip_title}\")
 "
 }
@@ -1099,11 +1103,38 @@ print('Item:')
 print(f\"  id:       {i.get('id')}\")
 print(f\"  trip_id:  {i.get('trip_id')}\")
 print(f\"  kind:     {i.get('kind')}\")
+det = i.get('details_json') or {}
+flight_num = det.get('flight_number') or det.get('train_number') or ''
 print(f\"  provider: {i.get('provider') or '-'}\")
+if flight_num:
+    print(f\"  flight:   {flight_num}\")
 print(f\"  summary:  {i.get('summary') or '-'}\")
 print(f\"  date:     {i.get('start_date') or '-'}\")
+dep_time = det.get('departure_local_time') or ''
+arr_time = det.get('arrival_local_time') or ''
+if dep_time:
+    time_str = dep_time
+    if arr_time:
+        time_str += f' → {arr_time}'
+    print(f\"  time:     {time_str}\")
 if i.get('start_location') or i.get('end_location'):
     print(f\"  route:    {(i.get('start_location') or '-') } → {(i.get('end_location') or '-')}\")
+dep_terminal = det.get('departure_terminal') or ''
+arr_terminal = det.get('arrival_terminal') or ''
+if dep_terminal or arr_terminal:
+    parts = []
+    if dep_terminal:
+        parts.append(f'Dep: {dep_terminal}')
+    if arr_terminal:
+        parts.append(f'Arr: {arr_terminal}')
+    print(f\"  terminal: {' / '.join(parts)}\")
+cabin = det.get('cabin_class') or ''
+seat = det.get('seat') or ''
+if cabin or seat:
+    extra = cabin
+    if seat:
+        extra += f' / Seat {seat}' if extra else f'Seat {seat}'
+    print(f\"  class:    {extra}\")
 "
 }
 
