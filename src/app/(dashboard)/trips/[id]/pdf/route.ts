@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { ItineraryDocument } from '@/components/pdf/itinerary-document'
@@ -46,9 +48,19 @@ export async function GET(
     .order('start_date', { ascending: true })
     .order('start_ts', { ascending: true })
 
+  // Read logo for embedding
+  let logoDataUri: string | undefined
+  try {
+    const logoPath = path.join(process.cwd(), 'public', 'ubtrippin_logo_simple.png')
+    const logoBuffer = fs.readFileSync(logoPath)
+    logoDataUri = `data:image/png;base64,${logoBuffer.toString('base64')}`
+  } catch {
+    // Logo not critical — continue without it
+  }
+
   // Generate PDF
   const pdfBuffer = await renderToBuffer(
-    ItineraryDocument({ trip, items: items || [] })
+    ItineraryDocument({ trip, items: items || [], logoDataUri })
   )
 
   // Create filename
