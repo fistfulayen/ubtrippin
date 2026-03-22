@@ -10,7 +10,7 @@ UB Trippin exists because that's absurd.
 
 UB Trippin is an open-source travel intelligence platform built agent-first. Not agent-friendly. Not agent-compatible. *Agent-first.* The AI is not an add-on; it's the assumed operator.
 
-Forward a booking confirmation to **trips@ubtrippin.xyz** and your agent extracts the itinerary, organizes it, augments it with local recommendations, and serves it back as clean data — structured JSON, readable markdown, or a PDF you can hand to your travel companion who still prints things out.
+Forward a booking confirmation to **trips@ubtrippin.xyz** and your agent extracts the itinerary, organizes it, augments it with live flight data and local weather, and serves it back as clean data — structured JSON, a branded PDF itinerary, or a shareable trip page with a movement timeline your travel companion can follow in real time.
 
 **Live at [ubtrippin.xyz](https://ubtrippin.xyz)**
 
@@ -21,13 +21,15 @@ Email arrives (booking confirmation, itinerary, hotel receipt)
     ↓
 AI extraction (Claude Sonnet 4 via Vercel AI Gateway)
     ↓
-Structured trip data (flights, hotels, trains, restaurants, activities, concert/event tickets)
+Structured trip data (flights, hotels, trains, cars, restaurants, activities, tickets)
     ↓
 Stored in Supabase (your data, your trips, private by default)
     ↓
-Accessible via web UI, REST API, or CLI
+Accessible via web UI, REST API, CLI, or MCP server
     ↓
-Exportable as markdown, PDF, or shareable link
+Augmented: live flight status, weather forecasts, city events
+    ↓
+Exportable as branded PDF, shareable link, or calendar sync
 ```
 
 ## Why Agent-First?
@@ -51,7 +53,7 @@ So we built for that. The web UI exists (it's quite nice, actually), but it's th
 
 That's it. Within a minute, your trip appears in your dashboard — flights, hotels, trains, cars, restaurants, activities, concert and event tickets, all extracted and organized. Confirmation codes and booking references are stored privately and never exposed via the API or share links.
 
-**Step 3 (optional):** Share your trip, export it as a PDF, or sync it to your calendar.
+**Step 3 (optional):** Share your trip, export a branded PDF itinerary, or sync it to your calendar.
 
 ---
 
@@ -108,52 +110,84 @@ Open [localhost:3000](http://localhost:3000). You're trippin.
 
 ---
 
-## API
+## Agent Interfaces
 
-The REST API v1 is live and documented. Your agent can read trips and items using a Bearer token — no browser, no OAuth dance, no cookie consent modals.
+UB Trippin gives your agent three ways in. Use whichever fits your stack.
 
-→ **[Full API Reference](docs/API.md)**
+### REST API
 
-### Get an API Key
-
-1. Go to **Settings → API Keys** in the web UI
-2. Create a key, give it a name (e.g. "My Agent")
-3. Copy it — it's shown once
+The API v1 is live and documented. Bearer token auth — no browser, no OAuth dance, no cookie consent modals.
 
 ```bash
 curl https://ubtrippin.xyz/api/v1/trips \
   -H "Authorization: Bearer ubt_your_key_here"
 ```
 
+Get an API key: **Settings → API Keys** in the web UI.
+
+→ **[Full API Reference](docs/API.md)**
+
+### CLI (`ubt`)
+
+Full-featured bash CLI. Every operation the API supports, from your terminal.
+
+```bash
+ubt trips list                           # all your trips
+ubt items add <trip_id> --kind flight \
+  --summary "AF1234 CDG→TRN" \
+  --start-date 2026-04-04               # add a flight
+ubt trips weather <trip_id>              # forecast for your trip
+ubt tickets list <trip_id>               # concert/event tickets
+```
+
+Install: clone the repo, the CLI lives at `cli/ubt`.
+
+### MCP Server
+
+For AI agents that speak MCP (Claude, Gemini, and others). Tools for trip management, family operations, loyalty lookups, and more.
+
+The MCP server lives at `mcp/` in the repo.
+
 ---
 
 ## Features
 
-- **AI email ingestion** — forward confirmations to `trips@ubtrippin.xyz`, get structured itinerary data back.
-- **Family Sharing** — sharing is caring: accepted family members share trips, loyalty vaults, profiles, and guides.
-- **Traveler Profile & Loyalty Vault** — persistent traveler preferences + loyalty numbers for booking-time personalization.
-- **Trip collaboration** — invite editors/viewers to collaborate on a trip.
-- **Agent interfaces** — access via web app, REST API, CLI, and MCP server.
+### AI Email Ingestion
+Forward booking confirmations to `trips@ubtrippin.xyz`. Claude extracts structured data — flights, hotels, trains, cars, restaurants, activities, tickets — and files them into your trips. Handles messy forwarded-from-forwarded chains, airline HTML, and multi-booking emails. Input sanitization pipeline quarantines suspicious content before it reaches the AI.
+
+### Live Flight Status
+Real-time gate changes, delay tracking, and departure/arrival updates via FlightAware. Flight cards show live status badges, and the data is accessible via the API. Fetched on-demand when you view the page — no background polling burning API credits.
+
+### Weather Forecasts
+7-day weather forecasts for every city stay in your trip, powered by Open-Meteo. Shown on city stay cards and the share page. Cached per-trip, refreshed on page load when stale.
+
+### Branded PDF Itinerary
+Download your trip as a polished PDF — cover image hero, item-type icons, confirmation code badges, day-by-day timeline, quick reference block with all your booking codes. Car rentals show pickup and drop-off; hotels show check-in/check-out with night count. Your trip, organized, on paper.
+
+### Movement Timeline
+The share page renders a visual timeline showing how you move between cities — flights, trains, drives — with gap labels and city markers. It turns a list of bookings into a story.
+
+### City Events
+Discover local exhibitions, concerts, and cultural events happening during your stay. Event discovery pipeline scores and surfaces relevant events for your trip's cities and dates.
 
 ### Family Sharing
+Create a family, invite members, and shared travel context becomes queryable by agents across the whole family. All-or-nothing by design — accepted members share trips, loyalty vaults, profiles, and guides.
 
-Family Sharing is all-or-nothing by design. Create a family, invite members, and shared travel context becomes queryable by agents across the whole family.
-
----
-
-## Traveler Profile & Loyalty Vault
-
-UBTRIPPIN stores persistent traveler preferences (seat, meal, alliance, home airport, currency) plus loyalty programs in a vault your agent can read at booking time.
-
-- Profile data keeps recommendations and booking defaults personalized without repeated prompts.
-- The loyalty vault is the authoritative database of record for loyalty numbers.
-- Agents can call MCP tools like `get_traveler_profile` and `lookup_loyalty_program` before every booking.
-
-CLI example:
+### Traveler Profile & Loyalty Vault
+Persistent traveler preferences (seat, meal, alliance, home airport, currency) plus loyalty program numbers in a vault your agent can read at booking time.
 
 ```bash
 ubt profile loyalty lookup united
 ```
+
+### City Guides
+Curated place recommendations attached to cities you've visited. Public or private. Shareable.
+
+### Trip Collaboration
+Invite editors or viewers to collaborate on a trip. Because travel is rarely a solo operation.
+
+### Public Feedback
+Built-in feedback system with upvoting, images, and comments. Response time is tracked and displayed publicly — because accountability is a feature.
 
 ---
 
@@ -163,9 +197,11 @@ ubt profile loyalty lookup united
 |---|---|
 | Framework | Next.js 15 (App Router) |
 | Auth | Supabase (Google OAuth) |
-| Database | Supabase (Postgres) |
+| Database | Supabase (Postgres, RLS everywhere) |
 | Email | Resend (inbound processing) |
 | AI | Vercel AI Gateway → Claude Sonnet 4 |
+| Flight Data | FlightAware AeroAPI |
+| Weather | Open-Meteo |
 | PDF | @react-pdf/renderer |
 | Styling | Tailwind CSS 4 |
 | Hosting | Vercel |
@@ -184,12 +220,10 @@ See the [full docs](docs/) for deployment details.
 
 ## What's Coming
 
-- **CLI** (`ubt`) — every operation from the terminal
+- **TripIt import** — bring your existing trips over (pending API access from SAP, because of course it's SAP now)
+- **Live flight pages** — public, shareable flight tracking pages. Send someone a link instead of "I'll text you when I land"
 - **Place notes** — attach recommendations, ratings, and stories to any location
-- **Markdown export** — your trip as a document, readable by humans and agents alike
 - **Agent feature requests** — agents can propose features via the API
-
-See the [Project Plan](https://github.com/fistfulayen/ubtrippin/wiki) for the full breakdown.
 
 ---
 
@@ -202,6 +236,7 @@ We welcome contributions from humans and agents alike.
 3. One feature per PR
 4. **Update docs if you change API behavior** — this is non-negotiable
 5. All PRs must pass existing tests and include tests for new functionality
+6. **Do not bypass RLS with service role on happy paths** — if RLS blocks an operation, the policy is wrong. Fix the policy.
 
 For agents: open an issue with the `agent-request` label. Describe what you need and why. We actually read these.
 
