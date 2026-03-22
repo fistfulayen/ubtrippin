@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normaliseToCity } from '@/lib/trips/assignment'
+import { resolveMetroAlias } from '@/lib/trips/airport-cities'
 import type { CitySegment } from '@/lib/trips/city-segments'
 import type {
   CityEvent,
@@ -322,9 +323,15 @@ export async function getItineraryCities(
 
 export function matchTrackedCityByName(cities: TrackedCity[], name: string): TrackedCity | null {
   const normalized = normaliseToCity(name).toLowerCase()
-  return (
-    cities.find((city) => normaliseToCity(city.city).toLowerCase() === normalized) ?? null
-  )
+  // Try exact match first
+  const exact = cities.find((city) => normaliseToCity(city.city).toLowerCase() === normalized)
+  if (exact) return exact
+  // Try metro alias match (Surfside → Miami, Brooklyn → New York, etc.)
+  const metro = resolveMetroAlias(name).toLowerCase()
+  if (metro !== normalized) {
+    return cities.find((city) => normaliseToCity(city.city).toLowerCase() === metro) ?? null
+  }
+  return null
 }
 
 export async function getTripTimelineEventPreviews(

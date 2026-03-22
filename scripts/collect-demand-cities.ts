@@ -7,6 +7,7 @@
 
 import { createSecretClient } from '@/lib/supabase/service'
 import { normaliseToCity } from '@/lib/trips/assignment'
+import { resolveMetroAlias } from '@/lib/trips/airport-cities'
 import { runCityDiscovery } from './lib/discover-events-core'
 import type { PipelineCity } from './lib/types'
 
@@ -92,7 +93,13 @@ function toDemandCity(raw: string | null | undefined): string | null {
   // Skip if it still looks like an address after normalisation
   if (ADDRESS_PATTERN.test(city)) return null
 
-  // Apply aliases to canonical names
+  // Apply metro area aliases (Surfside → Miami, Brooklyn → New York, etc.)
+  const metro = resolveMetroAlias(city)
+  if (metro !== city.toLowerCase()) {
+    city = metro.replace(/\b\w/g, (c) => c.toUpperCase())
+  }
+
+  // Apply canonical name aliases
   const lower = city.toLowerCase()
   if (CITY_ALIASES[lower]) {
     city = CITY_ALIASES[lower]

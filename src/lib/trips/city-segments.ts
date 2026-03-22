@@ -272,8 +272,13 @@ function buildSegment(raw: RawSegment): CitySegment {
     startDate
   const identity = deriveSegmentIdentity(raw)
 
+  // Normalise to metro area (Surfside → Miami, Brooklyn → New York, etc.)
+  const metroCity = resolveMetroAlias(identity.city)
+  // Capitalise first letter of each word for display
+  const displayCity = metroCity.replace(/\b\w/g, (c) => c.toUpperCase())
+
   return {
-    city: identity.city,
+    city: displayCity,
     countryCode: identity.countryCode,
     startDate,
     endDate,
