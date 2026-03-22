@@ -308,7 +308,20 @@ async function main() {
     }
   }
 
-  // 9. Summary
+  // 9. Clean up past events
+  const { count: deletedCount, error: deleteError } = await supabase
+    .from('city_events')
+    .delete({ count: 'exact' })
+    .lt('start_date', today)
+    .or(`end_date.lt.${today},end_date.is.null`)
+
+  if (deleteError) {
+    console.warn(`[collect-demand-cities] Failed to clean up past events: ${deleteError.message}`)
+  } else if (deletedCount && deletedCount > 0) {
+    console.log(`[collect-demand-cities] Cleaned up ${deletedCount} past events`)
+  }
+
+  // 10. Summary
   console.log(
     `[collect-demand-cities] Done: ${demandCityNames.size} demand cities, ` +
       `${newCitiesCount} new tracked, ${citiesToRefresh.length} needed refresh, ${refreshed} refreshed`
