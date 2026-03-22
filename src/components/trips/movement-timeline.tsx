@@ -42,7 +42,12 @@ export function MovementTimeline({
         }
 
         if (entry.type === 'segment' && entry.segment) {
-          const key = `${entry.segment.city}-${entry.segment.startDate}-${index}`
+          // segmentEvents keys use segment-only index, not full timeline index
+          const segmentIndex = entries
+            .slice(0, index + 1)
+            .filter((e) => e.type === 'segment' && e.segment != null)
+            .length - 1
+          const key = `${entry.segment.city}-${entry.segment.startDate}-${segmentIndex}`
           const preview = segmentEvents[key]
           return (
             <CitySegmentBlock
