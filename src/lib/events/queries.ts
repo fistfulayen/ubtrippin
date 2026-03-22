@@ -252,6 +252,7 @@ export async function getCityEvents(
       price_info, booking_url, tags, lineup, last_verified_at, expires_at
     `)
     .eq('city_id', cityId)
+    .gte('start_date', new Date().toISOString().slice(0, 10))
     .order('start_date', { ascending: true })
     .order('significance_score', { ascending: false })
 
@@ -352,6 +353,7 @@ export async function getTripTimelineEventPreviews(
       price_info, booking_url, tags, lineup, last_verified_at, expires_at
     `)
     .in('city_id', uniqueCities)
+    .gte('start_date', new Date().toISOString().slice(0, 10))
 
   if (error) throw error
 
