@@ -2,8 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Ticket, MapPin, Clock, CalendarDays } from 'lucide-react'
+import { Ticket, MapPin, Clock, CalendarDays, Sparkles } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { getTrackedCities, getCityEvents, matchTrackedCityByName } from '@/lib/events/queries'
+import type { CityEvent, TrackedCity } from '@/types/events'
+import { HomeCityPrompt } from './HomeCityPrompt'
 
 interface TicketItem {
   id: string
@@ -24,6 +27,55 @@ interface TicketItem {
 
 type EventFilter = 'upcoming' | 'past' | 'all'
 
+interface HeroData {
+  city: TrackedCity
+  events: CityEvent[]
+}
+
+async function resolveCurrentCity(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  today: string
+): Promise<{ city: TrackedCity; events: CityEvent[] } | null> {
+  const cities = await getTrackedCities(supabase)
+
+  // Check for active trip
+  const { data: activeTrips } = await supabase
+    .from('trips')
+    .select('primary_location')
+    .eq('user_id', userId)
+    .lte('start_date', today)
+    .gte('end_date', today)
+    .not('primary_location', 'is', null)
+    .limit(1)
+
+  let cityName: string | null = null
+
+  if (activeTrips && activeTrips.length > 0) {
+    cityName = activeTrips[0].primary_location as string
+  } else {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('home_city')
+      .eq('id', userId)
+      .maybeSingle()
+    cityName = profile?.home_city ?? null
+  }
+
+  if (!cityName) return null
+
+  const trackedCity = matchTrackedCityByName(cities, cityName)
+  if (!trackedCity) return null
+
+  const twoWeeksOut = new Date(today)
+  twoWeeksOut.setDate(twoWeeksOut.getDate() + 14)
+  const toDate = twoWeeksOut.toISOString().slice(0, 10)
+
+  const events = await getCityEvents(supabase, trackedCity.id, { from: today, to: toDate })
+
+  return { city: trackedCity, events }
+}
+
 export default async function EventsPage({
   searchParams,
 }: {
@@ -36,6 +88,22 @@ export default async function EventsPage({
   const params = await searchParams
   const filter = (params.filter as EventFilter) || 'upcoming'
   const today = new Date().toISOString().split('T')[0]
+
+  // Resolve "what's happening" hero city and events
+  let heroData: HeroData | null = null
+  let hasHomeCity = false
+
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('home_city')
+      .eq('id', user.id)
+      .maybeSingle()
+    hasHomeCity = !!(profile?.home_city)
+    heroData = await resolveCurrentCity(supabase, user.id, today)
+  } catch {
+    // Non-fatal — hero section is best-effort
+  }
 
   // Fetch all ticket items for this user, with their trip info
   let query = supabase
@@ -64,9 +132,9 @@ export default async function EventsPage({
   ]
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
-      <div className="mb-8 flex items-center gap-3">
+      <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
           <Ticket className="h-5 w-5 text-amber-600" />
         </div>
@@ -76,8 +144,66 @@ export default async function EventsPage({
         </div>
       </div>
 
+      {/* What's happening hero */}
+      {heroData ? (
+        <section>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-slate-900">
+              <Sparkles className="h-4 w-4 text-indigo-500" />
+              What&apos;s happening in {heroData.city.city}
+            </h2>
+            <Link
+              href={`/cities/${heroData.city.slug}`}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+            >
+              View all →
+            </Link>
+          </div>
+
+          {heroData.events.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 py-8 text-center">
+              <p className="text-sm text-slate-500">No upcoming events found for {heroData.city.city}.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {heroData.events.slice(0, 6).map((event) => (
+                <div
+                  key={event.id}
+                  className="overflow-hidden rounded-xl border border-indigo-100 bg-white shadow-sm"
+                >
+                  <div className="h-28 bg-slate-100">
+                    {event.image_url ? (
+                      <img
+                        src={event.image_url}
+                        alt={event.title}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : null}
+                  </div>
+                  <div className="space-y-1 p-3">
+                    <p className="line-clamp-2 text-sm font-semibold text-slate-900">{event.title}</p>
+                    <p className="text-xs text-slate-500">{formatDate(event.start_date)}</p>
+                    <p className="text-xs uppercase tracking-[0.14em] text-slate-400">{event.category}</p>
+                    {event.venue_name ? (
+                      <p className="flex items-center gap-1 text-xs text-slate-400">
+                        <MapPin className="h-3 w-3" />
+                        {event.venue_name}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      ) : (
+        <HomeCityPrompt hasHomeCity={hasHomeCity} />
+      )}
+
+      <div className="border-t border-gray-100" />
+
       {/* Filter tabs */}
-      <div className="mb-6 flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
+      <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
         {filterTabs.map((tab) => (
           <Link
             key={tab.key}

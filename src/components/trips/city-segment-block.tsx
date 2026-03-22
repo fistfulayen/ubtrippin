@@ -1,10 +1,13 @@
 'use client'
 
+import Link from 'next/link'
+import { Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDate, formatDateRange } from '@/lib/utils'
 import type { CitySegment } from '@/lib/trips/city-segments'
 import type { Trip } from '@/types/database'
+import type { CityEvent, TrackedCity } from '@/types/events'
 import { TripItemCard } from './trip-item-card'
 
 interface CitySegmentBlockProps {
@@ -12,6 +15,7 @@ interface CitySegmentBlockProps {
   allTrips: Pick<Trip, 'id' | 'title' | 'start_date'>[]
   currentUserId?: string
   readOnly?: boolean
+  events?: { city: TrackedCity; events: CityEvent[] }
 }
 
 function flagEmoji(countryCode?: string) {
@@ -30,6 +34,7 @@ export function CitySegmentBlock({
   allTrips,
   currentUserId,
   readOnly = false,
+  events,
 }: CitySegmentBlockProps) {
   const hasHotel = segment.items.some((item) => item.kind === 'hotel')
 
@@ -78,6 +83,34 @@ export function CitySegmentBlock({
                 />
             ))}
           </div>
+
+          {events && events.events.length > 0 ? (
+            <div className="border-t border-slate-100 pt-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  What&apos;s happening in {events.city.city}
+                </p>
+                <Link
+                  href={`/cities/${events.city.slug}?from=${segment.startDate}&to=${segment.endDate}`}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  See all →
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {events.events.slice(0, 3).map((event) => (
+                  <div key={event.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-slate-900">{event.title}</p>
+                      <p className="text-xs text-slate-500">{formatDate(event.start_date)}</p>
+                    </div>
+                    <Badge variant="secondary" className="shrink-0 capitalize">{event.category}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       </CardContent>
     </Card>

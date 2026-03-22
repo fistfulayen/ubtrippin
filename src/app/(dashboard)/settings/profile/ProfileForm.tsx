@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { CityAutocomplete } from '@/components/ui/city-autocomplete'
 
 type SeatPreference = 'window' | 'aisle' | 'middle' | 'no_preference'
 type MealPreference = 'standard' | 'vegetarian' | 'vegan' | 'kosher' | 'halal' | 'gluten_free' | 'no_preference'
@@ -104,11 +105,10 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="home_city" className="text-sm font-medium text-gray-700">Home City</label>
-          <Input
-            id="home_city"
+          <label className="text-sm font-medium text-gray-700">Home City</label>
+          <CityAutocomplete
             value={homeCity}
-            onChange={(event) => setHomeCity(event.target.value)}
+            onChange={setHomeCity}
             placeholder="Paris"
           />
           <p className="text-xs text-gray-500">Your home city for local event recommendations.</p>
