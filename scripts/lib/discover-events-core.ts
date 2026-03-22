@@ -172,7 +172,12 @@ async function sourceToCandidatesFromSearch(args: {
   const results = await searchBraveWeb(args.query, { count: 20, site: args.site, countryCode: args.city.country_code })
   const candidates: DiscoveredEventCandidate[] = []
 
-  for (const result of results) {
+  // Cap deep page fetches to top 5 results per query — we pay per search query,
+  // not per result, so count=20 gives us more snippets to filter without forcing
+  // us to fetch and AI-score all 20 pages.
+  const resultsToFetch = results.slice(0, 5)
+
+  for (const result of resultsToFetch) {
     // Deep extraction: fetch the actual page and extract multiple events
     const page = await fetchPageContent(result.url)
 
