@@ -12,6 +12,7 @@ interface ProfileResponse {
   airline_alliance: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
   hotel_brand_preference: string | null
   home_airport: string | null
+  home_city: string | null
   currency_preference: string
   temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
@@ -26,6 +27,7 @@ function fallbackProfile(userId: string): ProfileResponse {
     airline_alliance: 'none',
     hotel_brand_preference: null,
     home_airport: null,
+    home_city: null,
     currency_preference: 'USD',
     temperature_unit: 'fahrenheit',
     notes: null,

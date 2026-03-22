@@ -13,6 +13,7 @@ interface UserProfileRow {
   airline_alliance: (typeof ALLIANCE_PREFERENCES)[number]
   hotel_brand_preference: string | null
   home_airport: string | null
+  home_city: string | null
   currency_preference: string
   temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
@@ -33,6 +34,7 @@ function defaultProfile(userId: string): UserProfileRow {
     airline_alliance: 'none',
     hotel_brand_preference: null,
     home_airport: null,
+    home_city: null,
     currency_preference: 'USD',
     temperature_unit: 'fahrenheit',
     notes: null,
@@ -151,6 +153,7 @@ async function upsertProfile(request: NextRequest) {
 
   const hotelBrand = normalizeNullableString(body.hotel_brand_preference)
   const homeAirport = normalizeNullableString(body.home_airport)
+  const homeCity = normalizeNullableString(body.home_city)
   const notes = normalizeNullableString(body.notes)
 
   if (body.hotel_brand_preference !== undefined && hotelBrand === undefined) {
@@ -163,6 +166,13 @@ async function upsertProfile(request: NextRequest) {
   if (body.home_airport !== undefined && homeAirport === undefined) {
     return NextResponse.json(
       { error: { code: 'invalid_param', message: 'home_airport must be a string or null.', field: 'home_airport' } },
+      { status: 400 }
+    )
+  }
+
+  if (body.home_city !== undefined && homeCity === undefined) {
+    return NextResponse.json(
+      { error: { code: 'invalid_param', message: 'home_city must be a string or null.', field: 'home_city' } },
       { status: 400 }
     )
   }
@@ -187,6 +197,7 @@ async function upsertProfile(request: NextRequest) {
     ...(body.airline_alliance !== undefined ? { airline_alliance: body.airline_alliance } : {}),
     ...(body.hotel_brand_preference !== undefined ? { hotel_brand_preference: hotelBrand } : {}),
     ...(body.home_airport !== undefined ? { home_airport: homeAirport ? homeAirport.toUpperCase() : null } : {}),
+    ...(body.home_city !== undefined ? { home_city: homeCity } : {}),
     ...(currencyPreference !== undefined ? { currency_preference: currencyPreference } : {}),
     ...(body.temperature_unit !== undefined ? { temperature_unit: body.temperature_unit } : {}),
     ...(body.notes !== undefined ? { notes } : {}),
