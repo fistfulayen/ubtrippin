@@ -17,6 +17,7 @@ interface ProfileData {
   airline_alliance: AlliancePreference
   hotel_brand_preference: string | null
   home_airport: string | null
+  home_city: string | null
   currency_preference: string
   temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
@@ -30,6 +31,7 @@ interface ProfileFormProps {
 
 export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) {
   const [homeAirport, setHomeAirport] = useState(initialProfile.home_airport ?? '')
+  const [homeCity, setHomeCity] = useState(initialProfile.home_city ?? '')
   const [seatPreference, setSeatPreference] = useState<SeatPreference>(initialProfile.seat_preference)
   const [mealPreference, setMealPreference] = useState<MealPreference>(initialProfile.meal_preference)
   const [airlineAlliance, setAirlineAlliance] = useState<AlliancePreference>(initialProfile.airline_alliance)
@@ -55,6 +57,7 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
         },
         body: JSON.stringify({
           home_airport: homeAirport.trim() || null,
+          home_city: homeCity.trim() || null,
           seat_preference: seatPreference,
           meal_preference: mealPreference,
           airline_alliance: airlineAlliance,
@@ -98,6 +101,17 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
             maxLength={8}
           />
           <p className="text-xs text-gray-500">Use IATA code when possible (for example: SFO, JFK).</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="home_city" className="text-sm font-medium text-gray-700">Home City</label>
+          <Input
+            id="home_city"
+            value={homeCity}
+            onChange={(event) => setHomeCity(event.target.value)}
+            placeholder="Paris"
+          />
+          <p className="text-xs text-gray-500">Your home city for local event recommendations.</p>
         </div>
 
         <div className="space-y-1.5">
