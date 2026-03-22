@@ -4,6 +4,7 @@ import {
   Text,
   View,
   StyleSheet,
+  Image,
 } from '@react-pdf/renderer'
 import type { Trip, TripItem } from '@/types/database'
 
@@ -18,6 +19,11 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     borderBottom: '2 solid #f59e0b',
     paddingBottom: 20,
+  },
+  headerLogo: {
+    height: 40,
+    width: 40,
+    marginBottom: 10,
   },
   title: {
     fontSize: 24,
@@ -78,11 +84,18 @@ const styles = StyleSheet.create({
     color: '#4b5563',
     marginBottom: 2,
   },
+  itemConfirmationWrapper: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
   itemConfirmation: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#4338ca',
-    marginTop: 4,
   },
   itemLocation: {
     flexDirection: 'row',
@@ -102,6 +115,16 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  footerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  footerLogo: {
+    height: 20,
+    width: 20,
+    marginRight: 4,
   },
   footerText: {
     fontSize: 8,
@@ -130,6 +153,7 @@ const styles = StyleSheet.create({
 interface ItineraryDocumentProps {
   trip: Trip
   items: TripItem[]
+  logoDataUri?: string
 }
 
 function formatDate(dateStr: string): string {
@@ -139,6 +163,15 @@ function formatDate(dateStr: string): string {
     month: 'long',
     day: 'numeric',
     year: 'numeric',
+  })
+}
+
+function formatDateShort(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   })
 }
 
@@ -198,6 +231,15 @@ function groupByDate(items: TripItem[]): Map<string, TripItem[]> {
   return grouped
 }
 
+function arraysEqual(a: string[] | null | undefined, b: string[] | null | undefined): boolean {
+  const arrA = a || []
+  const arrB = b || []
+  if (arrA.length !== arrB.length) return false
+  const sortedA = [...arrA].sort()
+  const sortedB = [...arrB].sort()
+  return sortedA.every((v, i) => v === sortedB[i])
+}
+
 const kindLabels: Record<string, string> = {
   flight: 'FLIGHT',
   hotel: 'HOTEL',
@@ -228,15 +270,28 @@ function getCardStyle(kind: string) {
   }
 }
 
-export function ItineraryDocument({ trip, items }: ItineraryDocumentProps) {
+export function ItineraryDocument({ trip, items, logoDataUri }: ItineraryDocumentProps) {
   const groupedItems = groupByDate(items)
   const sortedDates = Array.from(groupedItems.keys()).sort()
+
+  const tripStartDate = trip.start_date
+    ? new Date(trip.start_date)
+    : sortedDates.length > 0 ? new Date(sortedDates[0]) : new Date()
+
+  const generatedDate = new Date().toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
+          {logoDataUri && (
+            <Image style={styles.headerLogo} src={logoDataUri} />
+          )}
           <Text style={styles.title}>{trip.title}</Text>
           <Text style={styles.subtitle}>
             {formatDateRange(trip.start_date, trip.end_date)}
@@ -252,8 +307,13 @@ export function ItineraryDocument({ trip, items }: ItineraryDocumentProps) {
         </View>
 
         {/* Timeline */}
-        {sortedDates.map((date, dayIndex) => {
+        {sortedDates.map((date) => {
           const dayItems = groupedItems.get(date) || []
+
+          // Calculate calendar day number from trip start
+          const dayNumber = Math.floor(
+            (new Date(date).getTime() - tripStartDate.getTime()) / 86400000
+          ) + 1
 
           // Sort by time within day
           const sortedDayItems = [...dayItems].sort((a, b) => {
@@ -266,76 +326,134 @@ export function ItineraryDocument({ trip, items }: ItineraryDocumentProps) {
           return (
             <View key={date} style={styles.daySection} wrap={false}>
               <View style={styles.dayHeader}>
-                <Text style={styles.dayNumber}>Day {dayIndex + 1}</Text>
+                <Text style={styles.dayNumber}>Day {dayNumber}</Text>
                 <Text style={styles.dayDate}>{formatDate(date)}</Text>
               </View>
 
-              {sortedDayItems.map((item, itemIndex) => (
-                <View
-                  key={itemIndex}
-                  style={[styles.itemCard, getCardStyle(item.kind)]}
-                >
-                  <Text style={styles.itemKind}>{kindLabels[item.kind]}</Text>
-                  <Text style={styles.itemProvider}>
-                    {item.provider || item.summary || 'Untitled'}
-                  </Text>
+              {sortedDayItems.map((item, itemIndex) => {
+                const det = item.details_json as Record<string, unknown> | null
+                const flightNumber = det?.flight_number as string | undefined
 
-                  {/* Time */}
-                  {(() => {
-                    const det = item.details_json as Record<string, unknown> | null
-                    if (!item.start_ts && !det?.departure_local_time) return null
-                    const [start, end] = getItemLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
-                    return (
-                      <Text style={styles.itemDetail}>
-                        {start}
-                        {end && ` - ${end}`}
-                      </Text>
-                    )
-                  })()}
+                // Determine if item travelers differ from trip travelers
+                const showItemTravelers =
+                  item.traveler_names &&
+                  item.traveler_names.length > 0 &&
+                  !arraysEqual(item.traveler_names, trip.travelers)
 
-                  {/* Location */}
-                  {(item.start_location || item.end_location) && (
-                    <View style={styles.itemLocation}>
-                      <Text style={styles.itemDetail}>
-                        {item.start_location}
-                        {item.end_location &&
-                          item.end_location !== item.start_location && (
-                            <>
-                              <Text style={styles.arrow}> → </Text>
-                              {item.end_location}
-                            </>
-                          )}
-                      </Text>
-                    </View>
-                  )}
+                return (
+                  <View
+                    key={itemIndex}
+                    style={[styles.itemCard, getCardStyle(item.kind)]}
+                  >
+                    <Text style={styles.itemKind}>{kindLabels[item.kind] ?? item.kind.toUpperCase()}</Text>
 
-                  {/* Confirmation code */}
-                  {item.confirmation_code && (
-                    <Text style={styles.itemConfirmation}>
-                      Confirmation: {item.confirmation_code}
+                    {/* Provider + flight number */}
+                    <Text style={styles.itemProvider}>
+                      {item.provider || item.summary || 'Untitled'}
+                      {item.kind === 'flight' && flightNumber ? ` — ${flightNumber}` : ''}
                     </Text>
-                  )}
 
-                  {/* Travelers */}
-                  {item.traveler_names && item.traveler_names.length > 0 && (
-                    <Text style={styles.itemDetail}>
-                      Travelers: {item.traveler_names.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              ))}
+                    {/* Kind-specific details */}
+                    {item.kind === 'car' ? (
+                      (() => {
+                        const pickupDate = item.start_date ? formatDateShort(item.start_date) : ''
+                        const dropoffDate = item.end_date ? formatDateShort(item.end_date) : ''
+                        const pickupTime = formatTime(item.start_ts) || (det?.pickup_time as string) || ''
+                        const dropoffTime = formatTime(item.end_ts) || (det?.dropoff_time as string) || ''
+                        const pickupLocation = item.start_location || (det?.pickup_location as string) || ''
+                        const dropoffLocation = item.end_location || (det?.dropoff_location as string) || ''
+                        return (
+                          <>
+                            <Text style={styles.itemDetail}>
+                              Pickup: {pickupDate}{pickupTime ? ` at ${pickupTime}` : ''}{pickupLocation ? ` — ${pickupLocation}` : ''}
+                            </Text>
+                            <Text style={styles.itemDetail}>
+                              Drop-off: {dropoffDate}{dropoffTime ? ` at ${dropoffTime}` : ''}{dropoffLocation ? ` — ${dropoffLocation}` : ''}
+                            </Text>
+                          </>
+                        )
+                      })()
+                    ) : item.kind === 'hotel' ? (
+                      (() => {
+                        const checkinDate = item.start_date ? formatDateShort(item.start_date) : ''
+                        const checkoutDate = item.end_date ? formatDateShort(item.end_date) : ''
+                        const nights =
+                          item.start_date && item.end_date
+                            ? Math.round(
+                                (new Date(item.end_date).getTime() - new Date(item.start_date).getTime()) /
+                                  86400000
+                              )
+                            : null
+                        return (
+                          <>
+                            <Text style={styles.itemDetail}>Check-in: {checkinDate}</Text>
+                            <Text style={styles.itemDetail}>
+                              Check-out: {checkoutDate}
+                              {nights !== null && nights > 0 ? `  (${nights} night${nights !== 1 ? 's' : ''})` : ''}
+                            </Text>
+                          </>
+                        )
+                      })()
+                    ) : (
+                      (() => {
+                        if (!item.start_ts && !det?.departure_local_time) return null
+                        const [start, end] = getItemLocalTimes({ start_ts: item.start_ts, end_ts: item.end_ts, details: det })
+                        return (
+                          <Text style={styles.itemDetail}>
+                            {start}
+                            {end && ` - ${end}`}
+                          </Text>
+                        )
+                      })()
+                    )}
+
+                    {/* Location (skip for car — already in pickup/drop-off lines) */}
+                    {item.kind !== 'car' && (item.start_location || item.end_location) && (
+                      <View style={styles.itemLocation}>
+                        <Text style={styles.itemDetail}>
+                          {item.start_location}
+                          {item.end_location &&
+                            item.end_location !== item.start_location && (
+                              <>
+                                <Text style={styles.arrow}> → </Text>
+                                {item.end_location}
+                              </>
+                            )}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Confirmation code — visually prominent */}
+                    {item.confirmation_code && (
+                      <View style={styles.itemConfirmationWrapper}>
+                        <Text style={styles.itemConfirmation}>
+                          Confirmation: {item.confirmation_code}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Travelers — only if different from trip-level travelers */}
+                    {showItemTravelers && (
+                      <Text style={styles.itemDetail}>
+                        Travelers: {item.traveler_names!.join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                )
+              })}
             </View>
           )
         })}
 
         {/* Footer */}
         <View style={styles.footer} fixed>
-          <Text style={styles.footerText}>
-            Generated by UBTRIPPIN.XYZ
-          </Text>
-          <Text style={styles.footerText}>
-            {new Date().toLocaleDateString()}
-          </Text>
+          <View style={styles.footerLeft}>
+            {logoDataUri && (
+              <Image style={styles.footerLogo} src={logoDataUri} />
+            )}
+            <Text style={styles.footerText}>UBTRIPPIN.XYZ</Text>
+          </View>
+          <Text style={styles.footerText}>Generated {generatedDate}</Text>
         </View>
       </Page>
     </Document>
