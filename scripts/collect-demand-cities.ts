@@ -12,8 +12,33 @@ import type { PipelineCity } from './lib/types'
 
 const isDryRun = process.argv.includes('--dry-run')
 
-// Keywords that indicate a non-city string (venues, transit infrastructure, etc.)
-const NON_CITY_PATTERN = /\b(shop|station|mall|terminal|kiosk|shinkansen|ext\.)\b/i
+// Keywords that indicate a non-city string (venues, transit, hotels, addresses, etc.)
+const NON_CITY_KEYWORDS = /\b(shop|station|mall|terminal|kiosk|shinkansen|ext\.|hotel|hotels|hostel|motel|inn|resort|suites?|hyatt|marriott|hilton|sheraton|sonesta|mercure|novotel|ibis|okko|mitsui|premier|surfside|garden|grand|byaku|onsen|ousenkaku|avenue|street|boulevard|road|blvd|ave|st\b|rd\b|drive|roppongi|collins|argyle|campbell|airport|airlines?|malpensa|o'hare|narita|heathrow|gatwick|orly|cdg|jfk|lhr|ewr|sfo|lax|dfw|pdx|chs|aus|mdw|mia|ltn|mxp|trn)\b/i
+
+// Patterns that match addresses (numbers at start)
+const ADDRESS_PATTERN = /^\d+[\s-]/
+
+// Pattern for flight-like strings
+const FLIGHT_PATTERN = /\b(AA|DL|UA|WN|NK|B6|AS|F9|HA|SY|AF|BA|LH|KL|AZ|IB|EK|QR|SQ|CX|NH|JL|W6)\s*\d{2,4}\b/i
+
+// Known venue/restaurant names that slip through keyword filters
+const KNOWN_VENUES = new Set([
+  'la maroquinerie',
+  'alhambra',
+  'ginette à la folie',
+  'ginette a la folie',
+  'izumigaya',
+  'takaragawa',
+])
+
+// Known city name aliases (normalise variants to canonical)
+const CITY_ALIASES: Record<string, string> = {
+  'new york city': 'New York',
+  'nyc': 'New York',
+  'sf': 'San Francisco',
+  'la': 'Los Angeles',
+  'dc': 'Washington',
+}
 
 function generateSlug(city: string): string {
   return city.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
@@ -27,10 +52,13 @@ function sleep(ms: number): Promise<void> {
  * Normalise a raw location string to a city name suitable for demand tracking.
  * Returns null if the value doesn't look like a real city.
  *
- * Rules applied on top of normaliseToCity:
- *   'Turin Airport'                → 'Turin'   (strip Airport suffix)
- *   'KTOL'                        → null       (all-caps code)
- *   'Shizuoka Shinkansen Ext. Shop' → null     (non-city keywords)
+ * Filters out:
+ *   - IATA codes (CHS, JFK, MIA)
+ *   - Airport names (Chicago O'Hare, Milan Malpensa T1)
+ *   - Hotel names (Grand Hyatt Baha Mar, Mitsui Garden Hotel...)
+ *   - Street addresses (9449 Collins Avenue, 6-10-3 Roppongi)
+ *   - Venue names (La Maroquinerie, Alhambra)
+ *   - Flight references (SFO - American Airlines 949)
  */
 function toDemandCity(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -40,14 +68,38 @@ function toDemandCity(raw: string | null | undefined): string | null {
   // Skip all-caps codes (IATA, transport codes, etc.)
   if (/^[A-Z0-9]{2,6}$/.test(trimmed)) return null
 
+  // Skip anything that looks like a street address
+  if (ADDRESS_PATTERN.test(trimmed)) return null
+
+  // Skip anything containing flight numbers
+  if (FLIGHT_PATTERN.test(trimmed)) return null
+
   // Strip 'Airport' suffix before further normalisation
   let city = trimmed.replace(/\s+Airport\b/i, '').trim()
+
+  // Strip terminal suffixes (T1, T2, etc.)
+  city = city.replace(/\s+T\d+$/i, '').trim()
 
   // Delegate comma/venue normalisation to the shared function
   city = normaliseToCity(city)
 
   // Skip if non-city keywords remain after normalisation
-  if (NON_CITY_PATTERN.test(city)) return null
+  if (NON_CITY_KEYWORDS.test(city)) return null
+
+  // Skip very short results (likely leftover codes)
+  if (city.length < 3) return null
+
+  // Skip if it still looks like an address after normalisation
+  if (ADDRESS_PATTERN.test(city)) return null
+
+  // Apply aliases to canonical names
+  const lower = city.toLowerCase()
+  if (CITY_ALIASES[lower]) {
+    city = CITY_ALIASES[lower]
+  }
+
+  // Skip known venue/restaurant names
+  if (KNOWN_VENUES.has(lower)) return null
 
   return city || null
 }
