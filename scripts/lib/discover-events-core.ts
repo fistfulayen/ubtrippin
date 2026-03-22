@@ -169,7 +169,7 @@ async function sourceToCandidatesFromSearch(args: {
   sourceName: string
   site?: string
 }): Promise<DiscoveredEventCandidate[]> {
-  const results = await searchBraveWeb(args.query, { count: 10, site: args.site })
+  const results = await searchBraveWeb(args.query, { count: 20, site: args.site, countryCode: args.city.country_code })
   const candidates: DiscoveredEventCandidate[] = []
 
   for (const result of results) {
@@ -372,15 +372,11 @@ export async function runCityDiscovery(args: {
     }
   }
 
+  // Only generic Brave Search queries — site-specific searches (eventbrite, bandsintown,
+  // songkick, musicfestivalwizard) are redundant because Brave indexes those sites already.
+  // This cuts API calls from 12 to 4 per city (~65% cost reduction).
   const querySpecs: Array<{ sourceName: string; query: string; site?: string }> = [
     ...searchQueries.map((query) => ({ sourceName: 'Brave Search', query })),
-    ...['eventbrite.com', 'bandsintown.com', 'songkick.com', 'musicfestivalwizard.com'].flatMap((site) =>
-      searchQueries.slice(0, 2).map((query) => ({
-        sourceName: site.replace('.com', ''),
-        query,
-        site,
-      }))
-    ),
   ]
 
   for (const spec of querySpecs) {

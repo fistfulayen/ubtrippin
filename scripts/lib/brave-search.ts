@@ -73,9 +73,18 @@ async function rateLimitDelay() {
   lastRequestAt = Date.now()
 }
 
+/**
+ * Map country_code to Brave's 2-letter country param for localized results.
+ */
+function countryCodeToBrave(countryCode?: string | null): string {
+  if (!countryCode) return 'US'
+  // Brave uses uppercase 2-letter country codes
+  return countryCode.toUpperCase()
+}
+
 export async function searchBraveWeb(
   query: string,
-  options?: { count?: number; site?: string }
+  options?: { count?: number; site?: string; countryCode?: string | null }
 ): Promise<SearchResult[]> {
   if (!BRAVE_API_KEY) {
     throw new Error('BRAVE_SEARCH_API_KEY or BRAVE_API_KEY is not configured.')
@@ -85,7 +94,9 @@ export async function searchBraveWeb(
 
   const params = new URLSearchParams({
     q: options?.site ? `site:${options.site} ${query}` : query,
-    count: String(options?.count ?? 10),
+    count: String(options?.count ?? 20),       // Max 20 results per call — pay per query, not per result
+    freshness: 'pm',                           // Past month only — no stale pages
+    country: countryCodeToBrave(options?.countryCode),  // Localize to city's country
     text_decorations: 'false',
     result_filter: 'web',
     extra_snippets: 'true',
