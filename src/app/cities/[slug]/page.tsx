@@ -69,10 +69,10 @@ export async function generateMetadata({ params, searchParams }: CityPageProps):
   const { slug } = await params
   const search = await searchParams
   const supabase = await createClient()
-  const defaults = getMonthWindow()
+  const today = new Date().toISOString().slice(0, 10)
   const data = await getCityEventsPageData(supabase, slug, {
-    from: search.from || defaults.from,
-    to: search.to || defaults.to,
+    from: search.from || today,
+    to: search.to || undefined,
   })
 
   if (!data) {
@@ -99,9 +99,11 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   const { slug } = await params
   const search = await searchParams
   const supabase = await createClient()
-  const defaults = getMonthWindow()
-  const from = search.from || defaults.from
-  const to = search.to || defaults.to
+  // If trip-scoped (from/to params), show events for that date range.
+  // Otherwise show ALL future events for the city — the full calendar view.
+  const today = new Date().toISOString().slice(0, 10)
+  const from = search.from || today
+  const to = search.to || undefined
   const data = await getCityEventsPageData(supabase, slug, { from, to })
 
   if (!data) notFound()
@@ -116,7 +118,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
     ? data.segments.find((segment) => segment.key === activeSegment)?.events ?? []
     : data.events
 
-  const isTripScoped = Boolean(search.from || search.to)
+  const isTripScoped = Boolean(search.from && search.to)
   const shouldUpsell = Boolean(user && tier === 'free' && isTripScoped)
   const visibleEvents = shouldUpsell ? trimEventsForFreeTier(activeEvents, 6) : activeEvents
   const hiddenCount = shouldUpsell ? Math.max(activeEvents.length - visibleEvents.length, 0) : 0

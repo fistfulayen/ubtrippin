@@ -145,11 +145,17 @@ function heuristicScore(candidate: DiscoveredEventCandidate, trackedVenue: Pipel
 
   if (candidate.category === 'festival') score += 18
   if (candidate.category === 'art') score += 12
-  if (candidate.category === 'music') score += 8
+  if (candidate.category === 'music') score += 15
   if (candidate.image_url) score += 5
   if (candidate.booking_url) score += 5
-  if (/\b(retrospective|biennale|festival|orchestra|museum|philharmonic|fashion week)\b/.test(text)) score += 20
-  if (/\b(open mic|meetup|networking|karaoke|weekly|every week)\b/.test(text)) score -= 35
+  // Major venues and popular events — arenas, stadiums, famous halls
+  if (/\b(madison square garden|msg|barclays|staples center|o2 arena|wembley|royal albert hall|carnegie hall|radio city|hollywood bowl|red rocks|palais|olympia|accor arena|bercy)\b/i.test(text)) score += 25
+  // Recognized touring acts and large-scale events
+  if (/\b(tour|world tour|arena tour|stadium tour|sold out|residency)\b/i.test(text)) score += 15
+  // Cultural institutions and exhibitions
+  if (/\b(retrospective|biennale|festival|orchestra|museum|philharmonic|fashion week)\b/.test(text)) score += 15
+  // Reject low-quality filler events
+  if (/\b(open mic|meetup|networking|karaoke|weekly|every week|trivia night|speed dating|happy hour)\b/.test(text)) score -= 35
   if (candidate.source?.match(/eventbrite|songkick|bandsintown|timeout|visit/i)) score += 8
 
   const bounded = Math.max(0, Math.min(100, score))
@@ -177,7 +183,7 @@ export async function scoreEventQuality(args: {
       {
         role: 'system',
         content:
-          'You score travel-worthy city events. Return only JSON with score (0-100), tier (major|medium|local), and reasoning.',
+          'You score city events for a travel app. We want events worth seeing — popular concerts, major exhibitions, festivals, sporting events, theater, food events. Not snooty, not highbrow-only. A Cardi B arena show is as notable as the NY Philharmonic. Score on: would a traveler regret missing this? Return only JSON with score (0-100), tier (major|medium|local), and reasoning.',
       },
       {
         role: 'user',
@@ -186,11 +192,13 @@ export async function scoreEventQuality(args: {
           candidate: args.candidate,
           trackedVenueTier: args.trackedVenue?.tier ?? null,
           rubric: [
-            'Would a well-traveled person be disappointed to miss this?',
-            'Venue significance matters.',
-            'Performer recognition matters.',
-            'Uniqueness and cultural importance matter.',
+            'Would a traveler visiting this city want to know about this event?',
+            'Major venue (arena, stadium, famous hall) = high score.',
+            'Popular/famous performer or artist = high score.',
+            'Touring acts at large venues score as high as classical or art events.',
+            'Unique, city-defining events (festivals, food events, sports) score high.',
             'Multi-day or large-scale events score higher.',
+            'Recurring bar events (trivia, open mic, karaoke) = reject.',
             'Events below 60 should be rejected.',
           ],
         }),
