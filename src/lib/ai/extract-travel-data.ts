@@ -35,6 +35,8 @@ export interface ExtractionResult {
 export interface ExtractTravelDataOptions {
   senderDomain?: string
   supabase?: import('@supabase/supabase-js').SupabaseClient
+  userId?: string
+  sourceEmailId?: string
 }
 
 interface DateNormalizationContext {
@@ -112,11 +114,28 @@ export async function extractTravelData(
 
   const prompt = buildExtractionPrompt(subject, body, attachmentText)
 
-  const { text } = await generateText({
+  const { text, usage } = await generateText({
     model: gateway('anthropic/claude-sonnet-4'),
     system: systemPrompt,
     prompt,
   })
+
+  // Track token usage (best-effort — never block extraction on failure)
+  try {
+    const inputCost = ((usage.inputTokens ?? 0) / 1_000_000) * 3
+    const outputCost = ((usage.outputTokens ?? 0) / 1_000_000) * 15
+    await dbClient.from('token_usage').insert({
+      user_id: options?.userId ?? null,
+      source_email_id: options?.sourceEmailId ?? null,
+      model: 'claude-sonnet-4',
+      input_tokens: usage.inputTokens,
+      output_tokens: usage.outputTokens,
+      total_cost_usd: inputCost + outputCost,
+      extraction_type: 'email',
+    })
+  } catch (trackErr) {
+    console.warn('[extract-travel-data] Token tracking failed (non-fatal):', trackErr)
+  }
 
   // Parse JSON from response
   try {

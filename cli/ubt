@@ -3798,6 +3798,70 @@ except: print(0)
   fi
 }
 
+cmd_costs() {
+  local result
+  result=$(_api "${API_V1}/admin/token-usage")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+
+tw = payload.get('this_week', {})
+lw = payload.get('last_week', {})
+trend = payload.get('trend', {})
+top = payload.get('top_expensive', [])
+
+def fmt_cost(val):
+    return f'\${float(val):.4f}' if val is not None else 'n/a'
+
+def fmt_pct(val):
+    if val is None:
+        return 'n/a'
+    sign = '+' if val > 0 else ''
+    return f'{sign}{val:.1f}%'
+
+print('Token Cost Report')
+print('=================')
+print()
+print('This week (last 7 days):')
+print(f\"  Extractions:   {tw.get('count', 0)}\")
+print(f\"  Input tokens:  {tw.get('input_tokens', 0):,}\")
+print(f\"  Output tokens: {tw.get('output_tokens', 0):,}\")
+print(f\"  Total cost:    {fmt_cost(tw.get('total_cost_usd'))}\")
+print(f\"  Avg/extraction:{fmt_cost(tw.get('avg_cost_per_extraction'))}\")
+print()
+print('Last week (7–14 days ago):')
+print(f\"  Extractions:   {lw.get('count', 0)}\")
+print(f\"  Input tokens:  {lw.get('input_tokens', 0):,}\")
+print(f\"  Output tokens: {lw.get('output_tokens', 0):,}\")
+print(f\"  Total cost:    {fmt_cost(lw.get('total_cost_usd'))}\")
+print()
+print('Trend (this vs last week):')
+print(f\"  Cost:   {fmt_pct(trend.get('cost_change_pct'))}\")
+print(f\"  Volume: {fmt_pct(trend.get('volume_change_pct'))}\")
+
+if top:
+    print()
+    print('Top 5 most expensive extractions this week:')
+    for i, row in enumerate(top, 1):
+        eid = row.get('source_email_id') or row.get('id', 'unknown')
+        cost = fmt_cost(row.get('total_cost_usd'))
+        inp = row.get('input_tokens', 0)
+        out = row.get('output_tokens', 0)
+        ts = row.get('created_at', '')[:19].replace('T', ' ')
+        print(f\"  {i}. {cost}  in={inp:,} out={out:,}  {ts}  [{eid[:8]}...]\")
+"
+}
+
 # Usage
 usage() {
   cat <<EOF
@@ -3881,6 +3945,7 @@ Commands:
   profile loyalty delete <id>           Delete a loyalty program *
   profile loyalty lookup <provider_key> Lookup by provider (alliance fallback aware) *
   profile loyalty export                Export loyalty vault JSON *
+  costs                                 Show token usage and cost report (admin) *
   users                                 List all users (admin)
   health                                Check service health
   rls-check                             Verify RLS policies
@@ -4101,6 +4166,7 @@ case "${1:-}" in
       *)    echo "Usage: ubt tickets <list|add|show>"; exit 1 ;;
     esac
     ;;
+  costs)    cmd_costs ;;
   users)    cmd_users ;;
   health)   cmd_health ;;
   rls-check) cmd_rls_check ;;
