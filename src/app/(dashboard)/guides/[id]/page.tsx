@@ -255,12 +255,15 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
       )}
 
       {/* Share info */}
-      {g.is_public && shareUrl && (
+      {g.visibility === 'public' && shareUrl && (
         <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-4">
           <div className="flex items-center gap-2 text-indigo-800 text-sm font-medium mb-1">
             <Globe className="h-4 w-4" />
             This guide is public
           </div>
+          {g.public_username ? (
+            <p className="mb-1 text-sm text-indigo-700">Published as @{g.public_username}</p>
+          ) : null}
           <p className="text-sm text-indigo-700">
             Share link:{' '}
             <a

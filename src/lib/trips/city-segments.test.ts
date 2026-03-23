@@ -200,20 +200,20 @@ describe('buildTimeline', () => {
     expect(segments).toHaveLength(6)
     expect(transitions).toHaveLength(6)
     expect(segments.map((entry) => entry.segment?.city)).toEqual([
-      'Surfside, Florida',
+      'Miami',
       'New York',
-      'Austin, TX',
-      'Portland, OR',
-      'Charleston, SC',
+      'Austin',
+      'Portland',
+      'Charleston',
       'Milan',
     ])
 
     expect(transitions.map((entry) => entry.nextSegmentCity)).toEqual([
-      'Surfside, Florida',
+      'Miami',
       'New York',
-      'Austin, TX',
-      'Portland, OR',
-      'Charleston, SC',
+      'Austin',
+      'Portland',
+      'Charleston',
       'Milan',
     ])
 
@@ -420,8 +420,8 @@ describe('hotel segment assignment', () => {
     const segments = timeline.filter((e) => e.type === 'segment')
 
     // Segment should exist with activity-derived city, even without hotel
-    // Brooklyn is a valid city from the activity location
-    const nycSegment = segments.find((e) => e.segment?.city?.includes('Brooklyn'))
+    // Brooklyn resolves to New York via metro alias
+    const nycSegment = segments.find((e) => e.segment?.city?.includes('New York'))
     expect(nycSegment).toBeDefined()
     expect(nycSegment!.segment!.items).toHaveLength(1) // just the activity
     expect(nycSegment!.segment!.anchorType).toBe('activity')

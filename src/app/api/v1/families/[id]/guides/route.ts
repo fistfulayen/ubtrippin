@@ -16,7 +16,8 @@ type GuideRow = {
   city: string
   country: string | null
   country_code: string | null
-  is_public: boolean
+  visibility: 'private' | 'public'
+  public_username: string | null
   share_token: string | null
   cover_image_url: string | null
   entry_count: number

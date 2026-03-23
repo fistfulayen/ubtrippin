@@ -1,7 +1,7 @@
 /**
  * GET    /api/v1/guides/:id  — Get a guide with its entries (?format=json|md)
  * DELETE /api/v1/guides/:id  — Delete a guide
- * PATCH  /api/v1/guides/:id  — Update guide metadata (is_public, city, etc.)
+ * PATCH  /api/v1/guides/:id  — Update guide metadata (visibility, city, etc.)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -11,6 +11,7 @@ import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { nanoid } from 'nanoid'
 import type { CityGuide, GuideEntry } from '@/types/database'
+import { PUBLIC_GUIDE_MIN_ENTRIES, isGuideVisibility } from '@/lib/guides/public'
 
 export async function GET(
   request: NextRequest,
@@ -151,24 +152,67 @@ export async function PATCH(
 
   const supabase = await createUserScopedClient(auth.userId)
 
-  // If making public, ensure share_token exists
   const updates: Record<string, unknown> = {}
   if (body.city !== undefined) updates.city = body.city
   if (body.country !== undefined) updates.country = body.country
   if (body.country_code !== undefined) updates.country_code = body.country_code
 
-  if (typeof body.is_public === 'boolean') {
-    updates.is_public = body.is_public
-    if (body.is_public) {
-      const { data: existing } = await supabase
-        .from('city_guides')
-        .select('share_token')
-        .eq('id', id)
-        .eq('user_id', auth.userId)
-        .single()
-      if (!existing?.share_token) {
+  const nextVisibility = isGuideVisibility(body.visibility)
+    ? body.visibility
+    : typeof body.is_public === 'boolean'
+      ? (body.is_public ? 'public' : 'private')
+      : null
+
+  if (nextVisibility) {
+    if (nextVisibility === 'public') {
+      const [{ data: existingGuide }, { data: profile }] = await Promise.all([
+        supabase
+          .from('city_guides')
+          .select('entry_count, share_token')
+          .eq('id', id)
+          .eq('user_id', auth.userId)
+          .single(),
+        supabase
+          .from('profiles')
+          .select('public_username')
+          .eq('id', auth.userId)
+          .single(),
+      ])
+
+      const currentGuide = existingGuide as { entry_count: number; share_token: string | null } | null
+      const currentProfile = profile as { public_username: string | null } | null
+
+      if (!currentGuide || !currentProfile?.public_username) {
+        return NextResponse.json(
+          {
+            error: {
+              code: 'public_username_required',
+              message: 'Set a public username in Settings to share guides publicly.',
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      if ((currentGuide.entry_count ?? 0) < PUBLIC_GUIDE_MIN_ENTRIES) {
+        return NextResponse.json(
+          {
+            error: {
+              code: 'not_enough_entries',
+              message: `Add at least ${PUBLIC_GUIDE_MIN_ENTRIES} places to publish this guide (currently ${currentGuide.entry_count ?? 0}).`,
+            },
+          },
+          { status: 400 }
+        )
+      }
+
+      updates.visibility = 'public'
+      updates.public_username = currentProfile.public_username
+      if (!currentGuide.share_token) {
         updates.share_token = nanoid(21)
       }
+    } else {
+      updates.visibility = 'private'
     }
   }
 

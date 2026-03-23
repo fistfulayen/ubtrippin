@@ -17,6 +17,9 @@ interface ProfileResponse {
   temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
   loyalty_count: number
+  public_username: string | null
+  public_username_changed_at: string | null
+  public_username_change_allowed_at: string | null
 }
 
 function fallbackProfile(userId: string): ProfileResponse {
@@ -32,6 +35,9 @@ function fallbackProfile(userId: string): ProfileResponse {
     temperature_unit: 'fahrenheit',
     notes: null,
     loyalty_count: 0,
+    public_username: null,
+    public_username_changed_at: null,
+    public_username_change_allowed_at: null,
   }
 }
 

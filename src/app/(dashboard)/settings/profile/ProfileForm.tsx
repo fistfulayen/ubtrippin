@@ -23,6 +23,9 @@ interface ProfileData {
   temperature_unit: 'fahrenheit' | 'celsius'
   notes: string | null
   loyalty_count: number
+  public_username: string | null
+  public_username_changed_at: string | null
+  public_username_change_allowed_at: string | null
 }
 
 interface ProfileFormProps {
@@ -40,9 +43,21 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
   const [currencyPreference, setCurrencyPreference] = useState(initialProfile.currency_preference || 'USD')
   const [temperatureUnit, setTemperatureUnit] = useState<'fahrenheit' | 'celsius'>(initialProfile.temperature_unit)
   const [notes, setNotes] = useState(initialProfile.notes ?? '')
+  const [publicUsername, setPublicUsername] = useState(initialProfile.public_username ?? '')
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const publicUsernameLocked =
+    Boolean(initialProfile.public_username) &&
+    Boolean(initialProfile.public_username_change_allowed_at) &&
+    new Date(initialProfile.public_username_change_allowed_at as string).getTime() > Date.now()
+  const publicUsernameUnlockDate = initialProfile.public_username_change_allowed_at
+    ? new Date(initialProfile.public_username_change_allowed_at).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null
 
   const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -66,6 +81,7 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
           currency_preference: currencyPreference,
           temperature_unit: temperatureUnit,
           notes: canEditNotes ? (notes.trim() || null) : null,
+          public_username: publicUsername.trim() || null,
         }),
       })
 
@@ -112,6 +128,33 @@ export function ProfileForm({ initialProfile, canEditNotes }: ProfileFormProps) 
             placeholder="Paris"
           />
           <p className="text-xs text-gray-500">Your home city for local event recommendations.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label htmlFor="public_username" className="text-sm font-medium text-gray-700">Public Username</label>
+          <div className="relative">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-gray-400">@</span>
+            <Input
+              id="public_username"
+              value={publicUsername}
+              onChange={(event) => setPublicUsername(event.target.value.replace(/^@+/, ''))}
+              placeholder="yourname"
+              maxLength={30}
+              className="pl-8"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              disabled={publicUsernameLocked || saving}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            Shown on your public city guides. Required to publish guides. Use 3-30 letters, numbers, or underscores.
+          </p>
+          {publicUsernameLocked && publicUsernameUnlockDate ? (
+            <p className="text-xs text-amber-700">
+              You can change this again on {publicUsernameUnlockDate}.
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-1.5">

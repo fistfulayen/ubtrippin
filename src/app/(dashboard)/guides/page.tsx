@@ -49,8 +49,8 @@ export default async function GuidesPage() {
       {!isPro && (
         <UpgradeCard
           source="guides_pro"
-          title="Pro features: PDF export, sharing."
-          description="Upgrade to export polished guide PDFs and share guides with family or collaborators."
+          title="Pro feature: PDF export."
+          description="Public guides are free. Upgrade to export polished guide PDFs."
           variant="inline"
           className="rounded-lg border border-slate-200 bg-white px-3 py-2"
         />
@@ -128,7 +128,7 @@ function GuideCard({ guide }: { guide: CityGuide }) {
             )}
           </div>
           <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
-            {guide.is_public ? (
+            {guide.visibility === 'public' ? (
               <Globe className="h-3.5 w-3.5" />
             ) : (
               <Lock className="h-3.5 w-3.5" />
