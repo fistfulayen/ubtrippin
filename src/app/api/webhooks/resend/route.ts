@@ -309,6 +309,49 @@ export async function POST(request: NextRequest) {
           .eq('id', sourceEmail.id)
       }
 
+      // Pre-filter: skip obvious non-booking emails (newsletters, marketing) before
+      // hitting the LLM to avoid burning tokens on junk forwards.
+      const emailSubject = (fullEmail.subject || '').toLowerCase()
+      const NEWSLETTER_PATTERNS = [
+        /unsubscribe/i,
+        /weekly digest/i,
+        /monthly digest/i,
+        /newsletter/i,
+        /you['']?re subscribed/i,
+        /marketing email/i,
+        /promotional email/i,
+        /sale ends/i,
+        /limited.{0,20}offer/i,
+        /\bblack friday\b/i,
+        /\bcyber monday\b/i,
+        /\bflash sale\b/i,
+        /don['']?t miss out/i,
+        /\bpromo\b.*\bcode\b/i,
+      ]
+      const isNewsletter = NEWSLETTER_PATTERNS.some((p) => p.test(emailSubject))
+
+      if (isNewsletter) {
+        console.log(`[token-filter] Skipping newsletter/marketing email: "${fullEmail.subject}"`)
+        try {
+          await supabase.from('token_usage').insert({
+            user_id: userId,
+            source_email_id: sourceEmail.id,
+            model: 'claude-sonnet-4',
+            input_tokens: 0,
+            output_tokens: 0,
+            total_cost_usd: 0,
+            extraction_type: 'skipped',
+          })
+        } catch (trackErr) {
+          console.warn('[token-filter] Failed to log skip (non-fatal):', trackErr)
+        }
+        await supabase
+          .from('source_emails')
+          .update({ parse_status: 'failed', parse_error: 'Skipped: newsletter/marketing email' })
+          .eq('id', sourceEmail.id)
+        return NextResponse.json({ message: 'Email skipped (newsletter/marketing)', email_id: sourceEmail.id })
+      }
+
       // Count this extraction against the user's monthly limit
       await incrementExtractionCount(userId, supabase)
 
@@ -325,7 +368,7 @@ export async function POST(request: NextRequest) {
         fullEmail.subject || '',
         fullEmail.text || fullEmail.html || '',
         attachmentText || undefined,
-        { senderDomain, supabase }
+        { senderDomain, supabase, userId, sourceEmailId: sourceEmail.id }
       )
 
       // Update source email with extraction result and attachment text
