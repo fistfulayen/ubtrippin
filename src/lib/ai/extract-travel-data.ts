@@ -122,8 +122,8 @@ export async function extractTravelData(
 
   // Track token usage (best-effort — never block extraction on failure)
   try {
-    const inputCost = (usage.inputTokens / 1_000_000) * 3
-    const outputCost = (usage.outputTokens / 1_000_000) * 15
+    const inputCost = ((usage.inputTokens ?? 0) / 1_000_000) * 3
+    const outputCost = ((usage.outputTokens ?? 0) / 1_000_000) * 15
     await dbClient.from('token_usage').insert({
       user_id: options?.userId ?? null,
       source_email_id: options?.sourceEmailId ?? null,
