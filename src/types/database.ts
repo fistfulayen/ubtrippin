@@ -31,6 +31,8 @@ export interface Database {
           subscription_grace_until: string | null
           referral_code: string | null
           referred_by: string | null
+          public_username: string | null
+          public_username_changed_at: string | null
         }
         Insert: {
           id: string
@@ -48,6 +50,8 @@ export interface Database {
           subscription_grace_until?: string | null
           referral_code?: string | null
           referred_by?: string | null
+          public_username?: string | null
+          public_username_changed_at?: string | null
         }
         Update: {
           id?: string
@@ -65,6 +69,8 @@ export interface Database {
           subscription_grace_until?: string | null
           referral_code?: string | null
           referred_by?: string | null
+          public_username?: string | null
+          public_username_changed_at?: string | null
         }
       }
       user_profiles: {
@@ -75,6 +81,7 @@ export interface Database {
           airline_alliance: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
           hotel_brand_preference: string | null
           home_airport: string | null
+          home_city: string | null
           currency_preference: string
           temperature_unit: 'fahrenheit' | 'celsius'
           notes: string | null
@@ -88,6 +95,7 @@ export interface Database {
           airline_alliance?: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
           hotel_brand_preference?: string | null
           home_airport?: string | null
+          home_city?: string | null
           currency_preference?: string
           temperature_unit?: 'fahrenheit' | 'celsius'
           notes?: string | null
@@ -101,6 +109,7 @@ export interface Database {
           airline_alliance?: 'star_alliance' | 'oneworld' | 'skyteam' | 'none'
           hotel_brand_preference?: string | null
           home_airport?: string | null
+          home_city?: string | null
           currency_preference?: string
           temperature_unit?: 'fahrenheit' | 'celsius'
           notes?: string | null
@@ -745,7 +754,8 @@ export interface CityGuide {
   city: string
   country: string | null
   country_code: string | null
-  is_public: boolean
+  visibility: 'private' | 'public'
+  public_username: string | null
   share_token: string | null
   cover_image_url: string | null
   entry_count: number

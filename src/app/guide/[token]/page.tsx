@@ -1,4 +1,4 @@
-import { createSecretClient } from '@/lib/supabase/service'
+import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Globe, Star, MapPin, ExternalLink, Bookmark } from 'lucide-react'
@@ -44,13 +44,13 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
   const { token } = await params
   const { view } = await searchParams
 
-  const supabase = createSecretClient()
+  const supabase = await createClient()
 
   const { data: guide, error } = await supabase
     .from('city_guides')
     .select('*')
     .eq('share_token', token)
-    .eq('is_public', true)
+    .eq('visibility', 'public')
     .single()
 
   if (error || !guide) notFound()
@@ -63,47 +63,7 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
     .eq('guide_id', g.id)
     .order('created_at', { ascending: false })
 
-  const rawEntries = (allEntries ?? []) as GuideEntryWithAuthor[]
-  const authorIds = Array.from(
-    new Set(
-      rawEntries
-        .map((entry) =>
-          typeof entry.author_id === 'string' && entry.author_id
-            ? entry.author_id
-            : entry.user_id
-        )
-        .filter((authorId): authorId is string => typeof authorId === 'string' && authorId.length > 0)
-    )
-  )
-
-  const authorNameById = new Map<string, string | null>()
-  if (authorIds.length > 0) {
-    const { data: authorProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
-      .in('id', authorIds)
-
-    for (const profile of (authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
-      authorNameById.set(profile.id, profile.full_name || profile.email || null)
-    }
-  }
-
-  const entries = rawEntries.map((entry) => {
-    const authorId =
-      typeof entry.author_id === 'string' && entry.author_id
-        ? entry.author_id
-        : entry.user_id
-    const explicitAuthorName =
-      typeof entry.author_name === 'string' && entry.author_name.trim()
-        ? entry.author_name
-        : null
-
-    return {
-      ...entry,
-      author_id: authorId,
-      author_name: explicitAuthorName || authorNameById.get(authorId) || null,
-    }
-  })
+  const entries = (allEntries ?? []) as GuideEntryWithAuthor[]
   const hasMultipleAuthors =
     new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
   const mapEntries = entries
@@ -179,6 +139,9 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
             <Globe className="h-3.5 w-3.5" />
             {visited.length} places · personal guide
           </p>
+          {g.public_username ? (
+            <p className="mt-2 text-sm font-medium text-slate-600">@{g.public_username}</p>
+          ) : null}
         </div>
 
         {hasMapEntries && (

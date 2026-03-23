@@ -61,7 +61,13 @@ export function GuideHeaderActions({
   return (
     <>
       <div className="hidden flex-wrap items-center justify-end gap-2 sm:flex">
-        <GuideShareToggle guideId={guide.id} isPublic={guide.is_public} shareUrl={shareUrl} />
+        <GuideShareToggle
+          guideId={guide.id}
+          visibility={guide.visibility}
+          shareUrl={shareUrl}
+          publicUsername={guide.public_username}
+          entryCount={guide.entry_count}
+        />
         <GuideMarkdownExport guide={guide} entries={entries} />
         <Link href={`/guides/${guide.id}/add`}>
           <Button size="sm">
@@ -84,8 +90,10 @@ export function GuideHeaderActions({
       <div className="flex w-full items-center gap-2 sm:hidden">
         <GuideShareToggle
           guideId={guide.id}
-          isPublic={guide.is_public}
+          visibility={guide.visibility}
           shareUrl={shareUrl}
+          publicUsername={guide.public_username}
+          entryCount={guide.entry_count}
           showCopyButton={false}
         />
         <Link href={`/guides/${guide.id}/add`} className="ml-auto">
@@ -109,7 +117,7 @@ export function GuideHeaderActions({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMobileMenuOpen(false)} />
               <div className="absolute right-0 top-10 z-20 w-48 rounded-xl border border-gray-200 bg-white py-1 shadow-lg">
-                {guide.is_public && shareUrl && (
+                {guide.visibility === 'public' && shareUrl && (
                   <button
                     type="button"
                     onClick={handleCopyLink}

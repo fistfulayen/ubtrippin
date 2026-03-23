@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { nanoid } from 'nanoid'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
+import { PUBLIC_GUIDE_MIN_ENTRIES, type GuideVisibility } from '@/lib/guides/public'
 
 // ---------------------------------------------------------------------------
 // Guide CRUD
@@ -89,37 +90,91 @@ export async function updateGuideMetadata(
   return { ok: true }
 }
 
-export async function toggleGuidePublic(guideId: string, isPublic: boolean) {
+export type UpdateGuideVisibilityResult =
+  | { ok: true }
+  | {
+      ok: false
+      code: 'not_found' | 'missing_public_username' | 'not_enough_entries' | 'update_failed'
+      error: string
+    }
+
+export async function updateGuideVisibility(
+  guideId: string,
+  visibility: GuideVisibility
+): Promise<UpdateGuideVisibilityResult> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
+  if (!user) {
+    return { ok: false, code: 'update_failed', error: 'Authentication required.' }
+  }
 
-  // Generate share token if making public and none exists
-  let share_token: string | undefined
-  if (isPublic) {
-    const { data: existing } = await supabase
-      .from('city_guides')
-      .select('share_token')
-      .eq('id', guideId)
-      .eq('user_id', user.id)
+  const { data: guide, error: guideError } = await supabase
+    .from('city_guides')
+    .select('entry_count, share_token')
+    .eq('id', guideId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (guideError || !guide) {
+    return { ok: false, code: 'not_found', error: 'Guide not found.' }
+  }
+
+  let publicUsername: string | null = null
+  let shareToken = guide.share_token
+
+  if (visibility === 'public') {
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('public_username')
+      .eq('id', user.id)
       .single()
-    if (!existing?.share_token) {
-      share_token = nanoid(21)
+
+    if (profileError) {
+      return { ok: false, code: 'update_failed', error: 'Failed to load your public profile.' }
+    }
+
+    publicUsername = (profile as { public_username: string | null }).public_username
+    if (!publicUsername) {
+      return {
+        ok: false,
+        code: 'missing_public_username',
+        error: 'Set a public username in Settings to share guides publicly.',
+      }
+    }
+
+    if ((guide.entry_count ?? 0) < PUBLIC_GUIDE_MIN_ENTRIES) {
+      return {
+        ok: false,
+        code: 'not_enough_entries',
+        error: `Add at least ${PUBLIC_GUIDE_MIN_ENTRIES} places to publish this guide (currently ${guide.entry_count ?? 0}).`,
+      }
+    }
+
+    if (!shareToken) {
+      shareToken = nanoid(21)
     }
   }
 
   const { error } = await supabase
     .from('city_guides')
     .update({
-      is_public: isPublic,
-      ...(share_token ? { share_token } : {}),
+      visibility,
+      ...(shareToken ? { share_token: shareToken } : {}),
+      ...(visibility === 'public' ? { public_username: publicUsername } : {}),
     })
     .eq('id', guideId)
     .eq('user_id', user.id)
 
-  if (error) return
+  if (error) {
+    return { ok: false, code: 'update_failed', error: 'Failed to update guide visibility.' }
+  }
 
   revalidatePath(`/guides/${guideId}`)
+  revalidatePath('/guides')
+  if (shareToken) {
+    revalidatePath(`/guide/${shareToken}`)
+  }
+
   return { ok: true }
 }
 
