@@ -3945,6 +3945,10 @@ Commands:
   profile loyalty delete <id>           Delete a loyalty program *
   profile loyalty lookup <provider_key> Lookup by provider (alliance fallback aware) *
   profile loyalty export                Export loyalty vault JSON *
+  tickets list [trip_id]                List ticket/event items (filter by trip or cross-trip search) *
+  tickets add <trip_id> --event <name> [--venue X] [--performer X] [--date YYYY-MM-DD] [--time HH:MM] [--section X] [--row X] [--seat X] [--tickets N] [--doors HH:MM]  Add a ticket item *
+  tickets show <item_id>                Show ticket/event details *
+  events list|add|show                  Alias for tickets commands *
   costs                                 Show token usage and cost report (admin) *
   users                                 List all users (admin)
   health                                Check service health
@@ -4000,6 +4004,50 @@ Examples:
   ubt profile set seat window
   ubt profile loyalty lookup united
 EOF
+}
+
+cmd_tickets_show() {
+  local item_id="${1:?Usage: ubt tickets show <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
+  local result
+  result=$(_api "${API_V1}/items/$(_urlencode "${item_id}")")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | _python3c "
+import json, sys
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+i = payload.get('data', {})
+det = i.get('details_json') or {}
+print('Ticket:')
+print(f\"  id:        {i.get('id')}\")
+print(f\"  trip_id:   {i.get('trip_id')}\")
+print(f\"  event:     {det.get('event_name') or i.get('summary') or '-'}\")
+venue = det.get('venue') or i.get('start_location') or '-'
+print(f\"  venue:     {venue}\")
+if det.get('performer'):
+    print(f\"  performer: {det['performer']}\")
+date = i.get('start_date') or '-'
+time_str = det.get('event_time') or ''
+print(f\"  date:      {date}{(' ' + time_str) if time_str else ''}\")
+if det.get('doors'):
+    print(f\"  doors:     {det['doors']}\")
+if det.get('section') or det.get('row') or det.get('seat'):
+    parts = []
+    if det.get('section'): parts.append(f\"Sec {det['section']}\")
+    if det.get('row'):     parts.append(f\"Row {det['row']}\")
+    if det.get('seat'):    parts.append(f\"Seat {det['seat']}\")
+    print(f\"  seating:   {' / '.join(parts)}\")
+if det.get('num_tickets'):
+    print(f\"  tickets:   {det['num_tickets']}\")
+print(f\"  summary:   {i.get('summary') or '-'}\")
+"
 }
 
 # Main router
@@ -4162,7 +4210,7 @@ case "${1:-}" in
     case "${2:-}" in
       list) shift 2; cmd_tickets_list "$@" ;;
       add)  shift 2; cmd_tickets_add "$@" ;;
-      show) cmd_items_show "${3:?Usage: ubt tickets show <item_id>}" ;;
+      show) cmd_tickets_show "${3:?Usage: ubt tickets show <item_id>}" ;;
       *)    echo "Usage: ubt tickets <list|add|show>"; exit 1 ;;
     esac
     ;;
