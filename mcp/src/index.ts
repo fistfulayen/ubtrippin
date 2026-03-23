@@ -252,15 +252,16 @@ Requires UBT_API_KEY environment variable (from ubtrippin.xyz/settings).
 Read: list_trips, get_trip, get_item, get_trip_weather, search_trips, get_upcoming, get_calendar, get_trip_status, get_item_status
 Write (trips): create_trip, update_trip, delete_trip, merge_trips, rename_trip
 Write (items): add_item, add_items, update_item, delete_item, move_item, refresh_item_status
+Live Status: get_live_flight, get_train_status
+City Events: get_city_events
 City Guides: list_guides, get_guide, find_or_create_guide, add_guide_entry, update_guide_entry, delete_guide_entry, update_guide, delete_guide, get_guide_markdown, get_nearby_places
 Collaboration: list_collaborators, invite_collaborator, update_collaborator_role, remove_collaborator
-Notifications: get_notifications, mark_notification_read
+Notifications: get_notifications, mark_notification_read, get_notification_preferences, update_notification_preferences
 Traveler Profile & Loyalty Vault: get_traveler_profile, update_traveler_profile, list_loyalty_programs, add_loyalty_program, update_loyalty_program, delete_loyalty_program, lookup_loyalty_program, export_loyalty_data, list_loyalty_providers
 Family Sharing: list_families, get_family, create_family, update_family, delete_family, invite_family_member, remove_family_member, get_family_loyalty, lookup_family_loyalty, get_family_profiles, get_family_trips, get_family_guides
 Settings: get_calendar_url, regenerate_calendar_token, list_senders, add_sender, delete_sender, list_webhooks, register_webhook, delete_webhook, test_webhook, list_deliveries
 Billing: get_subscription, get_billing_portal, get_prices
 Imports: list_imports, get_import
-Trains: get_train_status
 Activation: get_activation_status
 Cover images: search_cover_image (then set via update_trip.cover_image_url)
 Resources: ubtrippin://trips, ubtrippin://trips/{id}, ubtrippin://guides, ubtrippin://guides/{id}
@@ -750,6 +751,42 @@ Returns: { deleted: true } on success.`,
       return { content: [{ type: 'text', text: JSON.stringify({ deleted: true, item_id }) }] }
     }
     const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// City Events (PRD 023)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_city_events',
+  {
+    title: 'Get City Events',
+    description: `Discover curated events, exhibitions, festivals, and performances in a city. No authentication required but rate-limited.
+
+Use this when a user is traveling to a city and wants to know what's happening during their trip dates. Combine with trip dates for relevant results.
+
+Event categories: art, music, theater, food, festival, sports, architecture, sacred, market, other.
+Event tiers: major (flagship/blockbuster), medium (notable), local (neighborhood).`,
+    inputSchema: {
+      city: z.string().describe('City slug, e.g. "paris", "new-york", "tokyo"'),
+      from: z.string().optional().describe('Start date filter: YYYY-MM-DD'),
+      to: z.string().optional().describe('End date filter: YYYY-MM-DD'),
+      tier: z.enum(['major', 'medium', 'local']).optional().describe('Filter by event tier'),
+      category: z.string().optional().describe('Filter by category: art, music, theater, food, festival, sports, architecture, sacred, market, other'),
+    },
+  },
+  async ({ city, from, to, tier, category }) => {
+    const params = new URLSearchParams()
+    params.set('city', city)
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    if (tier) params.set('tier', tier)
+    if (category) params.set('category', category)
+    const result = await apiFetch<{ city: unknown; events: unknown[]; segments: unknown[] }>(
+      `/api/v1/events?${params}`
+    )
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )
@@ -1334,6 +1371,40 @@ Requires: owner of the trip.`,
 // ---------------------------------------------------------------------------
 
 server.registerTool(
+  'get_notification_preferences',
+  {
+    title: 'Get Notification Preferences',
+    description: 'Get the current notification preference settings for your account.',
+  },
+  async () => {
+    const result = await apiFetch<{ data: { trip_updates: boolean } }>(
+      '/api/v1/notifications/preferences'
+    )
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'update_notification_preferences',
+  {
+    title: 'Update Notification Preferences',
+    description: `Update your notification preferences. Currently supports toggling trip update notifications on or off.`,
+    inputSchema: {
+      trip_updates: z.boolean().describe('Whether to receive notifications about trip updates (items added, collaborator activity, etc.)'),
+    },
+  },
+  async ({ trip_updates }) => {
+    const res = await fetch(`${BASE_URL}/api/v1/notifications/preferences`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ trip_updates }),
+    })
+    const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
   'get_notifications',
   {
     title: 'Get Notifications',
@@ -1688,6 +1759,32 @@ server.registerTool(
       headers: authHeaders(),
     })
     const result = await res.json()
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+// ---------------------------------------------------------------------------
+// Live Flight Status (PRD 045)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'get_live_flight',
+  {
+    title: 'Get Live Flight Status',
+    description: `Get real-time status for any flight by IATA identifier and date. Returns gate, terminal, delays, aircraft type, and timestamps.
+
+No authentication required. Cached for 5 minutes. Use this when a user asks "is my flight on time?" or wants gate/terminal info.
+
+Example: get_live_flight({ ident: "NK2893", date: "2026-03-23" })`,
+    inputSchema: {
+      ident: z.string().describe('IATA flight identifier, e.g. "NK2893", "AF276", "B0301"'),
+      date: z.string().describe('Flight date: YYYY-MM-DD'),
+    },
+  },
+  async ({ ident, date }) => {
+    const result = await apiFetch<{ data: unknown }>(
+      `/api/v1/flights/${encodeURIComponent(ident)}/${encodeURIComponent(date)}/live`
+    )
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
   }
 )
