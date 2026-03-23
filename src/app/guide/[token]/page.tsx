@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Globe, Star, MapPin, ExternalLink, Bookmark } from 'lucide-react'
+import { Globe, Star, MapPin, ExternalLink, Bookmark, Lock } from 'lucide-react'
+import type { Metadata } from 'next'
 import type { CityGuide, GuideEntry } from '@/types/database'
 import { GuideMapSection } from '@/components/maps/guide-map-section'
 
@@ -40,6 +41,44 @@ const CATEGORY_ICONS: Record<string, string> = {
   'Hidden Gems': '💎',
 }
 
+function buildFlag(countryCode: string | null): string | null {
+  if (!countryCode) return null
+  return String.fromCodePoint(
+    ...countryCode
+      .toUpperCase()
+      .split('')
+      .map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+  )
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { token } = await params
+  const supabase = await createClient()
+
+  const { data: guide } = await supabase
+    .from('city_guides')
+    .select('city, country, country_code, public_username, entry_count')
+    .eq('share_token', token)
+    .eq('visibility', 'public')
+    .single()
+
+  if (!guide) return {}
+
+  const flag = buildFlag(guide.country_code ?? null)
+  const title = `${flag ? flag + ' ' : ''}${guide.city} City Guide${guide.public_username ? ` by @${guide.public_username}` : ''}`
+  const description = `A personal city guide for ${guide.city}${guide.country ? ', ' + guide.country : ''} with ${guide.entry_count ?? 0} recommended places. Created by a real traveler on UBTRIPPIN.`
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'article',
+    },
+  }
+}
+
 export default async function PublicGuidePage({ params, searchParams }: Props) {
   const { token } = await params
   const { view } = await searchParams
@@ -57,6 +96,10 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
 
   const g = guide as CityGuide
 
+  // Determine auth state — server-side, no extra round-trip cost
+  const { data: { user } } = await supabase.auth.getUser()
+  const isAuthenticated = !!user
+
   const { data: allEntries } = await supabase
     .from('guide_entries')
     .select('*')
@@ -66,6 +109,7 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
   const entries = (allEntries ?? []) as GuideEntryWithAuthor[]
   const hasMultipleAuthors =
     new Set(entries.map((entry) => entry.author_id || entry.user_id)).size > 1
+
   const mapEntries = entries
     .map((entry) => {
       const latitude = toCoordinate(entry.latitude)
@@ -93,14 +137,16 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
     return acc
   }, {})
 
-  const flag = g.country_code
-    ? String.fromCodePoint(
-        ...g.country_code
-          .toUpperCase()
-          .split('')
-          .map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
-      )
-    : null
+  const flag = buildFlag(g.country_code)
+
+  // For non-authenticated users: first 3 entries visible, rest blurred
+  const PREVIEW_LIMIT = 3
+  const allFlat = [...visited, ...toTry]
+  const visibleEntries = isAuthenticated ? allFlat : allFlat.slice(0, PREVIEW_LIMIT)
+  const hiddenCount = isAuthenticated ? 0 : Math.max(0, allFlat.length - PREVIEW_LIMIT)
+
+  // Redirect URL for sign-up CTA
+  const redirectParam = encodeURIComponent(`/guide/${token}`)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-slate-50">
@@ -144,7 +190,8 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
           ) : null}
         </div>
 
-        {hasMapEntries && (
+        {/* Map/List toggle — only shown to authenticated users in map view */}
+        {isAuthenticated && hasMapEntries && (
           <div className="flex gap-2">
             <Link
               href={`/guide/${token}`}
@@ -169,43 +216,109 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
           </div>
         )}
 
-        {showMapView ? (
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-gray-900">Map View</h2>
-            <GuideMapSection entries={mapEntries} />
-          </section>
-        ) : (
+        {/* ── AUTHENTICATED: full guide ── */}
+        {isAuthenticated && (
           <>
-            {/* Visited entries by category */}
-            {Object.entries(grouped).map(([category, catEntries]) => (
-              <section key={category}>
-                <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
-                  <span>{CATEGORY_ICONS[category] ?? '📍'}</span>
-                  {category}
-                </h2>
-                <div className="space-y-4">
-                  {catEntries.map((entry) => (
-                    <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
-                  ))}
-                </div>
+            {showMapView ? (
+              <section className="space-y-3">
+                <h2 className="text-xl font-semibold text-gray-900">Map View</h2>
+                <GuideMapSection entries={mapEntries} />
               </section>
-            ))}
+            ) : (
+              <>
+                {Object.entries(grouped).map(([category, catEntries]) => (
+                  <section key={category}>
+                    <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
+                      <span>{CATEGORY_ICONS[category] ?? '📍'}</span>
+                      {category}
+                    </h2>
+                    <div className="space-y-4">
+                      {catEntries.map((entry) => (
+                        <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
 
-            {/* To Try (if any) */}
-            {toTry.length > 0 && (
-              <section>
-                <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
-                  <Bookmark className="h-5 w-5 text-amber-500" />
-                  On the list
-                </h2>
-                <div className="space-y-4">
-                  {toTry.map((entry) => (
-                    <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
-                  ))}
-                </div>
-              </section>
+                {toTry.length > 0 && (
+                  <section>
+                    <h2 className="flex items-center gap-2 text-xl font-semibold text-gray-900 mb-5 pb-2 border-b border-gray-100">
+                      <Bookmark className="h-5 w-5 text-amber-500" />
+                      On the list
+                    </h2>
+                    <div className="space-y-4">
+                      {toTry.map((entry) => (
+                        <PublicEntryCard key={entry.id} entry={entry} showAuthorAttribution={hasMultipleAuthors} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
             )}
           </>
+        )}
+
+        {/* ── NON-AUTHENTICATED: preview + blur wall ── */}
+        {!isAuthenticated && (
+          <div className="space-y-4">
+            {/* First 3 entries — name + category only, no notes */}
+            {visibleEntries.map((entry) => (
+              <PreviewEntryCard key={entry.id} entry={entry} />
+            ))}
+
+            {/* Blurred placeholder cards + CTA overlay */}
+            {hiddenCount > 0 && (
+              <div className="relative">
+                {/* Ghost cards underneath the blur */}
+                <div className="space-y-4 blur-sm pointer-events-none select-none" aria-hidden="true">
+                  {Array.from({ length: Math.min(hiddenCount, 4) }).map((_, i) => (
+                    <BlurredPlaceholderCard key={i} />
+                  ))}
+                </div>
+
+                {/* CTA overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-t from-white via-white/90 to-transparent rounded-xl px-6 py-10 text-center">
+                  <div className="bg-white rounded-2xl shadow-lg border border-gray-100 px-8 py-8 max-w-sm w-full space-y-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 mx-auto">
+                      <Lock className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {hiddenCount} more place{hiddenCount !== 1 ? 's' : ''} in this guide
+                    </p>
+                    <p className="text-gray-500 text-sm">
+                      Sign up free to see the full guide — no credit card required.
+                    </p>
+                    <Link
+                      href={`/login?redirect=${redirectParam}`}
+                      className="block w-full rounded-xl bg-indigo-600 text-white font-semibold px-6 py-3 hover:bg-indigo-700 transition-colors text-sm"
+                    >
+                      Sign up free to see the full guide
+                    </Link>
+                    <p className="text-xs text-gray-400">
+                      Already have an account?{' '}
+                      <Link href={`/login?redirect=${redirectParam}`} className="text-indigo-600 hover:underline">
+                        Log in
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* If guide has ≤3 entries, just show the sign-up CTA normally */}
+            {hiddenCount === 0 && allFlat.length > 0 && (
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-6 text-center space-y-3">
+                <p className="font-semibold text-gray-900">Like what you see?</p>
+                <p className="text-gray-500 text-sm">Create your own city guide — free forever.</p>
+                <Link
+                  href={`/login?redirect=${redirectParam}`}
+                  className="inline-block rounded-xl bg-indigo-600 text-white font-semibold px-6 py-3 hover:bg-indigo-700 transition-colors text-sm"
+                >
+                  Get started free →
+                </Link>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Footer CTA */}
@@ -227,6 +340,7 @@ export default async function PublicGuidePage({ params, searchParams }: Props) {
   )
 }
 
+// Full card for authenticated users
 function PublicEntryCard({
   entry,
   showAuthorAttribution,
@@ -278,6 +392,36 @@ function PublicEntryCard({
               <span className="text-gray-400 italic">via {entry.recommended_by}</span>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Stripped-down card for unauthenticated preview — name + category only
+function PreviewEntryCard({ entry }: { entry: GuideEntryWithAuthor }) {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="flex items-center gap-3">
+        <span className="text-xl">{CATEGORY_ICONS[entry.category] ?? '📍'}</span>
+        <div>
+          <p className="font-semibold text-gray-900">{entry.name}</p>
+          <p className="text-sm text-gray-400">{entry.category}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Placeholder card shown blurred behind the CTA
+function BlurredPlaceholderCard() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5">
+      <div className="flex items-center gap-3">
+        <div className="w-8 h-8 rounded-full bg-gray-200" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 bg-gray-200 rounded w-2/3" />
+          <div className="h-3 bg-gray-100 rounded w-1/3" />
         </div>
       </div>
     </div>
