@@ -73,6 +73,12 @@ jobs:
               case "$api_path" in
                 */admin/*|*/webhooks/stripe|*/checkout|*/docs|*/activation/*|*/billing/*|*/referral)
                   skip_mcp=true ;;
+                */invites/*/accept|*/family-invites/*|*/invites/*)
+                  skip_mcp=true ;;  # Browser-based invite flows
+                */events/feedback|*/events/refresh|*/inbox/*/attachments/*)
+                  skip_mcp=true ;;  # UI-specific helpers
+                */places/autocomplete|*/places/reverse-geocode|*/trips/demo)
+                  skip_mcp=true ;;  # UI autocomplete / onboarding
               esac
               if [ "$skip_mcp" = false ] && [ -d "mcp/src" ]; then
                 # Match on the resource base path (before first param)
