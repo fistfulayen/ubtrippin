@@ -215,7 +215,12 @@ function deriveDisplayLocation(location: string): string | null {
   }
   if (index >= parts.length) return null
 
-  const city = normaliseToCity(parts[index])
+  const rawCity = normaliseToCity(parts[index])
+  // Resolve metro aliases (e.g. "Minato-ku" → "Tokyo", "Roppongi" → "Tokyo")
+  const resolved = resolveMetroAlias(rawCity)
+  const city = resolved !== rawCity.toLowerCase().replace(/[^a-z\s]+/g, '').trim()
+    ? resolved.charAt(0).toUpperCase() + resolved.slice(1)
+    : rawCity
   const region = parts[index + 1]
   return region && region.length <= 24 ? `${city}, ${region}` : city
 }

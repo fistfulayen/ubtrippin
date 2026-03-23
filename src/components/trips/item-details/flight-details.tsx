@@ -35,9 +35,12 @@ export function FlightDetailsView({ details, liveOverrides }: FlightDetailsViewP
   } = details
 
   // Live data (FlightAware) overrides stale booking data
-  const departure_terminal = liveOverrides?.departure_terminal ?? booking_departure_terminal
+  // Strip "Terminal " prefix if present — FlightAware returns "Terminal 1" but we render "Terminal {value}"
+  const stripTerminalPrefix = (v: string | null | undefined) =>
+    v?.replace(/^Terminal\s+/i, '') ?? null
+  const departure_terminal = stripTerminalPrefix(liveOverrides?.departure_terminal ?? booking_departure_terminal)
   const departure_gate = liveOverrides?.departure_gate ?? booking_departure_gate
-  const arrival_terminal = liveOverrides?.arrival_terminal ?? booking_arrival_terminal
+  const arrival_terminal = stripTerminalPrefix(liveOverrides?.arrival_terminal ?? booking_arrival_terminal)
   const arrival_gate = liveOverrides?.arrival_gate ?? booking_arrival_gate
 
   const flightCode = flight_number
