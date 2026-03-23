@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server'
-import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
-import { createClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { validateApiKey, isAuthError } from '@/lib/api/auth'
+import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,9 +15,9 @@ function getAllowedAdminEmails(): Set<string> {
   )
 }
 
-export async function GET() {
-  const auth = await requireSessionAuth()
-  if (isSessionAuthError(auth)) return auth
+export async function GET(request: NextRequest) {
+  const auth = await validateApiKey(request)
+  if (isAuthError(auth)) return auth
 
   const allowedEmails = getAllowedAdminEmails()
   if (allowedEmails.size === 0) {
@@ -27,27 +27,17 @@ export async function GET() {
     )
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await auth.supabase.auth.getUser()
+    const supabase = await createUserScopedClient(auth.userId)
 
-  if (userError || !user) {
-    return NextResponse.json(
-      { error: { code: 'session_lookup_failed', message: userError?.message ?? 'Could not resolve authenticated user.' } },
-      { status: 500 }
-    )
-  }
-
-  const email = user.email?.toLowerCase().trim()
+  // Look up user email for admin check
+  const { data: profile } = await supabase.from('profiles').select('email').eq('id', auth.userId).single()
+  const email = profile?.email?.toLowerCase().trim()
   if (!email || !allowedEmails.has(email)) {
     return NextResponse.json(
       { error: { code: 'forbidden', message: 'Admin access only.' } },
       { status: 403 }
     )
   }
-
-  const supabase = await createClient()
 
   const now = new Date()
   const thisWeekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
