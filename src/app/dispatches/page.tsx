@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { getAllDispatches, markdownToHtml } from '@/lib/dispatches'
 import { formatDispatchDate } from '@/lib/format-date'
 import { dispatchProseClasses } from '@/lib/dispatch-styles'
@@ -70,7 +71,9 @@ export default async function DispatchesPage({
                   {formatDispatchDate(dispatch.date)}
                 </p>
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                  {dispatch.title}
+                  <Link href={`/dispatches/${dispatch.slug}`} className="hover:text-[#312e81] transition-colors">
+                    {dispatch.title}
+                  </Link>
                 </h2>
                 <p className="mt-2 text-sm text-slate-600">
                   {dispatch.author} · COO, UBTRIPPIN
