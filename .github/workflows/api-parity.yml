@@ -42,17 +42,48 @@ jobs:
             
             if [ -n "$methods" ]; then
               REPORT="$REPORT\n$methods $api_path"
-              
+
+              # Skip internal endpoints that don't belong in public docs
+              skip_skill=false
+              case "$api_path" in
+                */admin/*|*/webhooks/stripe)
+                  skip_skill=true ;;
+              esac
+
               # Check skill coverage
-              # Normalize path for matching: replace :param patterns with generic markers
-              skill_path=$(echo "$api_path" | sed 's|/:[^/]*||g')
-              if ! grep -q "$skill_path" skill/SKILL.md 2>/dev/null; then
+              # Try exact match first, then try with params replaced by generic pattern
+              skill_found=false
+              if [ "$skip_skill" = true ]; then skill_found=true; fi
+              if grep -qF "$api_path" skill/SKILL.md 2>/dev/null; then
+                skill_found=true
+              else
+                # Replace :param with regex wildcard and search
+                skill_regex=$(echo "$api_path" | sed 's|/:[^/]*|/:[^/]*|g')
+                if grep -qP "$skill_regex" skill/SKILL.md 2>/dev/null; then
+                  skill_found=true
+                fi
+              fi
+              if [ "$skill_found" = false ]; then
                 MISSING_SKILL="$MISSING_SKILL\n- $methods $api_path"
               fi
               
               # Check MCP coverage (best effort)
-              if [ -d "mcp/src" ]; then
-                if ! grep -rq "$(echo "$api_path" | sed 's|/:.*||')" mcp/src/ 2>/dev/null; then
+              # Skip internal/admin endpoints that don't belong in MCP
+              skip_mcp=false
+              case "$api_path" in
+                */admin/*|*/webhooks/stripe|*/checkout|*/docs|*/activation/*|*/billing/*|*/referral)
+                  skip_mcp=true ;;
+                */invites/*/accept|*/family-invites/*|*/invites/*)
+                  skip_mcp=true ;;  # Browser-based invite flows
+                */events/feedback|*/events/refresh|*/inbox/*/attachments/*)
+                  skip_mcp=true ;;  # UI-specific helpers
+                */places/autocomplete|*/places/reverse-geocode|*/trips/demo)
+                  skip_mcp=true ;;  # UI autocomplete / onboarding
+              esac
+              if [ "$skip_mcp" = false ] && [ -d "mcp/src" ]; then
+                # Match on the resource base path (before first param)
+                mcp_base=$(echo "$api_path" | sed 's|/:[^/]*.*||')
+                if ! grep -rq "$mcp_base" mcp/src/ 2>/dev/null; then
                   MISSING_MCP="$MISSING_MCP\n- $methods $api_path"
                 fi
               fi
@@ -87,7 +118,7 @@ jobs:
           fi
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request' && steps.extract.outputs.has_drift == 'true'
+        if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: api-parity
