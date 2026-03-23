@@ -165,7 +165,7 @@ _resolve_id() {
   local api_route=""
   case "$table" in
     trips) api_route="${API_V1}/trips" ;;
-    trip_items) api_route="${API_V1}/trips" ;;  # items resolved from trips list
+    trip_items) api_route="${API_V1}/items" ;;
     city_guides) api_route="${API_V1}/guides" ;;
     *) echo "Error: Unknown table '${table}' for ID resolution" >&2; exit 1 ;;
   esac
@@ -915,8 +915,8 @@ cmd_trips_delete() {
       else
         echo "{}"
       fi
-    else
-      _mutation_output "Deleted" "$trip_id"
+    elif [ "${UBT_QUIET:-false}" != "true" ]; then
+      echo "Deleted: ${trip_id}"
     fi
     return
   fi
@@ -1403,8 +1403,8 @@ cmd_items_delete() {
       else
         echo "{}"
       fi
-    else
-      _mutation_output "Deleted" "$item_id"
+    elif [ "${UBT_QUIET:-false}" != "true" ]; then
+      echo "Deleted: ${item_id}"
     fi
     return
   fi
@@ -3798,6 +3798,41 @@ except: print(0)
   fi
 }
 
+cmd_referral() {
+  local result
+  result=$(_api "${API_V1}/referral")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+
+d = payload.get('data', {})
+code        = d.get('referral_code', 'n/a')
+link        = d.get('referral_link', 'n/a')
+signed_up   = d.get('signed_up_count', 0)
+converted   = d.get('converted_count', 0)
+
+print('Your Referral')
+print('=============')
+print()
+print(f'Code:      {code}')
+print(f'Share link: {link}')
+print()
+print('Stats:')
+print(f'  Signed up:    {signed_up}')
+print(f'  Converted:    {converted}')
+"
+}
+
 cmd_costs() {
   local result
   result=$(_api "${API_V1}/admin/token-usage")
@@ -3945,6 +3980,7 @@ Commands:
   profile loyalty delete <id>           Delete a loyalty program *
   profile loyalty lookup <provider_key> Lookup by provider (alliance fallback aware) *
   profile loyalty export                Export loyalty vault JSON *
+  referral                              Show your referral code, share link, and stats *
   tickets list [trip_id]                List ticket/event items (filter by trip or cross-trip search) *
   tickets add <trip_id> --event <name> [--venue X] [--performer X] [--date YYYY-MM-DD] [--time HH:MM] [--section X] [--row X] [--seat X] [--tickets N] [--doors HH:MM]  Add a ticket item *
   tickets show <item_id>                Show ticket/event details *
@@ -4214,6 +4250,7 @@ case "${1:-}" in
       *)    echo "Usage: ubt tickets <list|add|show>"; exit 1 ;;
     esac
     ;;
+  referral) cmd_referral ;;
   costs)    cmd_costs ;;
   users)    cmd_users ;;
   health)   cmd_health ;;
