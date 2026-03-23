@@ -683,6 +683,20 @@ GET /api/v1/events?city=paris&tier=major&category=art
 - Rate-limited: 10 requests/minute per IP
 - Events are curated by the UB Trippin editorial pipeline — not real-time scraped
 
+#### Submit Event Feedback
+```
+POST /api/v1/events/feedback
+Content-Type: application/json
+
+{
+  "city_id": "uuid",
+  "feedback_type": "missing_event",
+  "text": "The Monet exhibition at Grand Palais is missing from Paris events."
+}
+```
+
+Lets users report missing events, incorrect data, or suggest improvements. Rate-limited to 3 submissions per day per user. Feedback types: `missing_event`, `incorrect_data`, `suggestion`.
+
 #### Trigger Event Pipeline Refresh (Admin Only)
 ```
 POST /api/v1/events/refresh
@@ -841,6 +855,28 @@ Content-Type: application/json
 { "read": true }
 ```
 
+#### Get Notification Preferences
+```
+GET /api/v1/notifications/preferences
+```
+
+Response:
+```json
+{
+  "data": { "trip_updates": true }
+}
+```
+
+#### Update Notification Preferences
+```
+PATCH /api/v1/notifications/preferences
+Content-Type: application/json
+
+{ "trip_updates": false }
+```
+
+Toggles notification types on/off. Currently supports `trip_updates` (boolean).
+
 ---
 
 ### Webhooks
@@ -918,6 +954,45 @@ GET /api/v1/trains/:trainNumber/status
 ```
 
 Returns real-time status for a train by number (delays, platform, etc.).
+
+---
+
+### Places
+
+#### Autocomplete City Name
+```
+POST /api/v1/places/autocomplete
+Content-Type: application/json
+
+{ "query": "tok" }
+```
+
+Returns city name predictions from Google Places API. Query must be at least 2 characters.
+
+Response:
+```json
+{
+  "predictions": [
+    { "description": "Tokyo, Japan", "placeId": "ChIJ51...", "mainText": "Tokyo" },
+    { "description": "Tokushima, Japan", "placeId": "ChIJ...", "mainText": "Tokushima" }
+  ]
+}
+```
+
+#### Reverse Geocode
+```
+POST /api/v1/places/reverse-geocode
+Content-Type: application/json
+
+{ "lat": 48.8566, "lng": 2.3522 }
+```
+
+Returns the city name for a latitude/longitude pair.
+
+Response:
+```json
+{ "city": "Paris" }
+```
 
 ---
 
