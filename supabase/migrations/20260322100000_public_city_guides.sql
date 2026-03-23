@@ -36,9 +36,6 @@ ALTER TABLE public.city_guides
   ADD CONSTRAINT city_guides_visibility_check
   CHECK (visibility IN ('private', 'public'));
 
-ALTER TABLE public.city_guides
-  DROP COLUMN IF EXISTS is_public;
-
 CREATE INDEX IF NOT EXISTS idx_city_guides_visibility_updated_at
   ON public.city_guides (visibility, updated_at DESC);
 
@@ -46,10 +43,17 @@ CREATE INDEX IF NOT EXISTS idx_city_guides_public_city
   ON public.city_guides (LOWER(city))
   WHERE visibility = 'public';
 
+-- Drop ALL existing policies first (they reference is_public)
 DROP POLICY IF EXISTS "guides_select" ON public.city_guides;
 DROP POLICY IF EXISTS "guides_insert" ON public.city_guides;
 DROP POLICY IF EXISTS "guides_update" ON public.city_guides;
 DROP POLICY IF EXISTS "guides_delete" ON public.city_guides;
+DROP POLICY IF EXISTS "Public read" ON public.city_guides;
+DROP POLICY IF EXISTS "Owner read" ON public.city_guides;
+DROP POLICY IF EXISTS "city_guides_select" ON public.city_guides;
+DROP POLICY IF EXISTS "city_guides_insert" ON public.city_guides;
+DROP POLICY IF EXISTS "city_guides_update" ON public.city_guides;
+DROP POLICY IF EXISTS "city_guides_delete" ON public.city_guides;
 
 CREATE POLICY "guides_select" ON public.city_guides
   FOR SELECT
@@ -104,3 +108,7 @@ CREATE POLICY "guide_entries_update" ON public.guide_entries
 CREATE POLICY "guide_entries_delete" ON public.guide_entries
   FOR DELETE
   USING (user_id = (SELECT auth.uid()));
+
+-- Now safe to drop is_public — all policies that referenced it have been replaced
+ALTER TABLE public.city_guides
+  DROP COLUMN IF EXISTS is_public;
