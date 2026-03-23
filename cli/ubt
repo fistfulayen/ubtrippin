@@ -165,7 +165,7 @@ _resolve_id() {
   local api_route=""
   case "$table" in
     trips) api_route="${API_V1}/trips" ;;
-    trip_items) api_route="${API_V1}/trips" ;;  # items resolved from trips list
+    trip_items) api_route="${API_V1}/items" ;;
     city_guides) api_route="${API_V1}/guides" ;;
     *) echo "Error: Unknown table '${table}' for ID resolution" >&2; exit 1 ;;
   esac
@@ -915,8 +915,8 @@ cmd_trips_delete() {
       else
         echo "{}"
       fi
-    else
-      _mutation_output "Deleted" "$trip_id"
+    elif [ "${UBT_QUIET:-false}" != "true" ]; then
+      echo "Deleted: ${trip_id}"
     fi
     return
   fi
@@ -1403,8 +1403,8 @@ cmd_items_delete() {
       else
         echo "{}"
       fi
-    else
-      _mutation_output "Deleted" "$item_id"
+    elif [ "${UBT_QUIET:-false}" != "true" ]; then
+      echo "Deleted: ${item_id}"
     fi
     return
   fi
