@@ -135,9 +135,11 @@ export async function POST(
     }
   }
 
+  const RICH_STATUS_COLUMNS = 'item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response, aircraft_type, tail_number, operator, operator_iata, codeshares, departure_gate, departure_terminal, arrival_gate, arrival_terminal, baggage_claim, inbound_fa_flight_id, inbound_origin, inbound_ident, inbound_estimated_in, actual_off, actual_on, actual_out, actual_in'
+
   const { data: existingStatus } = await auth.supabase
     .from('trip_item_status')
-    .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
+    .select(RICH_STATUS_COLUMNS)
     .eq('item_id', itemId)
     .maybeSingle()
 
@@ -191,7 +193,7 @@ export async function POST(
   const { data: savedStatus, error: saveError } = await auth.supabase
     .from('trip_item_status')
     .upsert(upsert.values, { onConflict: 'item_id' })
-    .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
+    .select(RICH_STATUS_COLUMNS)
     .single()
 
   if (saveError || !savedStatus) {

@@ -18,6 +18,25 @@ export interface FlightStatusResult {
   estimatedArrival: string | null
   actualDeparture: string | null
   actualArrival: string | null
+  // Rich flight data
+  aircraftType: string | null
+  tailNumber: string | null
+  operator: string | null
+  operatorIata: string | null
+  codeshares: string[] | null
+  departureGate: string | null
+  departureTerminal: string | null
+  arrivalGate: string | null
+  arrivalTerminal: string | null
+  baggageClaim: string | null
+  inboundFaFlightId: string | null
+  inboundOrigin: string | null
+  inboundIdent: string | null
+  inboundEstimatedIn: string | null
+  actualOff: string | null
+  actualOn: string | null
+  actualOut: string | null
+  actualIn: string | null
   raw: Record<string, unknown>
 }
 
@@ -48,6 +67,25 @@ export interface TripItemStatusResponse {
   status_changed_at: string | null
   previous_status: FlightItemLiveStatus | null
   raw_response?: Record<string, unknown> | null
+  // Rich flight data
+  aircraft_type: string | null
+  tail_number: string | null
+  operator: string | null
+  operator_iata: string | null
+  codeshares: string[] | null
+  departure_gate: string | null
+  departure_terminal: string | null
+  arrival_gate: string | null
+  arrival_terminal: string | null
+  baggage_claim: string | null
+  inbound_fa_flight_id: string | null
+  inbound_origin: string | null
+  inbound_ident: string | null
+  inbound_estimated_in: string | null
+  actual_off: string | null
+  actual_on: string | null
+  actual_out: string | null
+  actual_in: string | null
 }
 
 const FLIGHTAWARE_BASE_URL = 'https://aeroapi.flightaware.com/aeroapi'
@@ -71,6 +109,12 @@ function asNumber(value: unknown): number | null {
 
 function asBoolean(value: unknown): boolean {
   return value === true
+}
+
+function asStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null
+  const result = value.filter((v): v is string => typeof v === 'string' && v.length > 0)
+  return result.length > 0 ? result : null
 }
 
 function toIsoOrNull(value: unknown): string | null {
@@ -326,6 +370,9 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
 
     const delayMinutes = calculateDelayMinutes(first)
 
+    // Extract inbound flight info if present (FA may return an inbound object with origin/ident/eta)
+    const inbound = asRecord(first.inbound)
+
     return {
       status: mapFlightStatus(first, delayMinutes),
       delayMinutes,
@@ -338,6 +385,25 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
       estimatedArrival: toIsoOrNull(first.estimated_on),
       actualDeparture: toIsoOrNull(first.actual_off),
       actualArrival: toIsoOrNull(first.actual_on),
+      // Rich flight data
+      aircraftType: asString(first.aircraft_type),
+      tailNumber: asString(first.registration),
+      operator: asString(first.operator),
+      operatorIata: asString(first.operator_iata),
+      codeshares: asStringArray(first.codeshares),
+      departureGate: asString(first.gate_origin),
+      departureTerminal: asString(first.terminal_origin),
+      arrivalGate: asString(first.gate_destination),
+      arrivalTerminal: asString(first.terminal_destination),
+      baggageClaim: asString(first.baggage_claim),
+      inboundFaFlightId: asString(first.inbound_fa_flight_id),
+      inboundOrigin: inbound ? asString(inbound.origin) : null,
+      inboundIdent: inbound ? (asString(inbound.ident_iata) ?? asString(inbound.ident)) : null,
+      inboundEstimatedIn: inbound ? toIsoOrNull(inbound.estimated_in) : null,
+      actualOff: toIsoOrNull(first.actual_off),
+      actualOn: toIsoOrNull(first.actual_on),
+      actualOut: toIsoOrNull(first.actual_out),
+      actualIn: toIsoOrNull(first.actual_in),
       raw: first,
     }
   } catch (error) {
@@ -386,6 +452,25 @@ export function normalizeStatusRow(
     status_changed_at: toIsoOrNull(row?.status_changed_at),
     previous_status: asLiveStatus(asString(row?.previous_status)),
     raw_response: asRecord(row?.raw_response),
+    // Rich flight data
+    aircraft_type: asString(row?.aircraft_type),
+    tail_number: asString(row?.tail_number),
+    operator: asString(row?.operator),
+    operator_iata: asString(row?.operator_iata),
+    codeshares: asStringArray(row?.codeshares),
+    departure_gate: asString(row?.departure_gate),
+    departure_terminal: asString(row?.departure_terminal),
+    arrival_gate: asString(row?.arrival_gate),
+    arrival_terminal: asString(row?.arrival_terminal),
+    baggage_claim: asString(row?.baggage_claim),
+    inbound_fa_flight_id: asString(row?.inbound_fa_flight_id),
+    inbound_origin: asString(row?.inbound_origin),
+    inbound_ident: asString(row?.inbound_ident),
+    inbound_estimated_in: toIsoOrNull(row?.inbound_estimated_in),
+    actual_off: toIsoOrNull(row?.actual_off),
+    actual_on: toIsoOrNull(row?.actual_on),
+    actual_out: toIsoOrNull(row?.actual_out),
+    actual_in: toIsoOrNull(row?.actual_in),
   }
 }
 
@@ -416,6 +501,25 @@ export function buildStatusUpsertValues(params: {
       status_changed_at: changed ? nowIso : params.existing?.status_changed_at ?? null,
       previous_status: changed ? previous : params.existing?.previous_status ?? null,
       updated_at: nowIso,
+      // Rich flight data
+      aircraft_type: params.result.aircraftType,
+      tail_number: params.result.tailNumber,
+      operator: params.result.operator,
+      operator_iata: params.result.operatorIata,
+      codeshares: params.result.codeshares,
+      departure_gate: params.result.departureGate,
+      departure_terminal: params.result.departureTerminal,
+      arrival_gate: params.result.arrivalGate,
+      arrival_terminal: params.result.arrivalTerminal,
+      baggage_claim: params.result.baggageClaim,
+      inbound_fa_flight_id: params.result.inboundFaFlightId,
+      inbound_origin: params.result.inboundOrigin,
+      inbound_ident: params.result.inboundIdent,
+      inbound_estimated_in: params.result.inboundEstimatedIn,
+      actual_off: params.result.actualOff,
+      actual_on: params.result.actualOn,
+      actual_out: params.result.actualOut,
+      actual_in: params.result.actualIn,
     },
     statusChanged: changed,
     previousStatus: changed ? previous : null,
