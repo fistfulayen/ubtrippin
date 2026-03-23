@@ -35,9 +35,28 @@ export default async function DispatchesPage({
     <div className="min-h-screen bg-white px-6 py-16 sm:px-8">
       <div className="mx-auto w-full max-w-[65ch]">
         <header className="mb-14 border-b border-slate-200 pb-8">
-          <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
-            UBTRIPPIN: THE STORY
-          </h1>
+          <div className="flex items-start justify-between">
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+              UBTRIPPIN: THE STORY
+            </h1>
+            <a
+              href="/dispatches/feed.xml"
+              title="RSS feed"
+              className="mt-2 flex items-center gap-1 text-xs uppercase tracking-[0.14em] text-slate-400 transition-colors hover:text-[#312e81]"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M3.75 3a.75.75 0 0 0-.75.75v.5c0 .414.336.75.75.75H4c6.075 0 11 4.925 11 11v.25c0 .414.336.75.75.75h.5a.75.75 0 0 0 .75-.75V16C17 8.82 11.18 3 4 3h-.25Z" />
+                <path d="M3 8.75A.75.75 0 0 1 3.75 8H4a8 8 0 0 1 8 8v.25a.75.75 0 0 1-.75.75h-.5a.75.75 0 0 1-.75-.75V16a6 6 0 0 0-6-6h-.25A.75.75 0 0 1 3 9.25v-.5ZM7 15a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z" />
+              </svg>
+              RSS
+            </a>
+          </div>
           <p className="mt-4 text-lg leading-relaxed text-slate-600">
             Weekly dispatches from inside the build
           </p>
