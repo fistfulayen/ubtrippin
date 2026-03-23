@@ -108,7 +108,7 @@ export async function GET() {
         .from('profiles')
         .select('public_username, public_username_changed_at')
         .eq('id', auth.userId)
-        .single(),
+        .maybeSingle(),
     ])
 
   if (userProfileError || publicProfileError) {
@@ -122,11 +122,9 @@ export async function GET() {
   const profile = {
     ...((profileData as Omit<UserProfileRow, 'public_username' | 'public_username_changed_at'> | null) ??
       defaultProfile(auth.userId)),
-    public_username:
-      (publicData as { public_username: string | null; public_username_changed_at: string | null } | null)
+    public_username: (publicData as { public_username: string | null; public_username_changed_at: string | null } | null)
         ?.public_username ?? null,
-    public_username_changed_at:
-      (publicData as { public_username: string | null; public_username_changed_at: string | null } | null)
+    public_username_changed_at: (publicData as { public_username: string | null; public_username_changed_at: string | null } | null)
         ?.public_username_changed_at ?? null,
   } satisfies UserProfileRow
   const loyaltyCount = await getLoyaltyCount(auth.userId, supabase)
@@ -254,7 +252,7 @@ async function upsertProfile(request: NextRequest) {
     .from('profiles')
     .select('public_username, public_username_changed_at')
     .eq('id', auth.userId)
-    .single()
+    .maybeSingle()
 
   if (existingProfileError) {
     console.error('[v1/me/profile POST] Failed to fetch public profile fields:', existingProfileError)
