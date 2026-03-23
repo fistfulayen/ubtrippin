@@ -118,7 +118,7 @@ jobs:
           fi
 
       - name: Comment on PR
-        if: github.event_name == 'pull_request' && steps.extract.outputs.has_drift == 'true'
+        if: github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           header: api-parity
