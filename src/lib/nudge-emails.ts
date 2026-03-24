@@ -66,7 +66,6 @@ export async function checkAndSendNudges(): Promise<number> {
 
     const tripRows = (trips ?? []) as TripSummary[]
     const hasNonDemoTrip = tripRows.some((trip) => !trip.is_demo)
-    const demoTrip = tripRows.find((trip) => trip.is_demo)
 
     const age = hoursSince(profile.created_at)
     const name = profile.full_name ?? 'there'
@@ -98,7 +97,7 @@ export async function checkAndSendNudges(): Promise<number> {
     // Day 5: still no forwarded booking
     if (!hasNonDemoTrip && age > 120 && !profile.nudge_2_sent_at) {
       try {
-        const demoTripUrl = demoTrip ? `${APP_URL}/trips/${demoTrip.id}` : `${APP_URL}/trips`
+        const demoTripUrl = `${APP_URL}/trips/demo`
         const html = await render(
           OnboardingDay5Email({
             userName: name,
@@ -109,7 +108,7 @@ export async function checkAndSendNudges(): Promise<number> {
         await resend.emails.send({
           from: 'UBTRIPPIN <hello@ubtrippin.xyz>',
           to: profile.email,
-          subject: "Still haven't tried it? Check out your sample trip",
+          subject: "See how UBTRIPPIN organizes your travel",
           html,
         })
 

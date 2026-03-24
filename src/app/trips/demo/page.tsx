@@ -33,7 +33,7 @@ export default function DemoTripPage() {
         className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to my trips
+        Back to trips
       </Link>
 
       {/* Demo banner with copy button (client component) */}

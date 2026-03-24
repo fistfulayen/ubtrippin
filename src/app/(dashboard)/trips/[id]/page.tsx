@@ -5,7 +5,6 @@ import { TripHeader } from '@/components/trips/trip-header'
 import { MovementTimeline } from '@/components/trips/movement-timeline'
 import { TripActions } from '@/components/trips/trip-actions'
 import { CollaboratorsSection } from '@/components/trips/collaborators-section'
-import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
 import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
 import { getTripTimelineEventPreviews } from '@/lib/events/queries'
@@ -144,8 +143,6 @@ export default async function TripPage({ params }: TripPageProps) {
           </span>
         </div>
       )}
-
-      {trip.is_demo && <DemoTripBanner />}
 
       <TripHeader trip={trip} />
 

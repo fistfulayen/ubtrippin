@@ -20,20 +20,20 @@ export function OnboardingDay5Email({ userName, demoTripUrl }: OnboardingDay5Ema
   return (
     <Html>
       <Head />
-      <Preview>Still haven't tried it? Check out your sample trip</Preview>
+      <Preview>See how UBTRIPPIN organizes your travel</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Heading style={h1}>Still haven't tried it? Check out your sample trip</Heading>
+          <Heading style={h1}>See how UBTRIPPIN organizes your travel</Heading>
 
           <Text style={text}>Hi {userName},</Text>
 
           <Text style={text}>
-            We created a sample trip in your account so you can see exactly how UBTRIPPIN organizes travel.
+            See how a trip looks when you forward a booking email — we put together an example to show you.
           </Text>
 
           <Section style={buttonContainer}>
             <Link href={demoTripUrl} style={button}>
-              View My Sample Trip
+              See Example Trip
             </Link>
           </Section>
 
