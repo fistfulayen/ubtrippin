@@ -42,6 +42,13 @@ export function MovementTimeline({
         }
 
         if (entry.type === 'segment' && entry.segment) {
+          // Skip empty segments with unknown city — these are artifacts of the
+          // timeline algorithm when items have no resolvable location. Users
+          // can't interact with them, so we hide them to avoid confusion.
+          if (entry.segment.city.toLowerCase() === 'unknown' && entry.segment.items.length === 0) {
+            return null
+          }
+
           // segmentEvents keys use segment-only index, not full timeline index
           const segmentIndex = entries
             .slice(0, index + 1)
