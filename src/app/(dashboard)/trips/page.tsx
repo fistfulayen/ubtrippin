@@ -35,7 +35,7 @@ export default async function TripsPage() {
     ).catch(() => {}) // swallow errors to not break page
   }
 
-  let { data: trips } = await supabase
+  const { data: trips } = await supabase
     .from('trips')
     .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
     .order('start_date', { ascending: true })
