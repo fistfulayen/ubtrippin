@@ -159,7 +159,7 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName, even
                       {placeholderLabel}
                     </p>
                     <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-600">
-                      {trip.is_demo ? 'Sample itinerary' : 'Trip overview'}
+                      Trip overview
                     </p>
                   </div>
                 </div>
@@ -212,11 +212,6 @@ export function TripCard({ trip, itemCount, needsReview, isPast, ownerName, even
               )}
               <TripStatusSummary tripId={trip.id} enabled={showStatusSummary} />
             </div>
-            {trip.is_demo && (
-              <Badge variant="secondary" className="shrink-0">
-                Sample Trip
-              </Badge>
-            )}
             {needsReview && (
               <Badge variant="warning" className="shrink-0">
                 <AlertCircle className="mr-1 h-3 w-3" />

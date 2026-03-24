@@ -5,7 +5,6 @@ import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
 import { sendWelcomeEmail } from './actions'
-import { createDemoTrip } from '@/lib/trips/demo-trip'
 import { Button } from '@/components/ui/button'
 import { UpgradeCard } from '@/components/billing/upgrade-card'
 import { Plus } from 'lucide-react'
@@ -40,22 +39,6 @@ export default async function TripsPage() {
     .from('trips')
     .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
     .order('start_date', { ascending: true })
-
-  // Create a sample trip for brand new users after email confirmation.
-  if (user && profile && (trips?.length ?? 0) === 0) {
-    await createDemoTrip({
-      userId: user.id,
-      travelerName: profile.full_name,
-      signupAt: profile.created_at,
-    }).catch(() => {})
-
-    const { data: refreshedTrips } = await supabase
-      .from('trips')
-      .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
-      .order('start_date', { ascending: true })
-
-    trips = refreshedTrips ?? []
-  }
 
   // Build a city→slug map for "What's on" links on trip cards
   const { data: trackedCities } = await supabase

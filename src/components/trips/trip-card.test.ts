@@ -63,6 +63,6 @@ describe('TripCard placeholder', () => {
 
     expect(html).toContain('No cover photo')
     expect(html).toContain('Tokyo, Japan')
-    expect(html).toContain('Sample itinerary')
+    expect(html).toContain('Trip overview')
   })
 })
