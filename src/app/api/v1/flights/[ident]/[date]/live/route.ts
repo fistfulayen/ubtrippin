@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { pickBestFlight } from '@/lib/flight-status'
 
 // Simple in-memory cache: key -> { data, fetchedAt }
 const cache = new Map<string, { data: unknown; fetchedAt: number }>()
@@ -120,6 +121,10 @@ function mapFlightStatus(
   
   const actualOff = asString(flight.actual_off)
   if (actualOff) return 'en_route'
+
+  // Left the gate but not yet airborne → taxiing for takeoff
+  const actualOut = asString(flight.actual_out)
+  if (actualOut) return 'en_route'
   
   if (delayMinutes && delayMinutes > 0) return 'delayed'
   
@@ -161,20 +166,17 @@ interface FlightApiResponse {
   last_updated: string
 }
 
-async function fetchFlightFromAware(ident: string, date: string): Promise<FlightApiResponse | null> {
+async function fetchFlightRaw(ident: string, date: string): Promise<Record<string, unknown>[] | null> {
   if (!process.env.FLIGHTAWARE_API_KEY) {
     console.error('[flightaware] FLIGHTAWARE_API_KEY is not configured')
     return null
   }
 
-  // Use a 36-hour window from midnight UTC to capture flights that depart
-  // late evening local time (which crosses into the next UTC day).
-  // Example: 9 PM EDT on March 13 = 01:00 UTC March 14.
   const start = `${date}T00:00:00Z`
   const startMs = new Date(start).getTime()
   const endDate = new Date(Math.min(startMs + 36 * 60 * 60 * 1000, Date.now() + 47 * 60 * 60 * 1000))
   const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
-  
+
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
 
   try {
@@ -189,32 +191,36 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
     }
 
     const payload = await response.json() as Record<string, unknown>
-    const flights = Array.isArray(payload?.flights) ? payload.flights : []
-    if (flights.length === 0) return null
+    const flights = Array.isArray(payload?.flights) ? payload.flights as Record<string, unknown>[] : []
+    return flights.length > 0 ? flights : null
+  } catch (error) {
+    console.error('[flightaware] request failed:', error)
+    return null
+  }
+}
 
-    // Pick the best matching flight for the URL date.
-    // Strategy: prefer a flight that hasn't landed yet (the one the user cares
-    // about). Among those, pick the latest scheduled_out. If ALL have landed,
-    // pick the latest scheduled_out (most recent departure that day).
-    let first = flights[0] as Record<string, unknown>
-    if (flights.length > 1) {
-      const scored = flights.map((f) => {
-        const fl = f as Record<string, unknown>
-        const schedOut = asString(fl.scheduled_out)
-        const schedMs = schedOut ? new Date(schedOut).getTime() : 0
-        const hasLanded = !!(asString(fl.actual_on) || asString(fl.actual_in))
-        return { fl, schedMs, hasLanded }
-      })
+async function fetchFlightFromAware(ident: string, date: string): Promise<FlightApiResponse | null> {
+  let flights = await fetchFlightRaw(ident, date)
+  if (!flights) return null
 
-      // Separate into not-landed and landed
-      const notLanded = scored.filter((s) => !s.hasLanded)
-      const pool = notLanded.length > 0 ? notLanded : scored
+  // Pick the best flight first so we can check for codeshare resolution
+  let first = pickBestFlight(flights)
+  if (!first) return null
 
-      // Pick the latest scheduled departure from the preferred pool
-      pool.sort((a, b) => b.schedMs - a.schedMs)
-      first = pool[0].fl
+  // Codeshare resolution: if the queried ident is a codeshare and FA returns
+  // an operating flight with a different ident, re-fetch using the operator's
+  // ident for fresher, more accurate status data.
+  const operatorIdent = asString(first.ident_iata) ?? asString(first.ident)
+  if (operatorIdent && operatorIdent.toUpperCase() !== ident.toUpperCase()) {
+    console.log(`[flightaware] codeshare detected: ${ident} → operating as ${operatorIdent}, re-fetching`)
+    const operatorFlights = await fetchFlightRaw(operatorIdent, date)
+    if (operatorFlights && operatorFlights.length > 0) {
+      flights = operatorFlights
+      first = pickBestFlight(flights) ?? first
     }
+  }
 
+  try {
     const delayMinutes = calculateDelayMinutes(first)
     const status = mapFlightStatus(first, delayMinutes)
     
