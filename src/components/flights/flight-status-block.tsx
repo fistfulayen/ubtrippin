@@ -127,17 +127,15 @@ export function FlightStatusBlock({
   const arrActual = formatTimeInZone(actualArrival, arrTz)
 
   // Determine what time to show.
-  // Default: scheduled time (what the ticket says).
-  // If delayed and not yet departed: show estimated (the current expected time).
-  // Once departed/landed: revert to scheduled unless there was a delay,
-  // in which case show the actual departure but annotate with "originally".
+  // Departure: show actual if departed, estimated if delayed, else scheduled.
+  // Arrival: always show the best available estimate — actual > estimated > scheduled.
+  // The scheduled time is what the ticket says, but once we have a better
+  // estimate (delayed departure, ATC, winds), show the real expected time.
   const isDelayedStatus = status === 'delayed'
-  const depDisplay = isDelayedStatus
-    ? (depEstimated ?? depScheduled)
-    : (depScheduled ?? depActual)
-  const arrDisplay = isDelayedStatus
-    ? (arrEstimated ?? arrScheduled)
-    : (arrScheduled ?? arrActual)
+  const depDisplay = depActual ?? depEstimated ?? depScheduled
+  const arrDisplay = arrActual
+    ? arrActual
+    : (arrEstimated ?? arrScheduled)
   
   // Compute gate-to-gate duration from the best available times (ISO/UTC)
   const depIso = actualDeparture ?? estimatedDeparture ?? scheduledDeparture
@@ -197,14 +195,9 @@ export function FlightStatusBlock({
               <p className="text-3xl font-light text-slate-400">--:--</p>
             )}
             
-            {isDelayedStatus && depScheduled && depEstimated && depScheduled !== depEstimated && (
-              <p className="text-sm text-amber-600 mt-1">
-                Originally {depScheduled}
-              </p>
-            )}
-            {!isDelayedStatus && depActual && depScheduled && depActual !== depScheduled && (
+            {depDisplay && depScheduled && depDisplay !== depScheduled && (
               <p className="text-sm text-slate-500 mt-1">
-                Departed {depActual}
+                Originally {depScheduled}
               </p>
             )}
           </div>
@@ -230,14 +223,9 @@ export function FlightStatusBlock({
               <p className="text-3xl font-light text-slate-400">--:--</p>
             )}
             
-            {isDelayedStatus && arrScheduled && arrEstimated && arrScheduled !== arrEstimated && (
-              <p className="text-sm text-amber-600 mt-1">
-                Originally {arrScheduled}
-              </p>
-            )}
-            {!isDelayedStatus && arrActual && arrScheduled && arrActual !== arrScheduled && (
+            {arrDisplay && arrScheduled && arrDisplay !== arrScheduled && (
               <p className="text-sm text-slate-500 mt-1">
-                Arrived {arrActual}
+                Originally {arrScheduled}
               </p>
             )}
           </div>
