@@ -132,11 +132,7 @@ export function FlightStatusBlock({
   // The scheduled time is what the ticket says, but once we have a better
   // estimate (delayed departure, ATC, winds), show the real expected time.
   const isDelayedStatus = status === 'delayed'
-  const depDisplay = depActual
-    ? depActual
-    : isDelayedStatus
-      ? (depEstimated ?? depScheduled)
-      : (depScheduled ?? depEstimated)
+  const depDisplay = depActual ?? depEstimated ?? depScheduled
   const arrDisplay = arrActual
     ? arrActual
     : (arrEstimated ?? arrScheduled)
@@ -201,7 +197,7 @@ export function FlightStatusBlock({
             
             {depDisplay && depScheduled && depDisplay !== depScheduled && (
               <p className="text-sm text-slate-500 mt-1">
-                {depActual ? `Departed ${depActual}` : `Originally ${depScheduled}`}
+                Originally {depScheduled}
               </p>
             )}
           </div>
@@ -229,7 +225,7 @@ export function FlightStatusBlock({
             
             {arrDisplay && arrScheduled && arrDisplay !== arrScheduled && (
               <p className="text-sm text-slate-500 mt-1">
-                {arrActual ? `Arrived ${arrActual}` : `Originally ${arrScheduled}`}
+                Originally {arrScheduled}
               </p>
             )}
           </div>
