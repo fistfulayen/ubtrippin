@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { pickBestFlight } from '@/lib/flight-status'
 
 // Simple in-memory cache: key -> { data, fetchedAt }
 const cache = new Map<string, { data: unknown; fetchedAt: number }>()
@@ -163,28 +164,6 @@ interface FlightApiResponse {
   }
   cached: boolean
   last_updated: string
-}
-
-/**
- * Pick the best flight from a list of FA results for a given date.
- * Prefers flights that haven't landed yet; among those (or all if none),
- * picks the latest scheduled departure.
- */
-function pickBestFlight(flights: Record<string, unknown>[]): Record<string, unknown> | null {
-  if (flights.length === 0) return null
-  if (flights.length === 1) return flights[0]
-
-  const scored = flights.map((fl) => {
-    const schedOut = asString(fl.scheduled_out)
-    const schedMs = schedOut ? new Date(schedOut).getTime() : 0
-    const hasLanded = !!(asString(fl.actual_on) || asString(fl.actual_in))
-    return { fl, schedMs, hasLanded }
-  })
-
-  const notLanded = scored.filter((s) => !s.hasLanded)
-  const pool = notLanded.length > 0 ? notLanded : scored
-  pool.sort((a, b) => b.schedMs - a.schedMs)
-  return pool[0].fl
 }
 
 async function fetchFlightRaw(ident: string, date: string): Promise<Record<string, unknown>[] | null> {

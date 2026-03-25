@@ -347,28 +347,29 @@ async function fetchFlightsRaw(ident: string, date: string): Promise<Record<stri
   }
 }
 
-function pickBestFlight(flights: Record<string, unknown>[]): Record<string, unknown> | null {
+/**
+ * Pick the most relevant flight from a list of FA results.
+ * Prefers in-progress flights over completed ones, scored by scheduled departure.
+ */
+export function pickBestFlight(flights: Record<string, unknown>[]): Record<string, unknown> | null {
   if (flights.length === 0) return null
+  if (flights.length === 1) return flights[0]
 
-  // Prefer not-yet-arrived over completed
-  let best: Record<string, unknown> | null = null
-  for (const rec of flights) {
-    const status = asString(rec.status)?.toLowerCase() ?? ''
-    const progress = asNumber(rec.progress_percent)
-    if (!status.startsWith('landed') && progress !== 100) {
-      best = rec
-      break
-    }
-  }
-  // If all flights are completed, fall back to the last one (most recent)
-  if (!best) {
-    best = flights[flights.length - 1] ?? null
-  }
-  return best
+  const scored = flights.map((fl) => {
+    const schedOut = asString(fl.scheduled_out)
+    const schedMs = schedOut ? new Date(schedOut).getTime() : 0
+    const hasLanded = !!(asString(fl.actual_on) || asString(fl.actual_in))
+    return { fl, schedMs, hasLanded }
+  })
+
+  const notLanded = scored.filter((s) => !s.hasLanded)
+  const pool = notLanded.length > 0 ? notLanded : scored
+  pool.sort((a, b) => b.schedMs - a.schedMs)
+  return pool[0].fl
 }
 
 export async function getFlightStatus(ident: string, date: string): Promise<FlightStatusResult | null> {
-  let flights = await fetchFlightsRaw(ident, date)
+  const flights = await fetchFlightsRaw(ident, date)
   if (!flights || flights.length === 0) return null
 
   let first = pickBestFlight(flights)
