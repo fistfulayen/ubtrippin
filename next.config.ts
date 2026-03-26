@@ -39,8 +39,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      // Allow any HTTPS image — cover images come from Brave search (any domain)
-      { protocol: 'https', hostname: '**' },
+      // Supabase Storage — cover images, feedback images, ticket attachments
+      { protocol: 'https', hostname: '*.supabase.co' },
+      // Unsplash — guide cover images
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+      { protocol: 'https', hostname: 'plus.unsplash.com' },
     ],
   },
   // SECURITY: Apply security headers to all routes

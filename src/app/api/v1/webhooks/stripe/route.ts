@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
+import { maskEmail } from '@/lib/privacy'
 import {
   mapStripeSubscriptionStatusToTier,
   unixSecondsToIso,
@@ -186,7 +187,7 @@ async function getProfileByEmail(
     .maybeSingle()
 
   if (error) {
-    console.error('[stripe webhook] profile lookup by email failed', { email, error })
+    console.error('[stripe webhook] profile lookup by email failed', { email: maskEmail(email), error })
     return null
   }
 
@@ -293,7 +294,7 @@ async function handleCustomerCreated(
 
   const profile = await getProfileByEmail(supabase, email)
   if (!profile) {
-    console.log('[stripe webhook] customer.created no matching profile', { email })
+    console.log('[stripe webhook] customer.created no matching profile', { email: maskEmail(email) })
     return
   }
 

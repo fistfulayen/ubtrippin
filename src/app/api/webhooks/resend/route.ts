@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { maskEmail } from '@/lib/privacy'
 import { createSecretClient } from '@/lib/supabase/service'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
 import { getResendClient } from '@/lib/resend/client'
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     const toAddress = webhookData.to?.[0]?.toLowerCase() || ''
     if (FORWARD_ADDRESSES[toAddress]) {
       try {
-        console.log(`Forwarding email to ${toAddress} → ${FORWARD_ADDRESSES[toAddress]}`)
+        console.log(`Forwarding email to ${toAddress} → ${maskEmail(FORWARD_ADDRESSES[toAddress])}`)
         const resendForward = getResendClient()
         
         // Fetch the full email to forward it
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     // If no user found, stop processing but acknowledge receipt
     if (!allowedSender) {
-      console.log(`Email from unrecognized sender: ${fromEmail}`)
+      console.log(`Email from unrecognized sender: ${maskEmail(fromEmail)}`)
       return NextResponse.json({
         message: 'Email stored but sender not recognized',
         email_id: sourceEmail.id,

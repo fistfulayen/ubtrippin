@@ -232,7 +232,7 @@ async function processQueueBatch() {
 
 function hasValidCronAuth(request: NextRequest): boolean {
   const cronSecret = process.env.CRON_SECRET
-  if (!cronSecret) return true
+  if (!cronSecret) return false
   return request.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 

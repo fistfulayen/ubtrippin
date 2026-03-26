@@ -73,7 +73,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       {
         error: {
           code: 'forbidden',
-          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${userEmail || 'a different account'}.`,
+          message: 'This invite was sent to a different email address. Please sign in with the correct account.',
         },
       },
       { status: 403 }

@@ -7,6 +7,7 @@
  */
 
 import { render } from '@react-email/components'
+import { maskEmail } from '@/lib/privacy'
 import { createSecretClient } from '@/lib/supabase/service'
 import { getResendClient } from '@/lib/resend/client'
 import { OnboardingDay2Email } from '@/components/email/onboarding-day-2'
@@ -87,7 +88,7 @@ export async function checkAndSendNudges(): Promise<number> {
           .eq('id', profile.id)
 
         sent++
-        console.log(`[nudge-emails] Sent day-2 onboarding email to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-2 onboarding email to ${maskEmail(profile.email!)}`)
         continue
       } catch (err) {
         console.error(`[nudge-emails] Failed day-2 email for ${profile.id}:`, err)
@@ -118,7 +119,7 @@ export async function checkAndSendNudges(): Promise<number> {
           .eq('id', profile.id)
 
         sent++
-        console.log(`[nudge-emails] Sent day-5 onboarding email to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-5 onboarding email to ${maskEmail(profile.email!)}`)
         continue
       } catch (err) {
         console.error(`[nudge-emails] Failed day-5 email for ${profile.id}:`, err)
@@ -148,7 +149,7 @@ export async function checkAndSendNudges(): Promise<number> {
           .eq('id', profile.id)
 
         sent++
-        console.log(`[nudge-emails] Sent day-14 onboarding email to ${profile.email}`)
+        console.log(`[nudge-emails] Sent day-14 onboarding email to ${maskEmail(profile.email!)}`)
       } catch (err) {
         console.error(`[nudge-emails] Failed day-14 email for ${profile.id}:`, err)
       }

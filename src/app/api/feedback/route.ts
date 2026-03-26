@@ -84,16 +84,18 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_IMAGE_BYTES) {
       return NextResponse.json({ error: 'Each image must be 5MB or smaller.' }, { status: 400 })
     }
-    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+
+    const validatedMimeType = await getValidatedMimeType(file)
+    if (!validatedMimeType) {
       return NextResponse.json({ error: 'Images must be JPG, PNG, WebP, or GIF.' }, { status: 400 })
     }
 
-    const ext = extensionFromMimeType(file.type)
+    const ext = extensionFromMimeType(validatedMimeType)
     const path = `${user.id}/${crypto.randomUUID()}.${ext}`
 
     const { error: uploadError } = await supabase.storage
       .from('feedback-images')
-      .upload(path, file, { contentType: file.type, upsert: false })
+      .upload(path, file, { contentType: validatedMimeType, upsert: false })
 
     if (uploadError) {
       // Clean up any already-uploaded images
