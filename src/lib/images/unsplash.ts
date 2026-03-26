@@ -143,7 +143,9 @@ export async function getDestinationImageUrl(location: string, tripTitle?: strin
 
   // Build destination-aware query
   const searchQuery = buildSearchQuery(cityName)
-  console.log(`Unsplash search: "${location}" → "${cityName}" → "${searchQuery}"`)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Unsplash search: "${location}" → "${cityName}" → "${searchQuery}"`)
+  }
 
   try {
     const params = new URLSearchParams({
@@ -180,7 +182,9 @@ export async function getDestinationImageUrl(location: string, tripTitle?: strin
           .replace(/\s*-\s*\w{3}\s+\d{4}$/i, '') // Remove " - Apr 2026" suffix
           .trim()
           .slice(0, 100) // Cap length — don't leak long AI titles to third-party API
-        console.log('Trying fallback with trip title:', titleQuery)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('Trying fallback with trip title:', titleQuery)
+        }
         const fallbackParams = new URLSearchParams({
           query: `${titleQuery} travel`,
           orientation: 'landscape',
@@ -204,7 +208,9 @@ export async function getDestinationImageUrl(location: string, tripTitle?: strin
           }
         }
       }
-      console.log('No Unsplash results for location or title:', cityName, tripTitle)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('No Unsplash results for location or title:', cityName, tripTitle)
+      }
       return null
     }
 

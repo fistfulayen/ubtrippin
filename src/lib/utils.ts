@@ -1,6 +1,7 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { format } from 'date-fns'
+import sanitizeHtmlLib from 'sanitize-html'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -198,9 +199,19 @@ export function getKindIcon(kind: string): string {
 
 export function sanitizeHtml(html: string | null | undefined): string {
   if (!html) return ''
-  // Basic HTML sanitization - remove script tags and event handlers
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '')
+  return sanitizeHtmlLib(html, {
+    allowedTags: [
+      'p', 'br', 'b', 'i', 'em', 'strong', 'a',
+      'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'blockquote', 'pre', 'code',
+      'span', 'div',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+    ],
+    allowedAttributes: {
+      'a': ['href'],
+    },
+    allowedSchemes: ['http', 'https', 'mailto'],
+    disallowedTagsMode: 'discard',
+  })
 }
