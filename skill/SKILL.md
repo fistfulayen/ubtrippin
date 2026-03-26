@@ -511,6 +511,73 @@ Returns your referral code, sharable referral link, and counts for referred user
 
 ---
 
+### Affiliate Program
+
+#### Get Affiliate Dashboard
+```
+GET /api/v1/affiliate
+```
+
+Returns the authenticated user's affiliate dashboard: stats, earnings, and recent conversions.
+
+Response:
+```json
+{
+  "data": {
+    "affiliate_code": "AB3X7QR2",
+    "tier": "standard",
+    "status": "active",
+    "payout_email": "you@example.com",
+    "payout_method": "stripe_connect",
+    "total_conversions": 12,
+    "total_earned_cents": 4800,
+    "total_paid_cents": 2400,
+    "pending_payout_cents": 2400,
+    "conversions": [
+      {
+        "id": "uuid",
+        "commission_cents": 400,
+        "status": "pending",
+        "created_at": "2026-03-01T10:00:00Z",
+        "paid_at": null
+      }
+    ]
+  }
+}
+```
+
+Returns `404 not_found` if the user has not yet applied. Returns up to 50 most recent conversions.
+
+#### Apply for Affiliate Program
+```
+POST /api/v1/affiliate
+Content-Type: application/json
+
+{ "payout_email": "you@example.com", "payout_method": "stripe_connect" }
+```
+
+Submits an affiliate application. Creates a pending affiliate record with a unique referral code.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `payout_email` | string | — | Email for payout notifications |
+| `payout_method` | string | — | `stripe_connect` (default) or `paypal` |
+
+Response (201):
+```json
+{
+  "data": {
+    "affiliate_code": "AB3X7QR2",
+    "status": "pending",
+    "tier": "standard"
+  }
+}
+```
+
+Returns `409 conflict` if an application already exists.
+
+---
+
 ### Family
 
 #### List My Families

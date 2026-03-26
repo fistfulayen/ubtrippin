@@ -14,6 +14,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { registerFamilyTools } from './tools/family.js'
+import { registerAffiliateTools } from './tools/affiliate.js'
 
 const API_KEY = process.env.UBT_API_KEY
 const BASE_URL = (process.env.UBT_BASE_URL || 'https://www.ubtrippin.xyz').replace(/\/$/, '')
@@ -133,8 +134,8 @@ function authHeaders(): Record<string, string> {
   }
 }
 
-async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders() })
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders(), ...init })
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')
@@ -1593,6 +1594,12 @@ server.registerTool(
 // ---------------------------------------------------------------------------
 
 registerFamilyTools(server, apiFetch)
+
+// ---------------------------------------------------------------------------
+// Affiliate Tools
+// ---------------------------------------------------------------------------
+
+registerAffiliateTools(server, apiFetch)
 
 
 // ---------------------------------------------------------------------------
