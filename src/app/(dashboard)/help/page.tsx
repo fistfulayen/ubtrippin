@@ -327,6 +327,15 @@ const sections: HelpSection[] = [
               to request full account deletion.
             </p>
           </div>
+          <div>
+            <h3 className="font-semibold text-slate-800">Is the code open source?</h3>
+            <p>
+              Yes. UBTRIPPIN is open source. View the code, report issues, or contribute on{" "}
+              <a href="https://github.com/fistfulayen/ubtrippin" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-500">
+                GitHub
+              </a>.
+            </p>
+          </div>
         </div>
       </>
     ),

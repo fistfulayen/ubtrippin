@@ -43,6 +43,15 @@ export default async function DashboardLayout({
           <Link href="/terms" className="hover:text-gray-700 transition-colors">
             Terms of Service
           </Link>
+          <span aria-hidden="true">•</span>
+          <a
+            href="https://github.com/fistfulayen/ubtrippin"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-gray-700 transition-colors"
+          >
+            GitHub
+          </a>
         </div>
       </footer>
     </div>

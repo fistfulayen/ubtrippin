@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { format } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -10,21 +11,9 @@ export function formatDate(date: string | Date | null | undefined): string {
   // For date-only strings (YYYY-MM-DD), parse as local date to avoid timezone shift.
   // new Date("2026-03-19") = midnight UTC = March 18 in US timezones. Adding T00:00 forces local.
   if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const d = new Date(date + 'T00:00:00')
-    return d.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
+    return format(new Date(date + 'T00:00:00'), 'EEE d MMM yyyy')
   }
-  const d = new Date(date)
-  return d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
+  return format(new Date(date), 'EEE d MMM yyyy')
 }
 
 /**

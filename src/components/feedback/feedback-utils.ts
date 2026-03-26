@@ -1,4 +1,4 @@
-export type FeedbackType = 'bug' | 'feature' | 'general'
+export type FeedbackType = 'bug' | 'feature' | 'general' | 'praise'
 export type FeedbackStatus = 'new' | 'under_review' | 'planned' | 'in_progress' | 'shipped' | 'declined'
 
 export interface FeedbackBoardItem {
@@ -31,6 +31,7 @@ export const TYPE_LABELS: Record<FeedbackType, string> = {
   bug: 'Bug',
   feature: 'Feature',
   general: 'General',
+  praise: 'Praise',
 }
 
 export const STATUS_LABELS: Record<FeedbackStatus, string> = {
@@ -46,6 +47,7 @@ export const TYPE_BADGE_CLASS: Record<FeedbackType, string> = {
   bug: 'bg-rose-50 text-rose-700 border border-rose-100',
   feature: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
   general: 'bg-slate-50 text-slate-700 border border-slate-100',
+  praise: 'bg-yellow-50 text-yellow-700 border border-yellow-100',
 }
 
 export const STATUS_BADGE_CLASS: Record<FeedbackStatus, string> = {
