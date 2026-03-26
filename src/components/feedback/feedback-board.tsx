@@ -52,6 +52,7 @@ const TYPE_FILTERS: Array<{ value: 'all' | FeedbackType; label: string }> = [
   { value: 'bug', label: 'Bug' },
   { value: 'feature', label: 'Feature' },
   { value: 'general', label: 'General' },
+  { value: 'praise', label: 'Praise' },
 ]
 
 function formatResponseTime(hours: number): string {
@@ -413,6 +414,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
                 <option value="general">General</option>
                 <option value="feature">Feature</option>
                 <option value="bug">Bug</option>
+                <option value="praise">Praise</option>
               </Select>
             </div>
 
