@@ -76,26 +76,31 @@ export async function POST(request: NextRequest) {
     const { data: webhookData } = emailData
 
     // Route non-trips emails: forward hello@, privacy@, etc. to admin inbox
-    const FORWARD_ADDRESSES: Record<string, string> = {
-      'hello@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
-      'privacy@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
-      'support@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
-      'security@ubtrippin.xyz': 'inspectorclouseau90@gmail.com',
+    const adminForwardEmail = process.env.ADMIN_FORWARD_EMAIL
+    if (!adminForwardEmail) {
+      console.warn('[webhook] ADMIN_FORWARD_EMAIL is not set — forwarding disabled')
+    }
+    const FORWARD_ADDRESSES: Record<string, string | undefined> = {
+      'hello@ubtrippin.xyz': adminForwardEmail,
+      'privacy@ubtrippin.xyz': adminForwardEmail,
+      'support@ubtrippin.xyz': adminForwardEmail,
+      'security@ubtrippin.xyz': adminForwardEmail,
     }
 
     // Check if this email should be forwarded instead of processed
     const toAddress = webhookData.to?.[0]?.toLowerCase() || ''
-    if (FORWARD_ADDRESSES[toAddress]) {
+    const forwardTarget = FORWARD_ADDRESSES[toAddress]
+    if (forwardTarget) {
       try {
-        console.log(`Forwarding email to ${toAddress} → ${maskEmail(FORWARD_ADDRESSES[toAddress])}`)
+        console.log(`Forwarding email to ${toAddress} → ${maskEmail(forwardTarget)}`)
         const resendForward = getResendClient()
-        
+
         // Fetch the full email to forward it
         const { data: fwdEmail } = await resendForward.emails.receiving.get(webhookData.email_id)
         if (fwdEmail) {
           await resendForward.emails.send({
             from: `UBT Forwarded <trips@ubtrippin.xyz>`,
-            to: FORWARD_ADDRESSES[toAddress],
+            to: forwardTarget,
             subject: `[${toAddress.split('@')[0]}@] ${fwdEmail.subject || '(no subject)'}`,
             text: `Forwarded from: ${fwdEmail.from}\nTo: ${toAddress}\n\n${fwdEmail.text || fwdEmail.html || '(no content)'}`,
           })

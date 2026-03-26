@@ -102,7 +102,7 @@ export async function extractTravelData(
   const dbClient = options?.supabase ?? createSecretClient()
   const examples = await selectExamples(options?.senderDomain, dbClient)
 
-  if (examples.length > 0) {
+  if (examples.length > 0 && process.env.NODE_ENV === 'development') {
     console.log(`Using ${examples.length} extraction examples for ${options?.senderDomain || 'unknown domain'}`)
   }
 

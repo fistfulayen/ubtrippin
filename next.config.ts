@@ -2,9 +2,10 @@ import type { NextConfig } from "next";
 
 // SECURITY: Content Security Policy
 // Tightened per OWASP recommendations. Adjust 'connect-src' / 'img-src' if you add new third-party services.
+// TODO: Replace 'unsafe-inline' with nonce-based CSP via middleware
 const ContentSecurityPolicy = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' 'unsafe-eval';
+  script-src 'self' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
   img-src 'self' blob: data: https:;
   font-src 'self';
