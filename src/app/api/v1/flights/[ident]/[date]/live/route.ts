@@ -83,20 +83,26 @@ function toIsoOrNull(value: unknown): string | null {
 }
 
 function calculateDelayMinutes(flight: Record<string, unknown>): number | null {
-  const scheduledOut = asString(flight.scheduled_out)
-  const estimatedOut = asString(flight.estimated_out)
+  // Prefer arrival delay (scheduled_on vs estimated_on) — this is what passengers care about.
+  // Fall back to departure delay (scheduled_off vs estimated_off) if arrival times not available.
+  const pairs: Array<[string, string]> = [
+    ['scheduled_on', 'estimated_on'],
+    ['scheduled_off', 'estimated_off'],
+    ['scheduled_out', 'estimated_out'],
+  ]
   
-  if (!scheduledOut || !estimatedOut) return null
-  
-  try {
-    const sched = new Date(scheduledOut).getTime()
-    const est = new Date(estimatedOut).getTime()
-    const delayMs = est - sched
-    if (delayMs <= 0) return null
-    return Math.round(delayMs / 60000)
-  } catch {
-    return null
+  for (const [schedKey, estKey] of pairs) {
+    const sched = asString(flight[schedKey])
+    const est = asString(flight[estKey])
+    if (!sched || !est) continue
+    try {
+      const schedMs = new Date(sched).getTime()
+      const estMs = new Date(est).getTime()
+      const delayMs = estMs - schedMs
+      if (delayMs > 60000) return Math.round(delayMs / 60000) // only count delays > 1 min
+    } catch { /* continue */ }
   }
+  return null
 }
 
 /** Return IATA code if available, otherwise ICAO as-is. No heuristic stripping. */
@@ -122,9 +128,9 @@ function mapFlightStatus(
   const actualOff = asString(flight.actual_off)
   if (actualOff) return 'en_route'
 
-  // Left the gate but not yet airborne → taxiing for takeoff
+  // Left the gate but not yet airborne → taxiing
   const actualOut = asString(flight.actual_out)
-  if (actualOut) return 'en_route'
+  if (actualOut) return 'taxiing'
   
   if (delayMinutes && delayMinutes > 0) return 'delayed'
   
