@@ -2,7 +2,7 @@ import { render } from '@react-email/components'
 import { getResendClient } from '@/lib/resend/client'
 import { InviteJoinedEmail } from '@/components/email/invite-joined'
 
-const FROM = 'UBTRIPPIN <hello@ubtrippin.xyz>'
+const FROM = process.env.EMAIL_FROM || 'UBTRIPPIN <hello@ubtrippin.xyz>'
 
 interface InviteJoinedParams {
   to: string

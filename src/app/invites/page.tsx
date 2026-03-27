@@ -201,21 +201,8 @@ export default function InvitesPage() {
 
     if (p) setProfile(p as Profile)
 
-    // Fetch first active API key for this user to make v1 calls
-    const { data: keys } = await supabase
-      .from('api_keys')
-      .select('raw_key, key_hash')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    // api_keys stores key_hash, not raw_key — we'll use supabase session for these calls
-    // Actually, we'll make the calls server-side via session auth
-    // For dashboard pages we'll call the v1 API with the session cookie approach
-    // But v1/invites uses validateApiKey (bearer).
-    // Solution: call from server action or add session-auth path.
-    // For now: fetch invites directly from Supabase client (RLS-scoped).
-    void keys // not used — see below
+    // Fetch invites directly from Supabase client (RLS-scoped)
+    // Note: v1/invites uses API key auth, but for dashboard we use session auth + direct Supabase
     await fetchInvitesDirect(supabase, user.id)
   }, [])
 
@@ -235,7 +222,7 @@ export default function InvitesPage() {
       user_id: userId,
     })
 
-    const APP_URL = 'https://www.ubtrippin.xyz'
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
     const withUrls = (invites ?? []).map((inv: Invite) => ({
       ...inv,
       url: `${APP_URL}/join/${inv.code}`,

@@ -11,6 +11,8 @@ interface InviteInfo {
   reason?: 'expired' | 'used' | 'not_found'
 }
 
+const MIN_PASSWORD_LENGTH = 8
+
 interface FormState {
   fullName: string
   email: string
@@ -211,11 +213,11 @@ export default function JoinPage() {
               type="password"
               autoComplete="new-password"
               required
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              placeholder="At least 8 characters"
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`}
             />
           </div>
 

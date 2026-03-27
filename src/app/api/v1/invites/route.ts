@@ -20,7 +20,7 @@ function nextMondayUTC(): string {
   return next.toISOString()
 }
 
-const APP_URL = 'https://www.ubtrippin.xyz'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 
 export async function GET(request: NextRequest) {
   const auth = await validateApiKey(request)

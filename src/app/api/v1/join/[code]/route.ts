@@ -17,7 +17,8 @@ export async function GET(
 ) {
   const { code } = await params
 
-  if (!code || typeof code !== 'string' || code.length < 4) {
+  const MIN_INVITE_CODE_LENGTH = 4
+  if (!code || typeof code !== 'string' || code.length < MIN_INVITE_CODE_LENGTH) {
     return NextResponse.json({ valid: false, reason: 'not_found' })
   }
 

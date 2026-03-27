@@ -3833,7 +3833,16 @@ else:
         email    = inv.get('email_used') or ''
         if used_at:
             print(f'  [used]    {code}  → {email or \"?\"}')
-        elif expires < '2000':
+        # Check if invite is expired by comparing to current date
+        from datetime import datetime
+        try:
+            is_expired = datetime.strptime(expires, '%Y-%m-%d') < datetime.now() if expires else True
+        except ValueError:
+            is_expired = True
+        
+        if used_at:
+            print(f'  [used]    {code}  → {email or "?"}')
+        elif is_expired:
             print(f'  [expired] {code}')
         else:
             print(f'  [open]    {code}  {url}  (expires {expires})')

@@ -21,8 +21,11 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
+const MIN_PASSWORD_LENGTH = 8
+
 function isValidPassword(value: string): boolean {
-  return value.length >= 8
+  // Basic length check — additional complexity requirements can be added here
+  return value.length >= MIN_PASSWORD_LENGTH
 }
 
 export async function POST(request: NextRequest) {
@@ -49,7 +52,7 @@ export async function POST(request: NextRequest) {
   }
   if (!password || !isValidPassword(password)) {
     return NextResponse.json(
-      { error: { code: 'validation_error', message: 'Password must be at least 8 characters.' } },
+      { error: { code: 'validation_error', message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` } },
       { status: 400 }
     )
   }
@@ -113,9 +116,15 @@ export async function POST(request: NextRequest) {
   })
 
   if (authError || !authData.user) {
+    // Check for specific Supabase error codes first, then fall back to message matching
+    const errorCode = (authError as { code?: string })?.code
     const msg = authError?.message ?? 'Unknown error'
+    
     // Surface email-already-exists without leaking internal detail
-    if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
+    // Supabase auth error codes: https://supabase.com/docs/reference/javascript/auth-error-codes
+    if (errorCode === 'user_already_exists' || 
+        msg.toLowerCase().includes('already registered') || 
+        msg.toLowerCase().includes('already exists')) {
       return NextResponse.json(
         { error: { code: 'email_taken', message: 'An account with this email already exists.' } },
         { status: 409 }
@@ -144,7 +153,9 @@ export async function POST(request: NextRequest) {
 
   if (profileError) {
     console.error('[register] profile upsert error:', profileError.message)
-    // Non-fatal: user was created, profile may have been created by trigger
+    // Log for monitoring but don't fail — profile may have been created by DB trigger
+    // If both upsert AND trigger failed, user will see incomplete profile on first login
+    // which they can fix by updating their profile settings
   }
 
   // 4. Mark invite used — service role bypasses RLS update restriction
