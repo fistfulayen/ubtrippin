@@ -163,20 +163,21 @@ export async function POST(request: NextRequest) {
   }
 
   // 5. Notify inviter — fire-and-forget, no await
-  supabase
-    .from('profiles')
-    .select('email, full_name')
-    .eq('id', invite.inviter_id)
-    .single()
-    .then(({ data: inviter }) => {
-      if (!inviter?.email) return
-      sendInviteJoinedEmail({
-        to: inviter.email,
-        inviterName: inviter.full_name?.split(' ')[0] ?? 'there',
-        inviteeName: fullName,
-      }).catch((err) => console.error('[register] invite notification email failed:', err))
-    })
-    .catch((err) => console.error('[register] inviter lookup failed:', err))
+  void Promise.resolve(
+    supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('id', invite.inviter_id)
+      .single()
+      .then(({ data: inviter }) => {
+        if (!inviter?.email) return
+        void Promise.resolve(sendInviteJoinedEmail({
+          to: inviter.email,
+          inviterName: inviter.full_name?.split(' ')[0] ?? 'there',
+          inviteeName: fullName,
+        })).catch((err: unknown) => console.error('[register] invite notification email failed:', err))
+      })
+  ).catch((err: unknown) => console.error('[register] inviter lookup failed:', err))
 
   return NextResponse.json({ user_id: userId, message: 'Account created' }, { status: 201 })
 }
