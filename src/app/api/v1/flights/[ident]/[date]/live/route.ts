@@ -166,6 +166,29 @@ interface FlightApiResponse {
   last_updated: string
 }
 
+// IATA airline codes that contain digits (FA can't resolve them directly).
+// Map: IATA prefix → ICAO prefix for FlightAware lookup.
+const IATA_TO_ICAO_PREFIX: Record<string, string> = {
+  'U2': 'EZY',  // easyJet
+  'W6': 'WZZ',  // Wizz Air
+  'FR': 'RYR',  // Ryanair (IATA=FR works, but ICAO=RYR sometimes needed)
+  'U5': 'GWY',  // USA3000 (legacy)
+}
+
+/**
+ * Given an IATA ident like "U28377", return the ICAO equivalent "EZY8377"
+ * if the airline prefix is in our digit-prefix map. Otherwise returns null.
+ */
+function toIcaoIdent(iataIdent: string): string | null {
+  for (const [iataPrefix, icaoPrefix] of Object.entries(IATA_TO_ICAO_PREFIX)) {
+    if (iataIdent.toUpperCase().startsWith(iataPrefix)) {
+      const flightNum = iataIdent.slice(iataPrefix.length)
+      return icaoPrefix + flightNum
+    }
+  }
+  return null
+}
+
 async function fetchFlightRaw(ident: string, date: string): Promise<Record<string, unknown>[] | null> {
   if (!process.env.FLIGHTAWARE_API_KEY) {
     console.error('[flightaware] FLIGHTAWARE_API_KEY is not configured')
@@ -177,26 +200,38 @@ async function fetchFlightRaw(ident: string, date: string): Promise<Record<strin
   const endDate = new Date(Math.min(startMs + 36 * 60 * 60 * 1000, Date.now() + 47 * 60 * 60 * 1000))
   const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
 
-  const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
-
-  try {
-    const response = await fetch(url, {
-      headers: { 'x-apikey': process.env.FLIGHTAWARE_API_KEY },
-      cache: 'no-store',
-    })
-
-    if (!response.ok) {
-      console.error(`[flightaware] ${response.status} for ${ident}`)
+  const fetchIdent = async (id: string): Promise<Record<string, unknown>[] | null> => {
+    const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(id)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
+    try {
+      const response = await fetch(url, {
+        headers: { 'x-apikey': process.env.FLIGHTAWARE_API_KEY! },
+        cache: 'no-store',
+      })
+      if (!response.ok) {
+        console.error(`[flightaware] ${response.status} for ${id}`)
+        return null
+      }
+      const payload = await response.json() as Record<string, unknown>
+      const flights = Array.isArray(payload?.flights) ? payload.flights as Record<string, unknown>[] : []
+      return flights.length > 0 ? flights : null
+    } catch (error) {
+      console.error('[flightaware] request failed:', error)
       return null
     }
-
-    const payload = await response.json() as Record<string, unknown>
-    const flights = Array.isArray(payload?.flights) ? payload.flights as Record<string, unknown>[] : []
-    return flights.length > 0 ? flights : null
-  } catch (error) {
-    console.error('[flightaware] request failed:', error)
-    return null
   }
+
+  // Primary lookup
+  const flights = await fetchIdent(ident)
+  if (flights) return flights
+
+  // Fallback: try ICAO ident for airlines with digit-containing IATA codes (e.g. U2 → EZY)
+  const icaoIdent = toIcaoIdent(ident)
+  if (icaoIdent) {
+    console.log(`[flightaware] empty result for ${ident}, retrying with ICAO ident ${icaoIdent}`)
+    return await fetchIdent(icaoIdent)
+  }
+
+  return null
 }
 
 async function fetchFlightFromAware(ident: string, date: string): Promise<FlightApiResponse | null> {
