@@ -135,7 +135,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, { headers: authHeaders(), ...init })
+  const res = await fetch(`${BASE_URL}${path}`, { ...init, headers: { ...authHeaders(), ...init?.headers } })
 
   if (!res.ok) {
     const body = await res.text().catch(() => '')

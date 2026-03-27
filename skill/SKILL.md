@@ -538,7 +538,7 @@ Response:
         "id": "uuid",
         "commission_cents": 400,
         "status": "pending",
-        "created_at": "2026-03-01T10:00:00Z",
+        "created_at": "2025-03-01T10:00:00Z",
         "paid_at": null
       }
     ]
