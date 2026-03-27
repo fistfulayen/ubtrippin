@@ -1141,6 +1141,108 @@ Returns whether the user's account is activated.
 
 ---
 
+### Invites (Pro/Admin Only)
+
+#### List My Invites
+```
+GET /api/v1/invites
+```
+
+Returns your invite codes and weekly remaining count.
+
+Response:
+```json
+{
+  "invites": [
+    {
+      "id": "uuid",
+      "code": "ABC123",
+      "url": "https://www.ubtrippin.xyz/join/ABC123",
+      "email_used": null,
+      "created_at": "2026-03-27T10:00:00Z",
+      "expires_at": "2026-04-03T10:00:00Z",
+      "used_at": null
+    }
+  ],
+  "remaining": 2,
+  "resets_at": "2026-03-30T00:00:00Z"
+}
+```
+
+#### Create Invite
+```
+POST /api/v1/invites
+```
+
+Creates a new invite code. Requires Pro subscription or admin status.
+
+Response:
+```json
+{
+  "invite": {
+    "id": "uuid",
+    "code": "ABC123",
+    "url": "https://www.ubtrippin.xyz/join/ABC123",
+    "created_at": "2026-03-27T10:00:00Z",
+    "expires_at": "2026-04-03T10:00:00Z"
+  }
+}
+```
+
+---
+
+### Public Join (No Auth)
+
+#### Validate Invite Code
+```
+GET /api/v1/join/:code
+```
+
+Validates an invite code for the public join page.
+
+Response (valid):
+```json
+{
+  "valid": true,
+  "inviter_name": "Ian",
+  "expires_at": "2026-04-03T10:00:00Z",
+  "expired": false
+}
+```
+
+Response (invalid):
+```json
+{
+  "valid": false,
+  "reason": "expired"
+}
+```
+
+#### Register with Invite
+```
+POST /api/v1/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "securepassword",
+  "full_name": "Jane Smith",
+  "invite_code": "ABC123"
+}
+```
+
+Creates a new account using an invite code.
+
+Response:
+```json
+{
+  "user_id": "uuid",
+  "message": "Account created"
+}
+```
+
+---
+
 ## Adding New Bookings (Email Forwarding)
 
 The primary way to add bookings is **email forwarding**. When your user receives a booking confirmation:
