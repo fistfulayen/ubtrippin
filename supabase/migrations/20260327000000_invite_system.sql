@@ -1,4 +1,9 @@
 -- PRD-043: Velvet Rope — invite-only sign-up system
+--
+-- Configurable values (change here + in src/lib/invites/constants.ts):
+--   INVITE_EXPIRY_DAYS     = 7   (expires_at default)
+--   INVITE_WEEKLY_LIMIT    = 3   (weekly_invites_remaining function)
+--   REFERRAL_TREE_DEPTH    = 3   (get_referral_tree function)
 
 -- Add is_admin flag to profiles
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT false;
@@ -10,6 +15,7 @@ CREATE TABLE IF NOT EXISTS invites (
   code        TEXT UNIQUE NOT NULL DEFAULT upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)),
   email_used  TEXT,
   created_at  TIMESTAMPTZ DEFAULT now(),
+  -- INVITE_EXPIRY_DAYS = 7 — also defined in src/lib/invites/constants.ts
   expires_at  TIMESTAMPTZ NOT NULL DEFAULT now() + INTERVAL '7 days',
   used_at     TIMESTAMPTZ,
   invitee_id  UUID REFERENCES profiles(id)
@@ -45,6 +51,7 @@ SET search_path = public
 AS $$
   SELECT CASE
     WHEN (SELECT is_admin FROM profiles WHERE id = user_id) = true THEN 999
+    -- INVITE_WEEKLY_LIMIT = 3 — also defined in src/lib/invites/constants.ts
     ELSE GREATEST(0, 3 - (
       SELECT COUNT(*)::int FROM invites
       WHERE inviter_id = user_id
@@ -72,6 +79,7 @@ AS $$
     FROM invites i
     JOIN profiles p ON p.id = i.invitee_id
     JOIN tree t ON t.invitee_id = i.inviter_id
+    -- REFERRAL_TREE_DEPTH = 3 — also defined in src/lib/invites/constants.ts
     WHERE t.depth < 3
   )
   SELECT * FROM tree;

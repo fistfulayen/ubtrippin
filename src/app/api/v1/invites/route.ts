@@ -8,19 +8,8 @@ import { validateApiKey, isAuthError } from '@/lib/api/auth'
 import { rateLimitResponse } from '@/lib/api/rate-limit'
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { createSecretClient } from '@/lib/supabase/service'
-
-/** ISO timestamp for next Monday 00:00 UTC */
-function nextMondayUTC(): string {
-  const now = new Date()
-  const day = now.getUTCDay() // 0=Sun, 1=Mon …
-  const daysUntilMonday = day === 0 ? 1 : 8 - day
-  const next = new Date(now)
-  next.setUTCDate(now.getUTCDate() + daysUntilMonday)
-  next.setUTCHours(0, 0, 0, 0)
-  return next.toISOString()
-}
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
+import { APP_URL } from '@/lib/invites/constants'
+import { nextMondayUTC } from '@/lib/invites/next-monday'
 
 export async function GET(request: NextRequest) {
   const auth = await validateApiKey(request)

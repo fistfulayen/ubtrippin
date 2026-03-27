@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Check, Copy, Loader2, RefreshCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { APP_URL } from '@/lib/invites/constants'
+import { nextMondayUTC } from '@/lib/invites/next-monday'
 
 interface Invite {
   id: string
@@ -222,26 +224,15 @@ export default function InvitesPage() {
       user_id: userId,
     })
 
-    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
     const withUrls = (invites ?? []).map((inv: Invite) => ({
       ...inv,
       url: `${APP_URL}/join/${inv.code}`,
     }))
 
-    const nextMonday = (() => {
-      const now = new Date()
-      const day = now.getUTCDay()
-      const daysUntil = day === 0 ? 1 : 8 - day
-      const next = new Date(now)
-      next.setUTCDate(now.getUTCDate() + daysUntil)
-      next.setUTCHours(0, 0, 0, 0)
-      return next.toISOString()
-    })()
-
     setData({
       invites: withUrls,
       remaining: remaining ?? 0,
-      resets_at: nextMonday,
+      resets_at: nextMondayUTC(),
     })
 
     // Fetch referral tree
