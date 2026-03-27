@@ -1210,6 +1210,15 @@ The primary way to add bookings is **email forwarding**. When your user receives
 1. `GET /api/v1/calendar/token`
 2. Give the user the iCal URL to add to their calendar app
 
+### "Invite a friend to UB Trippin"
+1. `POST /api/v1/invites` — creates an invite link (requires Pro or admin)
+2. Share the returned `invite.url` (`https://www.ubtrippin.xyz/join/<code>`) with the friend
+3. Each link expires in 7 days and can only be used once
+
+### "How many invites do I have left this week?"
+1. `GET /api/v1/invites` — returns `remaining` count and `resets_at` (next Monday UTC)
+2. Limit: 3 used invites per week; admins have unlimited. Resets every Monday UTC.
+
 ---
 
 ## Error Handling

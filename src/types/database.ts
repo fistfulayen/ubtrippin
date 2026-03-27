@@ -33,6 +33,7 @@ export interface Database {
           referred_by: string | null
           public_username: string | null
           public_username_changed_at: string | null
+          is_admin: boolean
         }
         Insert: {
           id: string
@@ -52,6 +53,7 @@ export interface Database {
           referred_by?: string | null
           public_username?: string | null
           public_username_changed_at?: string | null
+          is_admin?: boolean
         }
         Update: {
           id?: string
@@ -71,6 +73,7 @@ export interface Database {
           referred_by?: string | null
           public_username?: string | null
           public_username_changed_at?: string | null
+          is_admin?: boolean
         }
       }
       user_profiles: {
@@ -790,4 +793,24 @@ export interface GuideEntry {
 
 export interface CityGuideWithEntries extends CityGuide {
   entries: GuideEntry[]
+}
+
+// ─── Invite system (PRD-043) ─────────────────────────────────────────────────
+
+export interface Invite {
+  id: string
+  inviter_id: string
+  code: string
+  email_used: string | null
+  created_at: string
+  expires_at: string
+  used_at: string | null
+  invitee_id: string | null
+}
+
+export interface ReferralTreeEntry {
+  invitee_id: string
+  invitee_name: string | null
+  joined_at: string
+  depth: number
 }

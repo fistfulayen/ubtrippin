@@ -3798,6 +3798,78 @@ except: print(0)
   fi
 }
 
+cmd_invites() {
+  local sub="${1:-list}"
+  case "$sub" in
+    list)
+      local result
+      result=$(_api "${API_V1}/invites")
+      if [ "${FORMAT:-pretty}" = "json" ]; then
+        echo "$result" | _json
+        return
+      fi
+      echo "$result" | _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+
+invites   = payload.get('invites', [])
+remaining = payload.get('remaining', 0)
+resets_at = payload.get('resets_at', '')
+
+print(f'Invites  ({remaining} left this week)')
+print()
+if not invites:
+    print('  No invites yet.')
+else:
+    for inv in invites:
+        code     = inv.get('code', '')
+        url      = inv.get('url', '')
+        used_at  = inv.get('used_at')
+        expires  = inv.get('expires_at', '')[:10]
+        email    = inv.get('email_used') or ''
+        if used_at:
+            print(f'  [used]    {code}  → {email or \"?\"}')
+        elif expires < '2000':
+            print(f'  [expired] {code}')
+        else:
+            print(f'  [open]    {code}  {url}  (expires {expires})')
+print()
+print(f'Resets: {resets_at[:10]}')
+"
+      ;;
+    create)
+      local result
+      result=$(_api -X POST "${API_V1}/invites" -d '{}')
+      if [ "${FORMAT:-pretty}" = "json" ]; then
+        echo "$result" | _json
+        return
+      fi
+      echo "$result" | _python3c "
+import json, sys
+
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+
+inv = payload.get('invite', {})
+print(f\"Invite created:\")
+print(f\"  Code: {inv.get('code', '')}\")
+print(f\"  URL:  {inv.get('url', '')}\")
+print(f\"  Expires: {str(inv.get('expires_at', ''))[:10]}\")
+"
+      ;;
+    *)
+      echo "Usage: ubt invites <list|create>"
+      exit ${EXIT_USER_ERROR}
+      ;;
+  esac
+}
+
 cmd_referral() {
   local result
   result=$(_api "${API_V1}/referral")
@@ -4248,6 +4320,13 @@ case "${1:-}" in
       add)  shift 2; cmd_tickets_add "$@" ;;
       show) cmd_tickets_show "${3:?Usage: ubt tickets show <item_id>}" ;;
       *)    echo "Usage: ubt tickets <list|add|show>"; exit 1 ;;
+    esac
+    ;;
+  invites)
+    case "${2:-}" in
+      list)   cmd_invites list ;;
+      create) cmd_invites create ;;
+      *)      cmd_invites "${2:-list}" ;;
     esac
     ;;
   referral) cmd_referral ;;

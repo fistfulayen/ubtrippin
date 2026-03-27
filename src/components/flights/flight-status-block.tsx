@@ -27,6 +27,11 @@ const STATUS_META: Record<string, { label: string; toneClass: string; message: s
     toneClass: 'text-blue-700 bg-blue-50 border-blue-200',
     message: 'Somewhere over the sky.'
   },
+  taxiing: {
+    label: 'Taxiing',
+    toneClass: 'text-blue-700 bg-blue-50 border-blue-200',
+    message: 'Left the gate. Heading to the runway.'
+  },
   boarding: { 
     label: 'Boarding', 
     toneClass: 'text-blue-700 bg-blue-50 border-blue-200',
@@ -131,7 +136,7 @@ export function FlightStatusBlock({
   // Arrival: always show the best available estimate — actual > estimated > scheduled.
   // The scheduled time is what the ticket says, but once we have a better
   // estimate (delayed departure, ATC, winds), show the real expected time.
-  const isDelayedStatus = status === 'delayed'
+  const isDelayedStatus = status === 'delayed' || status === 'taxiing'
   const depDisplay = depActual ?? depEstimated ?? depScheduled
   const arrDisplay = arrActual
     ? arrActual
