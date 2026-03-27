@@ -21,7 +21,8 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[api/keys] list failed:', error.message)
+    return NextResponse.json({ error: 'Failed to list API keys' }, { status: 500 })
   }
 
   return NextResponse.json({ keys: data })
@@ -69,7 +70,8 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[api/keys] create failed:', error.message)
+    return NextResponse.json({ error: 'Failed to create API key' }, { status: 500 })
   }
 
   // Return the plaintext key ONCE — we will never show it again
@@ -105,7 +107,8 @@ export async function DELETE(req: NextRequest) {
     .eq('user_id', user.id)
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[api/keys] delete failed:', error.message)
+    return NextResponse.json({ error: 'Failed to delete API key' }, { status: 500 })
   }
 
   return NextResponse.json({ success: true })
