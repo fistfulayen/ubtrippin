@@ -1601,6 +1601,33 @@ registerFamilyTools(server, apiFetch)
 
 registerAffiliateTools(server, apiFetch)
 
+// ---------------------------------------------------------------------------
+// Invite Tools (PRD 043)
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  'list_invites',
+  {
+    title: 'List My Invites',
+    description: 'List all your invite codes and weekly remaining count. Requires Pro subscription or admin status.',
+  },
+  async () => {
+    const result = await apiFetch<{ invites: unknown[]; remaining: number; resets_at: string }>('/api/v1/invites')
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
+
+server.registerTool(
+  'create_invite',
+  {
+    title: 'Create Invite',
+    description: 'Create a new invite code for someone to join UB Trippin. Requires Pro subscription or admin status.',
+  },
+  async () => {
+    const result = await apiFetch<{ invite: { id: string; code: string; url: string; created_at: string; expires_at: string } }>('/api/v1/invites', { method: 'POST', body: {} })
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] }
+  }
+)
 
 // ---------------------------------------------------------------------------
 // Billing Tools (PRD 026)

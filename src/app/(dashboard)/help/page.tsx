@@ -217,6 +217,27 @@ const sections: HelpSection[] = [
     ),
   },
   {
+    id: 'invites',
+    title: 'Inviting Friends',
+    searchText: 'invite friends velvet rope code link crew referral share access pro',
+    content: (
+      <>
+        <p>
+          UB Trippin is invite-only. Pro subscribers get 3 fresh invites every Monday.
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>Go to <Link href="/invites" className="text-indigo-600 hover:text-indigo-500">Invites</Link> to generate a unique invite link.</li>
+          <li>Share the link with a friend — each link expires in 7 days and can only be used once.</li>
+          <li>Your weekly invite count resets every Monday at midnight UTC. Unused invites do <em>not</em> roll over.</li>
+          <li>Only <em>used</em> invites count against your weekly limit. Expired-but-unused invites free the slot for next week.</li>
+          <li>You can revoke an unused link before it is accepted.</li>
+          <li>Your Crew section shows everyone you've invited (and who they've invited), up to 3 levels.</li>
+          <li>Invites are a Pro feature. Admins have unlimited invites.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
     id: 'developers-agents',
     title: 'For Developers & Agents',
     searchText:

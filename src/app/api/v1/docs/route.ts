@@ -718,6 +718,72 @@ Full command list: \`ubt help\`
 
 ---
 
+## Invites (PRD-043)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/v1/invites | List your invites + remaining weekly count |
+| POST | /api/v1/invites | Create a new invite link (Pro or admin only) |
+| GET | /api/v1/join/:code | Validate an invite code (no auth required) |
+| POST | /api/v1/auth/register | Register a new account with an invite code |
+
+### GET /api/v1/invites
+
+\`\`\`
+200 OK
+{
+  "invites": [
+    {
+      "id": "uuid",
+      "code": "AB12CD34",
+      "email_used": null,
+      "created_at": "2026-03-27T10:00:00Z",
+      "expires_at": "2026-04-03T10:00:00Z",
+      "used_at": null,
+      "invitee_id": null,
+      "url": "https://www.ubtrippin.xyz/join/AB12CD34"
+    }
+  ],
+  "remaining": 2,
+  "resets_at": "2026-03-30T00:00:00Z"
+}
+\`\`\`
+
+### POST /api/v1/invites
+
+Creates a new invite. Requires Pro or admin. Max 3 used invites per week (resets Monday UTC).
+
+\`\`\`
+201 Created
+{ "invite": { "id": "uuid", "code": "AB12CD34", "expires_at": "...", "url": "..." } }
+\`\`\`
+
+Errors: \`403 forbidden\` (not Pro), \`429 invite_limit_reached\` (weekly limit hit)
+
+### GET /api/v1/join/:code
+
+No authentication required. Returns validity of an invite code.
+
+\`\`\`
+{ "valid": true, "inviter_name": "Ian", "expires_at": "...", "expired": false }
+{ "valid": false, "reason": "expired" | "used" | "not_found" }
+\`\`\`
+
+### POST /api/v1/auth/register
+
+Register with an invite code. No auth required.
+
+\`\`\`json
+{ "email": "user@example.com", "password": "...", "full_name": "Jane Smith", "invite_code": "AB12CD34" }
+\`\`\`
+
+\`\`\`
+201 Created
+{ "user_id": "uuid", "message": "Account created" }
+\`\`\`
+
+---
+
 ## Error Codes
 
 | Status | Code | Meaning |
