@@ -29,7 +29,7 @@ export function CityDirectoryCard({
         <div className="relative flex min-h-[320px] flex-col justify-between p-5 text-white">
           <div className="flex items-start justify-between gap-3">
             <Badge className="rounded-full bg-white/88 text-slate-900">
-              {city.active_event_count ?? 0} events
+              {city.active_event_count ?? 0} {(city.active_event_count ?? 0) === 1 ? 'event' : 'events'}
             </Badge>
             {isOnTrip ? <Badge className="rounded-full bg-indigo-500 text-white">Your Trip</Badge> : null}
           </div>
