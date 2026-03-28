@@ -32,9 +32,9 @@ export async function GET(request: NextRequest) {
       segments: data.segments,
     })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unable to fetch events.'
+    console.error('[v1/events]', error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: { code: 'invalid_request', message } },
+      { error: { code: 'invalid_request', message: 'Unable to fetch events.' } },
       { status: 400 }
     )
   }

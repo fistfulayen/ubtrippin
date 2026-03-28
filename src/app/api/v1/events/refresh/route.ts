@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
   if (userError || !user) {
     return NextResponse.json(
-      { error: { code: 'session_lookup_failed', message: userError?.message ?? 'Could not resolve authenticated user.' } },
+      { error: { code: 'session_lookup_failed', message: 'Could not resolve authenticated user.' } },
       { status: 500 }
     )
   }
@@ -111,9 +111,9 @@ export async function POST(request: NextRequest) {
       citySlug,
     }, { status: 202 })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to launch refresh.'
+    console.error('[v1/events/refresh]', error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: { code: 'launch_failed', message } },
+      { error: { code: 'launch_failed', message: 'Failed to launch refresh.' } },
       { status: 500 }
     )
   }
