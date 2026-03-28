@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { DEMO_TRIP, DEMO_ITEMS } from '@/lib/trips/demo-trip-data'
 import { DemoTripBanner } from '@/components/trips/demo-trip-banner'
+import { createClient } from '@/lib/supabase/server'
 
 const KIND_LABELS: Record<string, string> = {
   flight: '✈️ Flight',
@@ -24,7 +25,10 @@ function formatDate(dateStr: string | null | undefined): string {
   })
 }
 
-export default function DemoTripPage() {
+export default async function DemoTripPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
       {/* Back link */}
@@ -36,8 +40,8 @@ export default function DemoTripPage() {
         Back to trips
       </Link>
 
-      {/* Demo banner with copy button (client component) */}
-      <DemoTripBanner />
+      {/* Demo banner — only show email address to logged-in users */}
+      <DemoTripBanner isLoggedIn={!!user} />
 
       {/* Trip header */}
       <div className="rounded-2xl border border-[#cbd5e1] bg-white p-6">

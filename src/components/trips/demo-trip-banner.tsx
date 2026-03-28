@@ -2,16 +2,31 @@
 
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import Link from 'next/link'
 
 const EMAIL = 'trips@ubtrippin.xyz'
 
-export function DemoTripBanner() {
+export function DemoTripBanner({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(EMAIL)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <div className="rounded-xl border border-yellow-300 bg-yellow-50 px-5 py-4">
+        <p className="text-sm text-yellow-800">
+          This is a sample trip.{' '}
+          <Link href="/login" className="font-semibold underline underline-offset-2 hover:text-yellow-900">
+            Sign in
+          </Link>
+          {' '}to create your own.
+        </p>
+      </div>
+    )
   }
 
   return (
