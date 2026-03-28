@@ -205,6 +205,7 @@ export async function getTrackedCities(supabase: SupabaseClient): Promise<Tracke
   const { data, error } = await supabase
     .from('tracked_cities')
     .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at')
+    .neq('country', '')
     .order('city', { ascending: true })
 
   if (error) throw error
