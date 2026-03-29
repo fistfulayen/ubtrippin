@@ -115,11 +115,16 @@ export async function GET(request: Request) {
     if (!error) {
       // Velvet Rope: block new accounts created via OAuth without an invite.
       // Supabase auto-creates users on first OAuth sign-in. If the account
-      // was just created (within 60 s) and has no invite record, reject it.
-      const { data: { user: oauthUser } } = await supabase.auth.getUser()
-      if (oauthUser) {
+      // was just created (within 5 min) and has no invite record, reject it.
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+
+      if (userError) {
+        const sanitized = userError.message.replace(/\n/g, ' ').slice(0, 200)
+        console.error('[auth callback] error fetching user:', sanitized)
+      } else if (userData.user) {
+        const oauthUser = userData.user
         const createdAt = new Date(oauthUser.created_at).getTime()
-        const isNewAccount = !Number.isNaN(createdAt) && Date.now() - createdAt < 60_000
+        const isNewAccount = !Number.isNaN(createdAt) && Date.now() - createdAt < 5 * 60 * 1000
 
         if (isNewAccount) {
           const { data: inviteRecord } = await supabase
