@@ -143,7 +143,7 @@ function LoginContent() {
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-          <EmailForm redirectPath={redirectPath} referralCode={referralCode} />
+          <EmailForm redirectPath={redirectPath} />
 
           <p className="text-center text-xs text-slate-500">
             By signing in, you agree to our <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link>{' '}
