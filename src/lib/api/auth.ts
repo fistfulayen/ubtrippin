@@ -59,7 +59,8 @@ export async function validateApiKey(
 
   const keyHash = hashApiKey(rawKey)
 
-  // Use service-role client so we can look up any key regardless of RLS
+  // SECURITY (L-003): Service client needed for API key lookup — this runs pre-auth
+  // (no user session exists yet), so RLS cannot be applied. Read-only lookup only.
   const supabase = createSecretClient()
 
   const { data: apiKey, error } = await supabase

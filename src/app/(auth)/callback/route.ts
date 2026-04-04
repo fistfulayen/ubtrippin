@@ -113,6 +113,38 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // Velvet Rope: block new accounts created via OAuth without an invite.
+      // Supabase auto-creates users on first OAuth sign-in. If the account
+      // was just created (within 5 min) and has no invite record, reject it.
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+
+      if (userError) {
+        const sanitized = userError.message.replace(/\n/g, ' ').slice(0, 200)
+        console.error('[auth callback] error fetching user:', sanitized)
+      } else if (userData.user) {
+        const oauthUser = userData.user
+        const createdAt = new Date(oauthUser.created_at).getTime()
+        const isNewAccount = !Number.isNaN(createdAt) && Date.now() - createdAt < 5 * 60 * 1000
+
+        if (isNewAccount) {
+          const { data: inviteRecord } = await supabase
+            .from('invites')
+            .select('id')
+            .eq('invitee_id', oauthUser.id)
+            .maybeSingle()
+
+          if (!inviteRecord) {
+            // New user with no invite — sign them out and reject
+            await supabase.auth.signOut()
+            return redirectToLoginWithError(
+              origin,
+              'invite_required',
+              'UB Trippin is invite-only. Ask a member for an invite link to sign up.'
+            )
+          }
+        }
+      }
+
       await applyReferralAttribution(supabase, {
         redirectReferralCode,
         origin,
@@ -121,7 +153,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(redirectTo, origin))
     }
 
-    return redirectToLoginWithError(origin, 'auth_callback_error', error.message)
+    // SECURITY (L-005): Log internal error server-side; do not expose error.message in URL.
+    console.error('[auth/callback] exchangeCodeForSession failed:', error.message)
+    return redirectToLoginWithError(origin, 'auth_callback_error', 'Authentication failed. Please try again.')
   }
 
   if (tokenHash && type) {
@@ -139,7 +173,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(redirectTo, origin))
     }
 
-    return redirectToLoginWithError(origin, 'auth_callback_error', error.message)
+    // SECURITY (L-005): Log internal error server-side; do not expose error.message in URL.
+    console.error('[auth/callback] verifyOtp failed:', error.message)
+    return redirectToLoginWithError(origin, 'auth_callback_error', 'Token verification failed. Please try again.')
   }
 
   return redirectToLoginWithError(origin, 'auth_callback_error')

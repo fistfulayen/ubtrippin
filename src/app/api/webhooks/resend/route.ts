@@ -223,11 +223,9 @@ export async function POST(request: NextRequest) {
       }> = []
 
       if (fullEmail.attachments?.length) {
-        const { createClient: createServiceClient } = await import('@supabase/supabase-js')
-        const storageClient = createServiceClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SECRET_KEY!
-        )
+        // SECURITY (L-003): Using createSecretClient() for Storage uploads. Supabase Storage
+        // bucket operations are not user-scoped — service role required for email-attachments bucket.
+        const storageClient = createSecretClient()
 
         for (const attachment of fullEmail.attachments) {
           if (attachment.content_type === 'application/pdf') {

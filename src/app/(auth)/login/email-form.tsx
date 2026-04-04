@@ -4,12 +4,11 @@ import { useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { buildOAuthCallbackUrl } from '@/lib/supabase/auth'
 
-type Mode = 'sign_in' | 'sign_up' | 'magic_link' | 'forgot_password'
+type Mode = 'sign_in' | 'magic_link' | 'forgot_password'
 
 type FieldErrors = {
   email?: string
   password?: string
-  confirmPassword?: string
   form?: string
 }
 
@@ -22,10 +21,6 @@ function getFriendlyAuthError(message: string): string {
 
   if (normalized.includes('email not confirmed')) {
     return 'Please confirm your email before signing in.'
-  }
-
-  if (normalized.includes('user already registered')) {
-    return 'An account with this email already exists. Try signing in.'
   }
 
   return message
@@ -42,11 +37,10 @@ interface EmailFormProps {
   referralCode?: string | null
 }
 
-export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
+export function EmailForm({ redirectPath }: EmailFormProps) {
   const [mode, setMode] = useState<Mode>('sign_in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
   const [errors, setErrors] = useState<FieldErrors>({})
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -55,8 +49,6 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
     switch (mode) {
       case 'sign_in':
         return 'Sign In'
-      case 'sign_up':
-        return 'Create Account'
       case 'magic_link':
         return 'Send Magic Link'
       case 'forgot_password':
@@ -74,7 +66,6 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
   function switchMode(nextMode: Mode) {
     setMode(nextMode)
     setPassword('')
-    setConfirmPassword('')
     resetStatus()
   }
 
@@ -85,19 +76,9 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
     const nextErrors: FieldErrors = {}
     nextErrors.email = validateEmail(email)
 
-    if (mode === 'sign_in' || mode === 'sign_up') {
+    if (mode === 'sign_in') {
       if (!password) {
         nextErrors.password = 'Password is required.'
-      } else if (mode === 'sign_up' && password.length < 8) {
-        nextErrors.password = 'Password must be at least 8 characters.'
-      }
-    }
-
-    if (mode === 'sign_up') {
-      if (!confirmPassword) {
-        nextErrors.confirmPassword = 'Please confirm your password.'
-      } else if (confirmPassword !== password) {
-        nextErrors.confirmPassword = 'Passwords do not match.'
       }
     }
 
@@ -122,25 +103,6 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
         }
 
         window.location.href = redirectPath
-        return
-      }
-
-      if (mode === 'sign_up') {
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            emailRedirectTo: buildOAuthCallbackUrl(window.location.origin, redirectPath),
-            data: referralCode ? { referral_code: referralCode } : undefined,
-          },
-        })
-
-        if (error) {
-          setErrors({ form: getFriendlyAuthError(error.message) })
-          return
-        }
-
-        setSuccessMessage('Account created. Check your email to confirm your account.')
         return
       }
 
@@ -179,20 +141,13 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="grid grid-cols-3 gap-2 text-sm">
         <button
           type="button"
           className={`rounded-lg px-3 py-2 transition ${mode === 'sign_in' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
           onClick={() => switchMode('sign_in')}
         >
           Sign In
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg px-3 py-2 transition ${mode === 'sign_up' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
-          onClick={() => switchMode('sign_up')}
-        >
-          Sign Up
         </button>
         <button
           type="button"
@@ -229,7 +184,7 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
           {errors.email ? <p className="mt-1 text-sm text-red-600">{errors.email}</p> : null}
         </div>
 
-        {(mode === 'sign_in' || mode === 'sign_up') && (
+        {mode === 'sign_in' && (
           <div>
             <label htmlFor="password" className="mb-1 block text-sm font-medium text-slate-700">
               Password
@@ -238,36 +193,14 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
               id="password"
               name="password"
               type="password"
-              autoComplete={mode === 'sign_in' ? 'current-password' : 'new-password'}
+              autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder={mode === 'sign_up' ? 'At least 8 characters' : 'Enter your password'}
+              placeholder="Enter your password"
               disabled={submitting}
             />
             {errors.password ? <p className="mt-1 text-sm text-red-600">{errors.password}</p> : null}
-          </div>
-        )}
-
-        {mode === 'sign_up' && (
-          <div>
-            <label htmlFor="confirmPassword" className="mb-1 block text-sm font-medium text-slate-700">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(event) => setConfirmPassword(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder="Re-enter password"
-              disabled={submitting}
-            />
-            {errors.confirmPassword ? (
-              <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-            ) : null}
           </div>
         )}
 
@@ -282,6 +215,10 @@ export function EmailForm({ redirectPath, referralCode }: EmailFormProps) {
           {submitting ? 'Please wait...' : submitLabel}
         </button>
       </form>
+
+      <p className="text-center text-xs text-slate-500">
+        Don&apos;t have an account? You need an invite link to sign up.
+      </p>
     </div>
   )
 }
