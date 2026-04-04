@@ -153,7 +153,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(redirectTo, origin))
     }
 
-    return redirectToLoginWithError(origin, 'auth_callback_error', error.message)
+    // SECURITY (L-005): Log internal error server-side; do not expose error.message in URL.
+    console.error('[auth/callback] exchangeCodeForSession failed:', error.message)
+    return redirectToLoginWithError(origin, 'auth_callback_error', 'Authentication failed. Please try again.')
   }
 
   if (tokenHash && type) {
@@ -171,7 +173,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(redirectTo, origin))
     }
 
-    return redirectToLoginWithError(origin, 'auth_callback_error', error.message)
+    // SECURITY (L-005): Log internal error server-side; do not expose error.message in URL.
+    console.error('[auth/callback] verifyOtp failed:', error.message)
+    return redirectToLoginWithError(origin, 'auth_callback_error', 'Token verification failed. Please try again.')
   }
 
   return redirectToLoginWithError(origin, 'auth_callback_error')

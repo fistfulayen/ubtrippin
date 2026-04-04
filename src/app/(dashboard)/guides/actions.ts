@@ -83,7 +83,9 @@ export async function updateGuideMetadata(
     .eq('user_id', user.id)
 
   if (error) {
-    return { error: error.message }
+    // SECURITY (L-005): Never return raw error.message — log server-side, return generic message.
+    console.error('[guides/actions] updateGuideLocation failed:', error.message)
+    return { error: 'Failed to update guide location. Please try again.' }
   }
 
   revalidatePath(`/guides/${guideId}`)

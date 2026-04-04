@@ -110,6 +110,7 @@ async function getParticipantUserIds(ownerUserId: string, tripId?: string): Prom
     return [ownerUserId]
   }
 
+  // SECURITY (L-003): Service client to look up collaborators across trips for webhook fan-out.
   const supabase = createSecretClient()
   const { data: collaborators } = await supabase
     .from('trip_collaborators')
@@ -137,6 +138,8 @@ async function queueDeliveriesForWebhooks(
     return { webhookCount: 0, deliveryCount: 0 }
   }
 
+  // SECURITY (L-003): Service client for async webhook delivery — runs outside any user
+  // request context, queues deliveries for multiple users simultaneously.
   const supabase = createSecretClient()
   const timestamp = new Date().toISOString()
   const sanitizedData = removeSensitiveFields(data) as Record<string, unknown>
@@ -189,6 +192,8 @@ export async function dispatchWebhookEvent(
 ): Promise<DispatchWebhookEventResult> {
   const participantIds = await getParticipantUserIds(params.userId, params.tripId)
 
+  // SECURITY (L-003): Service client for webhook dispatch — must query webhooks across multiple
+  // participant user IDs (trip collaborators). User-scoped client can't see other users' webhooks.
   const supabase = createSecretClient()
   const { data: webhooks, error } = await supabase
     .from('webhooks')
@@ -209,6 +214,8 @@ export async function queueWebhookTestDelivery(
   webhookId: string,
   data: Record<string, unknown>
 ): Promise<{ queued: boolean }> {
+  // SECURITY (L-003): Service client for test delivery — webhook owner lookup runs outside
+  // any user auth context (admin test action, initiated server-side).
   const supabase = createSecretClient()
   const { data: webhook, error } = await supabase
     .from('webhooks')
