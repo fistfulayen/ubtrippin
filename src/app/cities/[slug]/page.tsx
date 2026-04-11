@@ -4,19 +4,22 @@ import { createClient } from '@/lib/supabase/server'
 import { EventCard } from '@/components/events/event-card'
 import { EventFeedbackForm } from '@/components/events/event-feedback-form'
 import { EventFilterBar } from '@/components/events/event-filter-bar'
+import { ShelfFilterBar } from '@/components/events/shelf-filter-bar'
 import { EventUpsellOverlay } from '@/components/events/event-upsell-overlay'
 import { PipelineTransparency } from '@/components/events/pipeline-transparency'
 import {
   flagEmoji,
   getCityEventsPageData,
   getMonthWindow,
+  getTrackedCityBySlug,
   trimEventsForFreeTier,
 } from '@/lib/events/queries'
+import { isOutgoingStale, refreshOutgoingForCity } from '@/lib/events/outgoing'
 import { getUserTier } from '@/lib/usage/limits'
 
 interface CityPageProps {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ from?: string; to?: string; segment?: string }>
+  searchParams: Promise<{ from?: string; to?: string; segment?: string; shelf?: string }>
 }
 
 /** Escape strings for safe embedding in JSON-LD <script> tags */
@@ -99,6 +102,17 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   const { slug } = await params
   const search = await searchParams
   const supabase = await createClient()
+
+  // Refresh Outgoing cache before loading page data (not in generateMetadata to avoid double-fetch)
+  const cityForRefresh = await getTrackedCityBySlug(supabase, slug)
+  if (cityForRefresh && isOutgoingStale(cityForRefresh)) {
+    try {
+      await refreshOutgoingForCity(cityForRefresh)
+    } catch (err) {
+      console.error('[outgoing] refresh failed for', slug, err)
+    }
+  }
+
   // If trip-scoped (from/to params), show events for that date range.
   // Otherwise show ALL future events for the city — the full calendar view.
   const today = new Date().toISOString().slice(0, 10)
@@ -113,10 +127,18 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   } = await supabase.auth.getUser()
 
   const tier = user ? await getUserTier(user.id, supabase) : 'free'
+  const hasOutgoingShelves = data.outgoingShelves.length > 0
   const activeSegment = search.segment
-  const activeEvents = activeSegment
-    ? data.segments.find((segment) => segment.key === activeSegment)?.events ?? []
-    : data.events
+  const activeShelf = search.shelf
+
+  let activeEvents: typeof data.events
+  if (hasOutgoingShelves && activeShelf) {
+    activeEvents = data.outgoingShelves.find((s) => s.slug === activeShelf)?.events ?? []
+  } else if (activeSegment) {
+    activeEvents = data.segments.find((segment) => segment.key === activeSegment)?.events ?? []
+  } else {
+    activeEvents = data.events
+  }
 
   const isTripScoped = Boolean(search.from && search.to)
   const shouldUpsell = Boolean(user && tier === 'free' && isTripScoped)
@@ -148,7 +170,11 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
           </div>
         </section>
 
-        <EventFilterBar segments={data.segments} activeSegment={activeSegment} />
+        {hasOutgoingShelves ? (
+          <ShelfFilterBar shelves={data.outgoingShelves} activeShelf={activeShelf} />
+        ) : (
+          <EventFilterBar segments={data.segments} activeSegment={activeSegment} />
+        )}
 
         <section className="relative space-y-8">
           {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (

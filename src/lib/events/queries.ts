@@ -9,10 +9,12 @@ import type {
   EventCategory,
   EventSegment,
   EventTier,
+  OutgoingShelfData,
   PipelineDiary,
   TrackedCity,
   VenueType,
 } from '@/types/events'
+import { isOutgoingStale, refreshOutgoingForCity, getOutgoingShelves } from '@/lib/events/outgoing'
 
 interface CityRow {
   id: string
@@ -25,6 +27,8 @@ interface CityRow {
   timezone: string | null
   hero_image_url: string | null
   last_refreshed_at: string | null
+  h3_cell: string | null
+  event_source: string
 }
 
 interface EventRow {
@@ -77,6 +81,7 @@ function toTrackedCity(row: CityRow): TrackedCity {
     ...row,
     latitude: row.latitude === null ? null : Number(row.latitude),
     longitude: row.longitude === null ? null : Number(row.longitude),
+    event_source: (row.event_source as 'outgoing' | 'legacy') ?? 'legacy',
   }
 }
 
@@ -204,7 +209,7 @@ export function getMonthWindow(date = new Date()): { from: string; to: string } 
 export async function getTrackedCities(supabase: SupabaseClient): Promise<TrackedCity[]> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at')
+    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source')
     .neq('country', '')
     .order('city', { ascending: true })
 
@@ -215,7 +220,7 @@ export async function getTrackedCities(supabase: SupabaseClient): Promise<Tracke
 export async function getTrackedCityBySlug(supabase: SupabaseClient, slug: string): Promise<TrackedCity | null> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at')
+    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -399,9 +404,12 @@ export async function getCityEventsPageData(
   const city = await getTrackedCityBySlug(supabase, slug)
   if (!city) return null
 
-  const [events, pipelineDiary] = await Promise.all([
+  const isOutgoing = city.event_source === 'outgoing'
+
+  const [events, pipelineDiary, outgoingShelves] = await Promise.all([
     getCityEvents(supabase, city.id, options),
     getPipelineDiaryForCity(supabase, city.id),
+    isOutgoing ? getOutgoingShelves(supabase, city.id) : Promise.resolve([] as OutgoingShelfData[]),
   ])
 
   return {
@@ -410,5 +418,6 @@ export async function getCityEventsPageData(
     segments: buildEventSegments(events),
     distanceGroups: buildDistanceGroups(events),
     pipelineDiary,
+    outgoingShelves,
   }
 }
