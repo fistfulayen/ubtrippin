@@ -83,8 +83,13 @@ async function fetchUnsplashHero(cityName: string): Promise<string | null> {
 
 // ─── API Client ────────────────────────────────────────────────────────────
 
+const FETCH_TIMEOUT_MS = 10_000
+
 async function fetchH3Cell(lat: number, lng: number): Promise<string> {
-  const res = await fetch(`${BASE_URL}/h3?lat=${lat}&lng=${lng}`, { headers: headers() })
+  const res = await fetch(`${BASE_URL}/h3?lat=${lat}&lng=${lng}`, {
+    headers: headers(),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  })
   if (!res.ok) throw new Error(`Outgoing /h3 failed: ${res.status}`)
   const data: H3Response = await res.json()
   return data.h3_cell
@@ -93,7 +98,7 @@ async function fetchH3Cell(lat: number, lng: number): Promise<string> {
 async function fetchHomescreen(h3Cell: string): Promise<OutgoingHomescreenResponse> {
   const res = await fetch(
     `${BASE_URL}/homescreen?h3_cell=${h3Cell}&limit=250&shelved=true`,
-    { headers: headers() }
+    { headers: headers(), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
   )
   if (!res.ok) throw new Error(`Outgoing /homescreen failed: ${res.status}`)
   return res.json()
@@ -200,12 +205,6 @@ export async function refreshOutgoingForCity(city: TrackedCity): Promise<void> {
 
   const supabase = createSecretClient()
 
-  // Optimistic lock: stamp now so concurrent requests skip the refresh
-  await supabase
-    .from('tracked_cities')
-    .update({ last_refreshed_at: new Date().toISOString() })
-    .eq('id', city.id)
-
   // 1. Resolve / cache H3 cell + hero image
   let h3Cell = city.h3_cell
   const cityUpdates: Record<string, unknown> = {}
@@ -236,28 +235,44 @@ export async function refreshOutgoingForCity(city: TrackedCity): Promise<void> {
 
   if (seen.size === 0) return
 
-  // 4. Delete old Outgoing events for this city, insert fresh
-  await supabase.from('city_events').delete().eq('city_id', city.id).eq('source', 'outgoing')
+  // 4. Insert new events first, then delete old ones (ensures data availability on insert failure)
   const rows = Array.from(seen.values()).map((a) => mapActivityToRow(a, city.id))
   if (rows.length > 0) {
     const { error } = await supabase.from('city_events').insert(rows)
     if (error) throw new Error(`Failed to insert Outgoing events: ${error.message}`)
   }
+  // Safe to delete old events now that new ones are committed
+  await supabase.from('city_events').delete()
+    .eq('city_id', city.id)
+    .eq('source', 'outgoing')
+    .lt('last_verified_at', new Date(Date.now() - 60_000).toISOString())
 
-  // 5. Delete old shelves, insert fresh
-  await supabase.from('outgoing_shelves').delete().eq('city_id', city.id)
+  // 5. Upsert shelves (unique on city_id + shelf_slug), then remove stale ones
   const shelfRows = data.shelves.map((shelf, i) => ({
     city_id: city.id,
     shelf_slug: shelf.slug,
     display_name: shelf.display_name,
     sort_order: i,
     activity_ids: shelf.activities.map((a) => a.activity_id),
+    created_at: new Date().toISOString(),
   }))
   if (shelfRows.length > 0) {
-    const { error } = await supabase.from('outgoing_shelves').insert(shelfRows)
-    if (error) throw new Error(`Failed to insert Outgoing shelves: ${error.message}`)
+    const { error } = await supabase.from('outgoing_shelves')
+      .upsert(shelfRows, { onConflict: 'city_id,shelf_slug' })
+    if (error) throw new Error(`Failed to upsert Outgoing shelves: ${error.message}`)
   }
+  // Remove shelves no longer returned by the API
+  const currentSlugs = data.shelves.map((s) => s.slug)
+  await supabase.from('outgoing_shelves')
+    .delete()
+    .eq('city_id', city.id)
+    .not('shelf_slug', 'in', `(${currentSlugs.join(',')})`)
 
+  // 6. Mark refresh complete — only after all writes succeed
+  await supabase
+    .from('tracked_cities')
+    .update({ last_refreshed_at: new Date().toISOString() })
+    .eq('id', city.id)
 }
 
 // ─── Query Helpers ─────────────────────────────────────────────────────────

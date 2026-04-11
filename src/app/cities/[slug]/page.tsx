@@ -121,7 +121,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
       const { createSecretClient } = await import('@/lib/supabase/service')
       readClient = createSecretClient()
     } catch (err) {
-      console.error('[outgoing] refresh failed for', slug, err)
+      console.error('[outgoing] refresh failed for', slug.replace(/[\n\r]/g, '').slice(0, 100), err)
     }
   }
 
