@@ -165,7 +165,10 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
               </p>
               <h1 className="font-serif text-5xl">What&apos;s On in {data.city.city}</h1>
               <p className="text-lg text-white/80">
-                {visibleEvents.length} curated picks between {from} and {to}.
+                {visibleEvents.length} curated picks
+                {to
+                  ? ` between ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and ${new Date(to + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : ` from ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}.
               </p>
             </div>
             {hasOutgoingShelves ? (
