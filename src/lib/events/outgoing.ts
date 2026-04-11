@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createSecretClient } from '@/lib/supabase/service'
-import type { CityEvent, EventCategory, EventTier, OutgoingShelfData, TrackedCity } from '@/types/events'
+import type { CityEvent, EventCategory, OutgoingShelfData, TrackedCity } from '@/types/events'
 
 // ─── Outgoing API Types ────────────────────────────────────────────────────
 
@@ -156,12 +156,6 @@ function mapCategory(displayLabel: string): EventCategory {
   return 'other'
 }
 
-function deriveTier(activity: OutgoingActivity): EventTier {
-  if (activity.is_bookable && activity.ticket_price && activity.ticket_price.min >= 30) return 'major'
-  if (activity.is_bookable) return 'medium'
-  return 'local'
-}
-
 function mapActivityToRow(activity: OutgoingActivity, cityId: string) {
   const today = new Date().toISOString().slice(0, 10)
   let startDate = today
@@ -185,19 +179,17 @@ function mapActivityToRow(activity: OutgoingActivity, cityId: string) {
     venue_name: activity.semantic_location,
     venue_type: null,
     category: mapCategory(activity.display_label),
-    event_tier: deriveTier(activity),
+    event_tier: 'medium' as const,
     start_date: startDate,
     end_date: null,
     time_info: activity.next_datetime
       ? new Date(activity.next_datetime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
       : null,
-    significance_score: activity.is_bookable ? 70 : 50,
+    significance_score: 50,
     source: 'outgoing',
     source_url: `outgoing:${activity.activity_id}`,
     price_info: activity.ticket_price?.label ?? null,
-    booking_url: activity.is_bookable && activity.booking_domain
-      ? `https://${activity.booking_domain}.com`
-      : null,
+    booking_url: null,
     tags: activity.highlights,
     lineup: null,
     last_verified_at: new Date().toISOString(),

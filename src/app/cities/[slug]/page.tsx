@@ -187,9 +187,18 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
         )}
 
         <section className="relative space-y-8">
-          {hasOutgoingShelves ? (
-            /* Outgoing: render events grouped by shelf */
-            activeShelf ? (
+          {hasOutgoingShelves ? (() => {
+            // Build featured picks: first event from each shelf
+            const featuredIds = new Set<string>()
+            const featured = data.outgoingShelves
+              .map((shelf) => shelf.events[0])
+              .filter((e): e is typeof e & object => {
+                if (!e || featuredIds.has(e.id)) return false
+                featuredIds.add(e.id)
+                return true
+              })
+
+            return activeShelf ? (
               /* Single shelf selected — flat grid */
               <div className="grid gap-5 lg:grid-cols-2">
                 {visibleEvents.map((event) => (
@@ -197,19 +206,32 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
                 ))}
               </div>
             ) : (
-              /* "All" — render each shelf as a section */
-              data.outgoingShelves.map((shelf) => (
-                <div key={shelf.slug} className="space-y-4">
-                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{shelf.displayName}</p>
+              /* "All" — featured row then shelf sections (deduped) */
+              <>
+                {featured.length > 0 ? (
                   <div className="grid gap-5 lg:grid-cols-2">
-                    {shelf.events.map((event) => (
-                      <EventCard key={event.id} event={event} />
+                    {featured.map((event) => (
+                      <EventCard key={event.id} event={{ ...event, event_tier: 'major' }} />
                     ))}
                   </div>
-                </div>
-              ))
+                ) : null}
+                {data.outgoingShelves.map((shelf) => {
+                  const deduped = shelf.events.filter((e) => !featuredIds.has(e.id))
+                  if (deduped.length === 0) return null
+                  return (
+                    <div key={shelf.slug} className="space-y-4">
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{shelf.displayName}</p>
+                      <div className="grid gap-5 lg:grid-cols-2">
+                        {deduped.map((event) => (
+                          <EventCard key={event.id} event={event} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
             )
-          ) : (
+          })() : (
             /* Legacy: render events grouped by tier */
             <>
               {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (
