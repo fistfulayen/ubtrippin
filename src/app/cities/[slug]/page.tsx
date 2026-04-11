@@ -222,7 +222,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
                   </div>
                 ) : null}
                 {data.outgoingShelves.map((shelf) => {
-                  const deduped = shelf.events.filter((e) => !featuredIds.has(e.id))
+                  const deduped = shelf.events.filter((e) => !featuredIds.has(e.id)).slice(0, 6)
                   if (deduped.length === 0) return null
                   return (
                     <div key={shelf.slug} className="space-y-4">
