@@ -67,6 +67,20 @@ function headers(): Record<string, string> {
   }
 }
 
+// ─── Unsplash ──────────────────────────────────────────────────────────────
+
+async function fetchUnsplashHero(cityName: string): Promise<string | null> {
+  const key = process.env.UNSPLASH_ACCESS_KEY
+  if (!key || key.startsWith('your_')) return null
+  const res = await fetch(
+    `https://api.unsplash.com/search/photos?query=${encodeURIComponent(cityName + ' city skyline')}&orientation=landscape&per_page=1`,
+    { headers: { Authorization: `Client-ID ${key}` } }
+  )
+  if (!res.ok) return null
+  const data = await res.json()
+  return data.results?.[0]?.urls?.regular ?? null
+}
+
 // ─── API Client ────────────────────────────────────────────────────────────
 
 async function fetchH3Cell(lat: number, lng: number): Promise<string> {
@@ -212,11 +226,19 @@ export async function refreshOutgoingForCity(city: TrackedCity): Promise<void> {
     .update({ last_refreshed_at: new Date().toISOString() })
     .eq('id', city.id)
 
-  // 1. Resolve / cache H3 cell
+  // 1. Resolve / cache H3 cell + hero image
   let h3Cell = city.h3_cell
+  const cityUpdates: Record<string, unknown> = {}
   if (!h3Cell) {
     h3Cell = await fetchH3Cell(city.latitude, city.longitude)
-    await supabase.from('tracked_cities').update({ h3_cell: h3Cell }).eq('id', city.id)
+    cityUpdates.h3_cell = h3Cell
+  }
+  if (!city.hero_image_url) {
+    const heroUrl = await fetchUnsplashHero(city.city)
+    if (heroUrl) cityUpdates.hero_image_url = heroUrl
+  }
+  if (Object.keys(cityUpdates).length > 0) {
+    await supabase.from('tracked_cities').update(cityUpdates).eq('id', city.id)
   }
 
   // 2. Fetch both shelved (for themed tabs) and unshelved (for all activities)
