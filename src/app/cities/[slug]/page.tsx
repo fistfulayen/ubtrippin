@@ -104,22 +104,28 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   const search = await searchParams
   const supabase = await createClient()
 
-  // Refresh Outgoing cache before loading page data (not in generateMetadata to avoid double-fetch)
-  const cityForRefresh = await getTrackedCityBySlug(supabase, slug)
-  if (cityForRefresh && isOutgoingStale(cityForRefresh)) {
-    try {
-      await refreshOutgoingForCity(cityForRefresh)
-    } catch (err) {
-      console.error('[outgoing] refresh failed for', slug, err)
-    }
-  }
-
   // If trip-scoped (from/to params), show events for that date range.
   // Otherwise show ALL future events for the city — the full calendar view.
   const today = new Date().toISOString().slice(0, 10)
   const from = search.from || today
   const to = search.to || undefined
-  const data = await getCityEventsPageData(supabase, slug, { from, to })
+
+  // Refresh Outgoing cache if stale, then load page data.
+  // Use the secret client for the read when we just refreshed to avoid
+  // read-after-write lag on the user-scoped client.
+  const cityForRefresh = await getTrackedCityBySlug(supabase, slug)
+  let readClient = supabase
+  if (cityForRefresh && isOutgoingStale(cityForRefresh)) {
+    try {
+      await refreshOutgoingForCity(cityForRefresh)
+      const { createSecretClient } = await import('@/lib/supabase/service')
+      readClient = createSecretClient()
+    } catch (err) {
+      console.error('[outgoing] refresh failed for', slug, err)
+    }
+  }
+
+  const data = await getCityEventsPageData(readClient, slug, { from, to })
 
   if (!data) notFound()
 
