@@ -59,7 +59,7 @@ export function EventCard({
     <Card className={cn('overflow-hidden rounded-2xl shadow-sm', getEventCardClasses(event))}>
       {isMajor && safeHref(event.image_url) ? (
         <div className="relative h-56 w-full overflow-hidden bg-slate-100">
-          <img src={safeHref(event.image_url)!} alt={event.title} className="h-full w-full object-cover" />
+          <img src={safeHref(event.image_url)!} alt={event.title} loading="eager" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/20 to-transparent" />
           <div className="absolute left-4 top-4">
             <Badge className="rounded-full bg-white/90 text-slate-900">Featured</Badge>
@@ -71,7 +71,7 @@ export function EventCard({
           /* Compact card with thumbnail — modelled on the Bilt ShelfCard */
           <div className="flex gap-4">
             <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100">
-              <img src={safeHref(event.image_url)!} alt={event.title} className="h-full w-full object-cover" />
+              <img src={safeHref(event.image_url)!} alt={event.title} loading="eager" className="h-full w-full object-cover" />
             </div>
             <div className="min-w-0 flex-1 space-y-1">
               <h3 className="text-sm font-semibold text-slate-950">{event.title}</h3>
