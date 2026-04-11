@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -60,10 +59,6 @@ export function ShelfFilterBar({
             {shelf.displayName}
           </Link>
         ))}
-        <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-slate-400">
-          <Image src="/outgoing-avatar.svg" alt="Outgoing" width={18} height={18} className="rounded" />
-          Powered by Outgoing
-        </span>
       </div>
     </div>
   )

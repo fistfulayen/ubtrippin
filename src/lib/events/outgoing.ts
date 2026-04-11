@@ -76,11 +76,24 @@ async function fetchH3Cell(lat: number, lng: number): Promise<string> {
   return data.h3_cell
 }
 
-async function fetchHomescreen(h3Cell: string): Promise<OutgoingHomescreenResponse> {
-  const res = await fetch(`${BASE_URL}/homescreen?h3_cell=${h3Cell}&limit=250&shelved=true`, {
-    headers: headers(),
-  })
-  if (!res.ok) throw new Error(`Outgoing /homescreen failed: ${res.status}`)
+const USUAL_PLANS = ['date-nights', 'fun-with-kids', 'staying-active', 'meet-new-people']
+
+async function fetchHomescreenShelved(h3Cell: string): Promise<OutgoingHomescreenResponse> {
+  const plansParam = USUAL_PLANS.map((p) => `usual_plans=${p}`).join('&')
+  const res = await fetch(
+    `${BASE_URL}/homescreen?h3_cell=${h3Cell}&limit=250&shelved=true&${plansParam}`,
+    { headers: headers() }
+  )
+  if (!res.ok) throw new Error(`Outgoing /homescreen shelved failed: ${res.status}`)
+  return res.json()
+}
+
+async function fetchHomescreenAll(h3Cell: string): Promise<OutgoingHomescreenResponse> {
+  const res = await fetch(
+    `${BASE_URL}/homescreen?h3_cell=${h3Cell}&limit=250`,
+    { headers: headers() }
+  )
+  if (!res.ok) throw new Error(`Outgoing /homescreen all failed: ${res.status}`)
   return res.json()
 }
 
@@ -206,19 +219,31 @@ export async function refreshOutgoingForCity(city: TrackedCity): Promise<void> {
     await supabase.from('tracked_cities').update({ h3_cell: h3Cell }).eq('id', city.id)
   }
 
-  // 2. Fetch shelved homescreen
-  const data = await fetchHomescreen(h3Cell)
-  if (data.shelves.length === 0) return
+  // 2. Fetch both shelved (for themed tabs) and unshelved (for all activities)
+  const [shelved, all] = await Promise.all([
+    fetchHomescreenShelved(h3Cell),
+    fetchHomescreenAll(h3Cell),
+  ])
 
-  // 3. Collect unique activities across all shelves
+  // 3. Collect ALL unique activities (unshelved has the complete set)
   const seen = new Map<string, OutgoingActivity>()
-  for (const shelf of data.shelves) {
+  for (const shelf of all.shelves) {
     for (const activity of shelf.activities) {
       if (!seen.has(activity.activity_id)) {
         seen.set(activity.activity_id, activity)
       }
     }
   }
+  // Also include any shelved-only activities
+  for (const shelf of shelved.shelves) {
+    for (const activity of shelf.activities) {
+      if (!seen.has(activity.activity_id)) {
+        seen.set(activity.activity_id, activity)
+      }
+    }
+  }
+
+  if (seen.size === 0) return
 
   // 4. Delete old Outgoing events for this city, insert fresh
   await supabase.from('city_events').delete().eq('city_id', city.id).eq('source', 'outgoing')
@@ -228,9 +253,9 @@ export async function refreshOutgoingForCity(city: TrackedCity): Promise<void> {
     if (error) throw new Error(`Failed to insert Outgoing events: ${error.message}`)
   }
 
-  // 5. Delete old shelves, insert fresh
+  // 5. Delete old shelves, insert fresh (from the shelved/persona response)
   await supabase.from('outgoing_shelves').delete().eq('city_id', city.id)
-  const shelfRows = data.shelves.map((shelf, i) => ({
+  const shelfRows = shelved.shelves.map((shelf, i) => ({
     city_id: city.id,
     shelf_slug: shelf.slug,
     display_name: shelf.display_name,

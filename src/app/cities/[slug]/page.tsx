@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventCard } from '@/components/events/event-card'
@@ -167,6 +168,12 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
                 {visibleEvents.length} curated picks between {from} and {to}.
               </p>
             </div>
+            {hasOutgoingShelves ? (
+              <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm sm:bottom-8 sm:right-8">
+                <Image src="/outgoing-avatar.svg" alt="Outgoing" width={18} height={18} className="rounded" />
+                <span className="text-xs font-medium text-white/90">Powered by Outgoing</span>
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -177,46 +184,73 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
         )}
 
         <section className="relative space-y-8">
-          {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Major Events</p>
+          {hasOutgoingShelves ? (
+            /* Outgoing: render events grouped by shelf */
+            activeShelf ? (
+              /* Single shelf selected — flat grid */
               <div className="grid gap-5 lg:grid-cols-2">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'major')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
+                {visibleEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
               </div>
-            </div>
-          ) : null}
+            ) : (
+              /* "All" — render each shelf as a section */
+              data.outgoingShelves.map((shelf) => (
+                <div key={shelf.slug} className="space-y-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{shelf.displayName}</p>
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {shelf.events.map((event) => (
+                      <EventCard key={event.id} event={event} />
+                    ))}
+                  </div>
+                </div>
+              ))
+            )
+          ) : (
+            /* Legacy: render events grouped by tier */
+            <>
+              {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Major Events</p>
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'major')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </div>
+              ) : null}
 
-          {visibleEvents.filter((event) => event.event_tier === 'medium').length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Worth Planning Around</p>
-              <div className="space-y-4">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'medium')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
-              </div>
-            </div>
-          ) : null}
+              {visibleEvents.filter((event) => event.event_tier === 'medium').length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Worth Planning Around</p>
+                  <div className="space-y-4">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'medium')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </div>
+              ) : null}
 
-          {visibleEvents.filter((event) => event.event_tier === 'local').length > 0 ? (
-            <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" open>
-              <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Local Finds
-              </summary>
-              <div className="mt-4 space-y-3">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'local')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
-              </div>
-            </details>
-          ) : null}
+              {visibleEvents.filter((event) => event.event_tier === 'local').length > 0 ? (
+                <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" open>
+                  <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Local Finds
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'local')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </details>
+              ) : null}
+            </>
+          )}
 
           <EventUpsellOverlay visible={shouldUpsell} hiddenCount={hiddenCount} />
         </section>
