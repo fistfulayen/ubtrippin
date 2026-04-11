@@ -168,7 +168,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
                 {visibleEvents.length} curated picks
                 {to
                   ? ` between ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and ${new Date(to + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
-                  : ` from ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}.
+                  : ` in ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}.
               </p>
             </div>
             {hasOutgoingShelves ? (
