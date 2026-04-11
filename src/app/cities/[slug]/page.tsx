@@ -172,10 +172,10 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
               </p>
             </div>
             {hasOutgoingShelves ? (
-              <div className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm sm:bottom-8 sm:right-8">
+              <a href="https://outgoing.world" target="_blank" rel="noreferrer noopener" className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm transition hover:bg-white/25 sm:bottom-8 sm:right-8">
                 <Image src="/outgoing-avatar.svg" alt="Outgoing" width={18} height={18} className="rounded" />
                 <span className="text-xs font-medium text-white/90">Powered by Outgoing</span>
-              </div>
+              </a>
             ) : null}
           </div>
         </section>
