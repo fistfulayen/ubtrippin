@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 #
 # ubt — UB Trippin CLI
-# Talk directly to Supabase REST API
+# Manage travel from the terminal
 #
 UBT_VERSION="2.0.0"
 set -euo pipefail
 
 # Load config
 CONFIG_FILE="${UBT_CONFIG:-$HOME/.ubt/config}"
+REPO_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
 if [ -f "$CONFIG_FILE" ]; then
   source "$CONFIG_FILE"
 fi
@@ -15,23 +16,7 @@ fi
 # Can also be set via env vars
 SUPABASE_URL="${UBT_SUPABASE_URL:-${SUPABASE_URL:-}}"
 SUPABASE_KEY="${UBT_SUPABASE_KEY:-${SUPABASE_KEY:-}}"
-
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-  # Try loading from .env.local in the repo
-  REPO_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-  if [ -f "$REPO_DIR/.env.local" ]; then
-    SUPABASE_URL=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
-    SUPABASE_KEY=$(grep '^SUPABASE_SECRET_KEY=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
-  fi
-fi
-
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-  echo "Error: Supabase credentials not configured." >&2
-  echo "Set UBT_SUPABASE_URL and UBT_SUPABASE_KEY, or create ~/.ubt/config" >&2
-  exit 1
-fi
-
-API="${SUPABASE_URL}/rest/v1"
+API=""
 API_V1="${UBT_API_URL:-https://www.ubtrippin.xyz/api/v1}"
 API_V1="${API_V1%/}"
 APP_URL="${UBT_APP_URL:-https://www.ubtrippin.xyz}"
@@ -50,8 +35,38 @@ EXIT_AUTH_ERROR=2
 EXIT_API_ERROR=3
 EXIT_DATA_ERROR=4
 
+_load_supabase_config() {
+  if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
+    API="${SUPABASE_URL%/}/rest/v1"
+    return 0
+  fi
+
+  if [ -f "$REPO_DIR/.env.local" ]; then
+    SUPABASE_URL=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
+    SUPABASE_KEY=$(grep '^SUPABASE_SECRET_KEY=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
+  fi
+
+  if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_KEY" ]; then
+    API="${SUPABASE_URL%/}/rest/v1"
+    return 0
+  fi
+
+  return 1
+}
+
+_require_supabase_config() {
+  if _load_supabase_config; then
+    return 0
+  fi
+
+  echo "Error: Supabase credentials not configured for this command." >&2
+  echo "Set UBT_SUPABASE_URL and UBT_SUPABASE_KEY, or create $REPO_DIR/.env.local" >&2
+  exit 1
+}
+
 # Helpers
 _curl() {
+  _require_supabase_config
   curl -s "$@" \
     -H "apikey: ${SUPABASE_KEY}" \
     -H "Authorization: Bearer ${SUPABASE_KEY}" \
@@ -604,6 +619,7 @@ cmd_tables() {
 }
 
 cmd_health() {
+  _require_supabase_config
   curl -s "${SUPABASE_URL}/rest/v1/" \
     -H "apikey: ${SUPABASE_KEY}" \
     -o /dev/null -w "Supabase: HTTP %{http_code} (%{time_total}s)\n"
