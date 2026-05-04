@@ -1138,6 +1138,71 @@ if cabin or seat:
 "
 }
 
+cmd_items_source() {
+  local item_id="${1:?Usage: ubt items source <item_id>}"
+  item_id=$(_resolve_item_id "$item_id")
+  local result
+  result=$(_api "${API_V1}/items/$(_urlencode "${item_id}")/source")
+
+  if [ "${FORMAT:-pretty}" = "json" ]; then
+    echo "$result" | _json
+    return
+  fi
+
+  echo "$result" | _python3c "
+import json, sys, textwrap
+payload = json.load(sys.stdin)
+if 'error' in payload:
+    print(f\"Error: {payload['error']['message']}\")
+    sys.exit(1)
+
+data = payload.get('data') or {}
+item = data.get('item') or {}
+email = data.get('source_email')
+details = item.get('details_json') or {}
+
+print('Item source:')
+print(f\"  item_id:       {item.get('id')}\")
+print(f\"  trip_id:       {item.get('trip_id')}\")
+print(f\"  summary:       {item.get('summary') or '-'}\")
+if item.get('confirmation_code'):
+    print(f\"  confirmation:  {item.get('confirmation_code')}\")
+booking_ref = details.get('booking_reference')
+if booking_ref:
+    print(f\"  booking_ref:   {booking_ref}\")
+
+if not email:
+    print('  source_email:  none')
+    sys.exit(0)
+
+print(f\"  source_email:  {email.get('id')}\")
+print(f\"  from:          {email.get('from_email') or '-'}\")
+print(f\"  to:            {email.get('to_email') or '-'}\")
+print(f\"  received:      {email.get('received_at') or '-'}\")
+print(f\"  subject:       {email.get('subject') or '-'}\")
+print(f\"  parse_status:  {email.get('parse_status') or '-'}\")
+
+attachments = email.get('attachments_json') or []
+if attachments:
+    print('  attachments:')
+    for idx, attachment in enumerate(attachments):
+        if not isinstance(attachment, dict):
+            continue
+        name = attachment.get('filename') or f'attachment-{idx}'
+        ctype = attachment.get('content_type') or '-'
+        print(f\"    [{idx}] {name} ({ctype})\")
+
+for label, key in [('body_text', 'body_text'), ('attachment_text', 'attachment_text')]:
+    value = email.get(key) or ''
+    if not value:
+        continue
+    print()
+    print(f\"{label}:\")
+    excerpt = value if len(value) <= 4000 else value[:4000] + '\\n...[truncated; use FORMAT=json for full text]'
+    print(textwrap.indent(excerpt.strip(), '  '))
+"
+}
+
 cmd_items_add() {
   _parse_quiet_flag "$@"
   set -- "${UBT_ARGS[@]}"
@@ -4004,6 +4069,7 @@ Commands:
   items list <trip_id>                  List items in a trip
   items search [--date Y-M-D] [--from Y-M-D] [--to Y-M-D] [--kind X] [--limit N]  Search items across all trips *
   items show <item_id>                  Show item details *
+  items source <item_id>                Show original source email for an item *
   items add <trip_id> --kind <k> --summary <text> [--provider X] [--start-ts X] [--end-ts X] [--start-date Y-M-D] [--end-date Y-M-D] [--start-location X] [--end-location X] [--details-json '{...}']  Add item *
   items update <item_id> [--summary X] [--start-location X] [--end-location X] [--status X]  Update item *
   items delete <item_id>                Delete an item *
@@ -4088,6 +4154,7 @@ Examples:
   ubt trips merge <target_id> <source_id>
   ubt items search --date 2026-03-13 --kind flight
   ubt items show <item_id>
+  ubt items source <item_id>
   ubt items add <trip_id> --kind flight --summary "UA 101 SFO to JFK" --start-ts 2026-04-10T08:30:00Z
   ubt items update <item_id> --status confirmed
   ubt items status <item_id>
@@ -4189,6 +4256,7 @@ case "${1:-}" in
       list) cmd_items_list "${3:?Usage: ubt items list <trip_id>}" ;;
       search) shift 2; cmd_items_search "$@" ;;
       show) cmd_items_show "${3:?Usage: ubt items show <item_id>}" ;;
+      source) cmd_items_source "${3:?Usage: ubt items source <item_id>}" ;;
       add) shift 2; cmd_items_add "$@" ;;
       update) shift 2; cmd_items_update "$@" ;;
       delete) shift 2; cmd_items_delete "$@" ;;
