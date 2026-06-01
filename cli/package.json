@@ -1,6 +1,6 @@
 {
   "name": "@ubtrippin/cli",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "UB Trippin CLI — manage travel from the terminal",
   "bin": {
     "ubt": "ubt"

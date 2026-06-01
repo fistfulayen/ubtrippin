@@ -3,7 +3,7 @@
 # ubt — UB Trippin CLI
 # Talk to the UB Trippin API
 #
-UBT_VERSION="2.0.1"
+UBT_VERSION="2.0.2"
 set -euo pipefail
 
 # Load config
