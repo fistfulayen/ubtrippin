@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { pickBestFlight } from '@/lib/flight-status'
+import { buildFlightAwareDateWindow, pickBestFlight } from '@/lib/flight-status'
 
 // Simple in-memory cache: key -> { data, fetchedAt }
 const cache = new Map<string, { data: unknown; fetchedAt: number }>()
@@ -201,10 +201,7 @@ async function fetchFlightRaw(ident: string, date: string): Promise<Record<strin
     return null
   }
 
-  const start = `${date}T00:00:00Z`
-  const startMs = new Date(start).getTime()
-  const endDate = new Date(Math.min(startMs + 36 * 60 * 60 * 1000, Date.now() + 47 * 60 * 60 * 1000))
-  const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const { start, end } = buildFlightAwareDateWindow(date)
 
   const fetchIdent = async (id: string): Promise<Record<string, unknown>[] | null> => {
     const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(id)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`

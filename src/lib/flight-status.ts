@@ -45,6 +45,11 @@ export interface FlightLookup {
   date: string
 }
 
+export interface FlightAwareDateWindow {
+  start: string
+  end: string
+}
+
 export interface ExistingTripItemStatus {
   status: string | null
   previous_status: string | null
@@ -90,6 +95,7 @@ export interface TripItemStatusResponse {
 
 const FLIGHTAWARE_BASE_URL = 'https://aeroapi.flightaware.com/aeroapi'
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+const FLIGHTAWARE_LOOKUP_WINDOW_HOURS = 36
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -310,18 +316,23 @@ export function buildFlightLookup(item: {
   }
 }
 
+export function buildFlightAwareDateWindow(date: string): FlightAwareDateWindow {
+  const startDate = new Date(`${date}T00:00:00Z`)
+  const endDate = new Date(startDate.getTime() + FLIGHTAWARE_LOOKUP_WINDOW_HOURS * 60 * 60 * 1000)
+
+  return {
+    start: startDate.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    end: endDate.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+  }
+}
+
 async function fetchFlightsRaw(ident: string, date: string): Promise<Record<string, unknown>[] | null> {
   if (!process.env.FLIGHTAWARE_API_KEY) {
     console.error('[flightaware] FLIGHTAWARE_API_KEY is not configured')
     return null
   }
 
-  const start = `${date}T00:00:00Z`
-  const endOfWindow = new Date(`${date}T00:00:00Z`)
-  endOfWindow.setUTCHours(endOfWindow.getUTCHours() + 36)
-  const maxEnd = new Date(Date.now() + 47 * 60 * 60 * 1000)
-  const endDate = endOfWindow < maxEnd ? endOfWindow : maxEnd
-  const end = endDate.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const { start, end } = buildFlightAwareDateWindow(date)
   const url = `${FLIGHTAWARE_BASE_URL}/flights/${encodeURIComponent(ident)}?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
 
   try {
