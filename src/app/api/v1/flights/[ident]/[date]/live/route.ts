@@ -66,6 +66,13 @@ function isValidDate(date: string): boolean {
   )
 }
 
+function isTodayOrFutureDate(date: string, now = new Date()): boolean {
+  const today = new Date(now)
+  today.setUTCHours(0, 0, 0, 0)
+  const requested = new Date(`${date}T00:00:00Z`)
+  return requested.getTime() >= today.getTime()
+}
+
 function asString(value: unknown): string | null {
   if (typeof value === 'string' && value.length > 0) return value
   return null
@@ -170,6 +177,45 @@ interface FlightApiResponse {
   }
   cached: boolean
   last_updated: string
+  upstream_status?: 'pending'
+}
+
+function buildPendingFlightResponse(ident: string): FlightApiResponse {
+  return {
+    flight: {
+      ident,
+      airline: null,
+      origin: {
+        code: 'TBD',
+        city: null,
+        name: null,
+        gate: null,
+        terminal: null,
+        timezone: null,
+      },
+      destination: {
+        code: 'TBD',
+        city: null,
+        name: null,
+        gate: null,
+        terminal: null,
+        timezone: null,
+      },
+      scheduled_departure: null,
+      estimated_departure: null,
+      actual_departure: null,
+      scheduled_arrival: null,
+      estimated_arrival: null,
+      actual_arrival: null,
+      status: 'unknown',
+      delay_minutes: null,
+      aircraft_type: null,
+      progress_percent: null,
+    },
+    cached: false,
+    last_updated: new Date().toISOString(),
+    upstream_status: 'pending',
+  }
 }
 
 // IATA airline codes that contain digits (FA can't resolve them directly).
@@ -356,6 +402,17 @@ export async function GET(
   const result = await fetchFlightFromAware(ident, date)
 
   if (!result) {
+    if (isTodayOrFutureDate(date)) {
+      const pending = buildPendingFlightResponse(ident)
+      cache.set(cacheKey, { data: pending, fetchedAt: now })
+      return NextResponse.json(pending, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300',
+          'X-Cache': 'MISS',
+        },
+      })
+    }
+
     return NextResponse.json(
       { error: { code: 'not_found', message: 'Flight not found. Double-check the flight number and date.' } },
       { status: 404 }
