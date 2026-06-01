@@ -291,9 +291,10 @@ async function processStatusChecks() {
       continue
     }
 
+    const upsertValues: Record<string, unknown> = upsert.values
     const { data: upserted, error: upsertError } = await supabase
       .from('trip_item_status')
-      .upsert(upsert.values, { onConflict: 'item_id' })
+      .upsert(upsertValues, { onConflict: 'item_id' })
       .select('*')
       .single()
 
