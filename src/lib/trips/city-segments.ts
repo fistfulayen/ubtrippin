@@ -297,6 +297,12 @@ function cityKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
+function usableSegmentCity(segment: CitySegment | null | undefined): string | null {
+  const city = segment?.city?.trim()
+  if (!city || city.toLowerCase() === 'unknown') return null
+  return city
+}
+
 function matchesWeatherCity(segmentCity: string, weatherCity: string): boolean {
   const left = cityKey(segmentCity)
   const right = cityKey(weatherCity)
@@ -476,7 +482,7 @@ export function buildTimeline(items: TripItem[]): TimelineEntry[] {
     timeline.push({
       type: 'transition',
       transition,
-      nextSegmentCity: nextSegment?.city ?? resolveAirportCity(transition.arrival.code)?.city ?? transition.arrival.city,
+      nextSegmentCity: usableSegmentCity(nextSegment) ?? resolveAirportCity(transition.arrival.code)?.city ?? transition.arrival.city,
     })
 
     if (nextSegment) {

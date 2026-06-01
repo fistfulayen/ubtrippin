@@ -269,6 +269,48 @@ describe('buildTimeline', () => {
     expect(transitionIdx).toBeGreaterThanOrEqual(0)
     expect(segmentIdx).toBeLessThan(transitionIdx)
   })
+
+  it('labels a flight-only Zurich segment from the arrival airport', () => {
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'Swiss International Air Lines',
+        start_date: '2026-06-22',
+        end_date: '2026-06-22',
+        start_ts: '2026-06-22T07:45:00+00:00',
+        end_ts: '2026-06-22T09:05:00+00:00',
+        start_location: 'CDG',
+        end_location: 'ZRH',
+        details_json: {
+          departure_airport: 'CDG',
+          arrival_airport: 'ZRH',
+          departure_local_time: '09:45',
+          arrival_local_time: '11:05',
+        },
+      }),
+      makeItem({
+        provider: 'ITA Airways',
+        start_date: '2026-06-24',
+        end_date: '2026-06-24',
+        start_ts: '2026-06-24T08:55:00+00:00',
+        end_ts: '2026-06-24T10:25:00+00:00',
+        start_location: 'ZRH',
+        end_location: 'FCO',
+        details_json: {
+          departure_airport: 'ZRH',
+          arrival_airport: 'FCO',
+          departure_local_time: '10:55',
+          arrival_local_time: '12:25',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const transitions = timeline.filter((entry) => entry.type === 'transition')
+    const segments = timeline.filter((entry) => entry.type === 'segment')
+
+    expect(transitions[0].nextSegmentCity).toBe('Zurich')
+    expect(segments[0].segment?.city).toBe('Zurich')
+  })
 })
 
 describe('hotel segment assignment', () => {

@@ -49,6 +49,7 @@ const AIRPORT_CITIES: Record<string, ResolvedAirportCity> = {
   TLL: { city: 'Tallinn', country: 'Estonia', countryCode: 'EE' },
   TPA: { city: 'Tampa, FL', country: 'United States', countryCode: 'US' },
   TRN: { city: 'Turin', country: 'Italy', countryCode: 'IT' },
+  ZRH: { city: 'Zurich', country: 'Switzerland', countryCode: 'CH' },
 }
 
 export function resolveAirportCity(code: string): ResolvedAirportCity | null {
