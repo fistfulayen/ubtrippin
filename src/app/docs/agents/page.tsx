@@ -125,7 +125,7 @@ export default function AgentDocsPage() {
       "command": "npx",
       "args": ["-y", "ubtrippin-mcp"],
       "env": {
-        "UBTRIPPIN_API_KEY": "your_api_key_here"
+        "UBT_API_KEY": "ubt_k1_your_key_here"
       }
     }
   }

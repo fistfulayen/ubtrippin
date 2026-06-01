@@ -119,8 +119,8 @@ UB Trippin gives your agent three ways in. Use whichever fits your stack.
 The API v1 is live and documented. Bearer token auth — no browser, no OAuth dance, no cookie consent modals.
 
 ```bash
-curl https://ubtrippin.xyz/api/v1/trips \
-  -H "Authorization: Bearer ubt_your_key_here"
+curl https://www.ubtrippin.xyz/api/v1/trips \
+  -H "Authorization: Bearer ubt_k1_your_key_here"
 ```
 
 Get an API key: **Settings → API Keys** in the web UI.
@@ -140,7 +140,7 @@ ubt trips weather <trip_id>              # forecast for your trip
 ubt tickets list <trip_id>               # concert/event tickets
 ```
 
-Install: clone the repo, the CLI lives at `cli/ubt`.
+Install: `npm install -g @ubtrippin/cli`, then run `ubt login` and paste your `ubt_k1_...` API key from Settings. The public CLI uses `UBT_API_KEY` only; no Supabase credentials or repo `.env.local` file are needed.
 
 ### MCP Server
 

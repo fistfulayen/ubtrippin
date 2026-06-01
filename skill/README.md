@@ -17,8 +17,8 @@ clawhub install ubtrippin --workdir ~/.openclaw/workspace
 ## Setup
 
 1. Your user generates an API key at [ubtrippin.xyz/settings](https://www.ubtrippin.xyz/settings)
-2. Store the key in your agent config or TOOLS.md
-3. Start using the API — see SKILL.md for all endpoints and workflows
+2. Store the key as `UBT_API_KEY` in your agent config or TOOLS.md
+3. No Supabase URL, Supabase key, or repo `.env.local` is needed. Start using the API — see SKILL.md for all endpoints and workflows
 
 ## API Docs
 

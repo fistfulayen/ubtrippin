@@ -1,44 +1,26 @@
 #!/usr/bin/env bash
 #
 # ubt — UB Trippin CLI
-# Talk directly to Supabase REST API
+# Talk to the UB Trippin API
 #
-UBT_VERSION="2.0.0"
+UBT_VERSION="2.0.1"
 set -euo pipefail
 
 # Load config
+UBT_API_KEY_ENV="${UBT_API_KEY:-}"
+UBT_API_URL_ENV="${UBT_API_URL:-}"
+UBT_APP_URL_ENV="${UBT_APP_URL:-}"
 CONFIG_FILE="${UBT_CONFIG:-$HOME/.ubt/config}"
 if [ -f "$CONFIG_FILE" ]; then
   source "$CONFIG_FILE"
 fi
 
-# Can also be set via env vars
-SUPABASE_URL="${UBT_SUPABASE_URL:-${SUPABASE_URL:-}}"
-SUPABASE_KEY="${UBT_SUPABASE_KEY:-${SUPABASE_KEY:-}}"
-
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-  # Try loading from .env.local in the repo
-  REPO_DIR="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
-  if [ -f "$REPO_DIR/.env.local" ]; then
-    SUPABASE_URL=$(grep '^NEXT_PUBLIC_SUPABASE_URL=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
-    SUPABASE_KEY=$(grep '^SUPABASE_SECRET_KEY=' "$REPO_DIR/.env.local" | cut -d= -f2- | tr -d '"')
-  fi
-fi
-
-if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
-  echo "Error: Supabase credentials not configured." >&2
-  echo "Set UBT_SUPABASE_URL and UBT_SUPABASE_KEY, or create ~/.ubt/config" >&2
-  exit 1
-fi
-
-API="${SUPABASE_URL}/rest/v1"
-API_V1="${UBT_API_URL:-https://www.ubtrippin.xyz/api/v1}"
+API_V1="${UBT_API_URL_ENV:-${UBT_API_URL:-https://www.ubtrippin.xyz/api/v1}}"
 API_V1="${API_V1%/}"
-APP_URL="${UBT_APP_URL:-https://www.ubtrippin.xyz}"
+APP_URL="${UBT_APP_URL_ENV:-${UBT_APP_URL:-https://www.ubtrippin.xyz}}"
 
-# UBT_API_KEY enables v1 REST API calls (required for merge, move, etc.)
-# Set in config or via env: export UBT_API_KEY=ubt_...
-UBT_API_KEY="${UBT_API_KEY:-}"
+# Set in config or via env: export UBT_API_KEY=ubt_k1_...
+UBT_API_KEY="${UBT_API_KEY_ENV:-${UBT_API_KEY:-}}"
 if [ -z "$UBT_API_KEY" ] && [ -f "$CONFIG_FILE" ]; then
   UBT_API_KEY=$(grep '^UBT_API_KEY=' "$CONFIG_FILE" 2>/dev/null | cut -d= -f2- | tr -d '"')
 fi
@@ -51,22 +33,14 @@ EXIT_API_ERROR=3
 EXIT_DATA_ERROR=4
 
 # Helpers
-_curl() {
-  curl -s "$@" \
-    -H "apikey: ${SUPABASE_KEY}" \
-    -H "Authorization: Bearer ${SUPABASE_KEY}" \
-    -H "Content-Type: application/json"
-}
-
-# v1 API calls — requires UBT_API_KEY
 _require_api_key() {
-  if [ -z "$UBT_API_KEY" ] && [ -f "$HOME/.ubt/config" ]; then
-    UBT_API_KEY=$(grep "^UBT_API_KEY=" "$HOME/.ubt/config" | head -n1 | cut -d= -f2-)
+  if [ -z "$UBT_API_KEY" ] && [ -f "$CONFIG_FILE" ]; then
+    UBT_API_KEY=$(grep '^UBT_API_KEY=' "$CONFIG_FILE" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"')
   fi
   if [ -z "$UBT_API_KEY" ]; then
     echo "Error: UBT_API_KEY is required for this command." >&2
-    echo "Get yours at ubtrippin.xyz/settings and set UBT_API_KEY in ~/.ubt/config" >&2
-    exit 1
+    echo 'Generate an API key at ubtrippin.xyz/settings, then run `ubt login` or set `UBT_API_KEY`.' >&2
+    exit "$EXIT_AUTH_ERROR"
   fi
 }
 
@@ -584,53 +558,12 @@ cmd_items_search() {
   fi
 }
 
-cmd_tables() {
-  # List all tables via RPC or information_schema
-  local result
-  result=$(_curl "${API}/rpc/get_tables" -X POST -d '{}' 2>/dev/null || true)
-  if [ "${FORMAT:-pretty}" = "json" ]; then
-    if [ -n "$result" ]; then
-      echo "$result" | _json
-    else
-      echo "[]"
-    fi
-    return
-  fi
-  if [ -n "$result" ]; then
-    echo "$result" | _json
-  else
-    echo "Use 'supabase db' commands for schema inspection."
-  fi
-}
-
 cmd_health() {
-  curl -s "${SUPABASE_URL}/rest/v1/" \
-    -H "apikey: ${SUPABASE_KEY}" \
-    -o /dev/null -w "Supabase: HTTP %{http_code} (%{time_total}s)\n"
-  
-  curl -s "https://www.ubtrippin.xyz/api/health" \
+  curl -s "$APP_URL" \
     -o /dev/null -w "App: HTTP %{http_code} (%{time_total}s)\n"
-}
 
-cmd_users() {
-  local result
-  result=$(_curl "${API}/profiles?select=id,email,full_name,created_at&order=created_at")
-  if [ "${FORMAT:-pretty}" = "json" ]; then
-    echo "$result" | _json
-    return
-  fi
-  echo "$result" | _python3c "
-import json, sys
-data = json.load(sys.stdin)
-if isinstance(data, dict) and 'message' in data:
-    print(f'Error: {data[\"message\"]}')
-    sys.exit(1)
-for u in data:
-    email = u.get('email','?')
-    name = u.get('full_name','')
-    created = (u.get('created_at') or '?')[:10]
-    print(f\"  {u['id'][:8]}  {email:<35} {name:<20} joined: {created}\")
-" 2>/dev/null || echo "Could not list users"
+  curl -s "$API_V1/docs" \
+    -o /dev/null -w "API docs: HTTP %{http_code} (%{time_total}s)\n"
 }
 
 cmd_trips_merge() {
@@ -2285,6 +2218,7 @@ print(f'Added: {d.get(\"email\")} (id: {d.get(\"id\", \"\")[:8]}...)')
 }
 
 cmd_senders_remove() {
+  _require_api_key
   local sender_id="${1:?Usage: ubt senders remove <sender_id>}"
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -2438,6 +2372,7 @@ print(f\"  updated_at:   {w.get('updated_at')}\")
 }
 
 cmd_webhooks_delete() {
+  _require_api_key
   local webhook_id="${1:?Usage: ubt webhooks delete <id>}"
   local status
   status=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -2533,11 +2468,6 @@ for i, img in enumerate(images):
 "
 }
 
-cmd_rls_check() {
-  echo "Checking RLS policies via Supabase CLI..."
-  cd /home/iancr/ubtrippin
-  supabase inspect db policies --linked 2>/dev/null || echo "Use 'supabase inspect db policies --linked' manually"
-}
 
 cmd_collab_list() {
   local trip_id="${1:?Usage: ubt collab list <trip_id>}"
@@ -2603,6 +2533,7 @@ print('Invite email sent.')
 }
 
 cmd_collab_remove() {
+  _require_api_key
   _parse_quiet_flag "$@"
   set -- "${UBT_ARGS[@]}"
   local trip_id="${1:?Usage: ubt collab remove [--quiet] <trip_id> <collaborator_id>}"
@@ -2938,6 +2869,7 @@ print('Updated loyalty program.')
 }
 
 cmd_profile_loyalty_delete() {
+  _require_api_key
   local program_id="${1:?Usage: ubt profile loyalty delete <id>}"
   local confirm
   read -r -p "Delete loyalty program ${program_id}? [y/N]: " confirm
@@ -3127,6 +3059,7 @@ print('Invite email queued.')
 }
 
 cmd_family_remove() {
+  _require_api_key
   local family_id="${1:?Usage: ubt family remove <family_id> <user_id>}"
   local user_or_member_id="${2:?Usage: ubt family remove <family_id> <user_id>}"
 
@@ -3175,6 +3108,7 @@ print('')
 }
 
 cmd_family_leave() {
+  _require_api_key
   local family_id="${1:?Usage: ubt family leave <family_id>}"
   local profile_json family_json
   profile_json=$(_api "${API_V1}/me/profile")
@@ -3724,7 +3658,7 @@ cmd_selftest() {
   fi
 
   if [ -z "$UBT_API_KEY" ]; then
-    echo "FAIL: No API key configured. Run 'ubt login' or set UBT_API_KEY." >&2
+    echo 'FAIL: No API key configured. Generate an API key at ubtrippin.xyz/settings, then run `ubt login` or set `UBT_API_KEY`.' >&2
     exit 1
   fi
 
@@ -4045,7 +3979,7 @@ if top:
 
 # Usage
 usage() {
-  cat <<EOF
+  cat <<'EOF'
 ubt — UB Trippin CLI
 
 Usage: ubt <command> [args]
@@ -4133,11 +4067,9 @@ Commands:
   tickets show <item_id>                Show ticket/event details *
   events list|add|show                  Alias for tickets commands *
   costs                                 Show token usage and cost report (admin) *
-  users                                 List all users (admin)
   health                                Check service health
-  rls-check                             Verify RLS policies
 
-Commands marked * require UBT_API_KEY in ~/.ubt/config or env.
+Data commands require `UBT_API_KEY`. Generate an API key at ubtrippin.xyz/settings, then run `ubt login` or set `UBT_API_KEY`.
 
 Options:
   FORMAT=json ubt ...      Output raw JSON instead of formatted text
@@ -4408,9 +4340,7 @@ case "${1:-}" in
     ;;
   referral) cmd_referral ;;
   costs)    cmd_costs ;;
-  users)    cmd_users ;;
   health)   cmd_health ;;
-  rls-check) cmd_rls_check ;;
   version)  cmd_version ;;
   login)    cmd_login ;;
   whoami)   cmd_whoami ;;

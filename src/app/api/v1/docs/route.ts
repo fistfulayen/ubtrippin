@@ -27,8 +27,8 @@ This installs the full skill with all endpoints and agent workflows documented.
 
 **CLI:**
 \`\`\`bash
-npm install -g ubtrippin-cli   # or clone the repo and use cli/ubt directly
-ubt login                     # authenticate with your API key
+npm install -g @ubtrippin/cli
+ubt login                     # paste your ubt_k1_... API key from Settings
 ubt trips list                # you're in
 \`\`\`
 
@@ -672,7 +672,7 @@ The \`ubt\` CLI wraps the REST API for terminal and agent use.
 ### Setup
 
 \`\`\`bash
-ubt login          # prompts for API key, saves to ~/.ubt/config
+ubt login          # prompts for your ubt_k1_... API key, saves UBT_API_KEY to ~/.ubt/config
 ubt whoami         # verify authentication
 ubt selftest       # test API connectivity
 \`\`\`
