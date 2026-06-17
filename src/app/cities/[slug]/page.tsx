@@ -1,22 +1,26 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventCard } from '@/components/events/event-card'
 import { EventFeedbackForm } from '@/components/events/event-feedback-form'
 import { EventFilterBar } from '@/components/events/event-filter-bar'
+import { ShelfFilterBar } from '@/components/events/shelf-filter-bar'
 import { EventUpsellOverlay } from '@/components/events/event-upsell-overlay'
 import { PipelineTransparency } from '@/components/events/pipeline-transparency'
 import {
   flagEmoji,
   getCityEventsPageData,
   getMonthWindow,
+  getTrackedCityBySlug,
   trimEventsForFreeTier,
 } from '@/lib/events/queries'
+import { isOutgoingStale, refreshOutgoingForCity } from '@/lib/events/outgoing'
 import { getUserTier } from '@/lib/usage/limits'
 
 interface CityPageProps {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ from?: string; to?: string; segment?: string }>
+  searchParams: Promise<{ from?: string; to?: string; segment?: string; shelf?: string }>
 }
 
 /** Escape strings for safe embedding in JSON-LD <script> tags */
@@ -99,12 +103,29 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   const { slug } = await params
   const search = await searchParams
   const supabase = await createClient()
+
   // If trip-scoped (from/to params), show events for that date range.
   // Otherwise show ALL future events for the city — the full calendar view.
   const today = new Date().toISOString().slice(0, 10)
   const from = search.from || today
   const to = search.to || undefined
-  const data = await getCityEventsPageData(supabase, slug, { from, to })
+
+  // Refresh Outgoing cache if stale, then load page data.
+  // Use the secret client for the read when we just refreshed to avoid
+  // read-after-write lag on the user-scoped client.
+  const cityForRefresh = await getTrackedCityBySlug(supabase, slug)
+  let readClient = supabase
+  if (cityForRefresh && isOutgoingStale(cityForRefresh)) {
+    try {
+      await refreshOutgoingForCity(cityForRefresh)
+      const { createSecretClient } = await import('@/lib/supabase/service')
+      readClient = createSecretClient()
+    } catch (err) {
+      console.error('[outgoing] refresh failed for', slug.replace(/[\n\r]/g, '').slice(0, 100), err)
+    }
+  }
+
+  const data = await getCityEventsPageData(readClient, slug, { from, to })
 
   if (!data) notFound()
 
@@ -113,10 +134,18 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
   } = await supabase.auth.getUser()
 
   const tier = user ? await getUserTier(user.id, supabase) : 'free'
+  const hasOutgoingShelves = data.outgoingShelves.length > 0
   const activeSegment = search.segment
-  const activeEvents = activeSegment
-    ? data.segments.find((segment) => segment.key === activeSegment)?.events ?? []
-    : data.events
+  const activeShelf = search.shelf
+
+  let activeEvents: typeof data.events
+  if (hasOutgoingShelves && activeShelf) {
+    activeEvents = data.outgoingShelves.find((s) => s.slug === activeShelf)?.events ?? []
+  } else if (activeSegment) {
+    activeEvents = data.segments.find((segment) => segment.key === activeSegment)?.events ?? []
+  } else {
+    activeEvents = data.events
+  }
 
   const isTripScoped = Boolean(search.from && search.to)
   const shouldUpsell = Boolean(user && tier === 'free' && isTripScoped)
@@ -142,55 +171,117 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
               </p>
               <h1 className="font-serif text-5xl">What&apos;s On in {data.city.city}</h1>
               <p className="text-lg text-white/80">
-                {visibleEvents.length} curated picks between {from} and {to}.
+                {visibleEvents.length} curated picks
+                {to
+                  ? ` between ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} and ${new Date(to + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                  : ` in ${new Date(from + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}.
               </p>
             </div>
+            {hasOutgoingShelves ? (
+              <a href="https://outgoing.world" target="_blank" rel="noreferrer noopener" className="absolute bottom-6 right-6 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm transition hover:bg-white/25 sm:bottom-8 sm:right-8">
+                <Image src="/outgoing-avatar.svg" alt="Outgoing" width={18} height={18} className="rounded" />
+                <span className="text-xs font-medium text-white/90">Powered by Outgoing</span>
+              </a>
+            ) : null}
           </div>
         </section>
 
-        <EventFilterBar segments={data.segments} activeSegment={activeSegment} />
+        {hasOutgoingShelves ? (
+          <ShelfFilterBar shelves={data.outgoingShelves} activeShelf={activeShelf} />
+        ) : (
+          <EventFilterBar segments={data.segments} activeSegment={activeSegment} />
+        )}
 
         <section className="relative space-y-8">
-          {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Major Events</p>
+          {hasOutgoingShelves ? (() => {
+            // Build featured picks: first event from each shelf
+            const featuredIds = new Set<string>()
+            const featured = data.outgoingShelves
+              .map((shelf) => shelf.events[0])
+              .filter((e): e is typeof e & object => {
+                if (!e || featuredIds.has(e.id)) return false
+                featuredIds.add(e.id)
+                return true
+              })
+
+            return activeShelf ? (
+              /* Single shelf selected — flat grid */
               <div className="grid gap-5 lg:grid-cols-2">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'major')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
+                {visibleEvents.map((event) => (
+                  <EventCard key={event.id} event={event} />
+                ))}
               </div>
-            </div>
-          ) : null}
+            ) : (
+              /* "All" — featured row then shelf sections (deduped) */
+              <>
+                {featured.length > 0 ? (
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {featured.map((event) => (
+                      <EventCard key={event.id} event={{ ...event, event_tier: 'major' }} />
+                    ))}
+                  </div>
+                ) : null}
+                {data.outgoingShelves.map((shelf) => {
+                  const deduped = shelf.events.filter((e) => !featuredIds.has(e.id)).slice(0, 6)
+                  if (deduped.length === 0) return null
+                  return (
+                    <div key={shelf.slug} className="space-y-4">
+                      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">{shelf.displayName}</p>
+                      <div className="grid gap-5 lg:grid-cols-2">
+                        {deduped.map((event) => (
+                          <EventCard key={event.id} event={event} />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </>
+            )
+          })() : (
+            /* Legacy: render events grouped by tier */
+            <>
+              {visibleEvents.filter((event) => event.event_tier === 'major').length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Major Events</p>
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'major')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </div>
+              ) : null}
 
-          {visibleEvents.filter((event) => event.event_tier === 'medium').length > 0 ? (
-            <div className="space-y-4">
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Worth Planning Around</p>
-              <div className="space-y-4">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'medium')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
-              </div>
-            </div>
-          ) : null}
+              {visibleEvents.filter((event) => event.event_tier === 'medium').length > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Worth Planning Around</p>
+                  <div className="space-y-4">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'medium')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </div>
+              ) : null}
 
-          {visibleEvents.filter((event) => event.event_tier === 'local').length > 0 ? (
-            <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" open>
-              <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-                Local Finds
-              </summary>
-              <div className="mt-4 space-y-3">
-                {visibleEvents
-                  .filter((event) => event.event_tier === 'local')
-                  .map((event) => (
-                    <EventCard key={event.id} event={event} />
-                  ))}
-              </div>
-            </details>
-          ) : null}
+              {visibleEvents.filter((event) => event.event_tier === 'local').length > 0 ? (
+                <details className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" open>
+                  <summary className="cursor-pointer list-none text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+                    Local Finds
+                  </summary>
+                  <div className="mt-4 space-y-3">
+                    {visibleEvents
+                      .filter((event) => event.event_tier === 'local')
+                      .map((event) => (
+                        <EventCard key={event.id} event={event} />
+                      ))}
+                  </div>
+                </details>
+              ) : null}
+            </>
+          )}
 
           <EventUpsellOverlay visible={shouldUpsell} hiddenCount={hiddenCount} />
         </section>
