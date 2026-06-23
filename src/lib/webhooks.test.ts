@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildWebhookDeliveryPayload,
+  sanitizeWebhookData,
   serializeWebhookPayload,
   signWebhookPayload,
 } from './webhooks'
@@ -63,6 +64,43 @@ describe('serializeWebhookPayload', () => {
     })
 
     expect(serializeWebhookPayload(payload)).toContain('"nested":{"code":"X1"}')
+  })
+})
+
+describe('sanitizeWebhookData', () => {
+  it('removes PII and secret fields recursively', () => {
+    const sanitized = sanitizeWebhookData({
+      trip: {
+        id: 'trip_1',
+        title: 'Paris',
+        user_email: 'alex@example.com',
+      },
+      item: {
+        id: 'item_1',
+        confirmation_code: 'ABC123',
+        traveler_names: ['Alex Example'],
+        details_json: {
+          flight_number: 'AF1234',
+          booking_reference: 'BR123',
+          contact_phone: '+15551234567',
+        },
+      },
+      nested: [{ api_key: 'secret', ok: true }],
+    })
+
+    expect(sanitized).toEqual({
+      trip: {
+        id: 'trip_1',
+        title: 'Paris',
+      },
+      item: {
+        id: 'item_1',
+        details_json: {
+          flight_number: 'AF1234',
+        },
+      },
+      nested: [{ ok: true }],
+    })
   })
 })
 

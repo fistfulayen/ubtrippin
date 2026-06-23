@@ -55,6 +55,41 @@ function parseDetailObject(details: Json): Record<string, unknown> {
   return details as Record<string, unknown>
 }
 
+function removeCalendarSensitiveDetails(details: Json): Json {
+  const parsed = parseDetailObject(details)
+  const {
+    booking_reference,
+    confirmation_code,
+    confirmation,
+    reservation_number,
+    ticket_number,
+    passenger_name,
+    passenger_names,
+    traveler_name,
+    traveler_names,
+    ...safe
+  } = parsed
+  void booking_reference
+  void confirmation_code
+  void confirmation
+  void reservation_number
+  void ticket_number
+  void passenger_name
+  void passenger_names
+  void traveler_name
+  void traveler_names
+  return safe as Json
+}
+
+function redactItemForCalendar(item: TripItem): TripItem {
+  return {
+    ...item,
+    confirmation_code: null,
+    traveler_names: [],
+    details_json: removeCalendarSensitiveDetails(item.details_json),
+  }
+}
+
 function normalizeTime(value: string | null | undefined): string | null {
   if (!value) return null
   const match = value.match(/^(\d{1,2}):(\d{2})/)
@@ -296,6 +331,7 @@ function buildEventLines(
   item: TripItem,
   trip?: Trip | null
 ): string[] {
+  item = redactItemForCalendar(item)
   const details = parseDetailObject(item.details_json)
   const now = toUtcDateTime(new Date())
   const lines: string[] = [

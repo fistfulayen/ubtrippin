@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/nudge-emails",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/internal/events/outgoing-refresh",
+      "schedule": "0 */6 * * *"
     }
   ],
   "redirects": [

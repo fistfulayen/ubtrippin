@@ -101,7 +101,23 @@ describe('generateTripICal', () => {
     expect(ics).toContain('DESCRIPTION:Air France AF1234')
     expect(ics).toContain('Terminal 2E')
     expect(ics).toContain('Gate K21')
-    expect(ics).toContain('Confirmation: ABC123')
+    expect(ics).not.toContain('Confirmation: ABC123')
+    expect(ics).not.toContain('Travelers: Alex')
+  })
+
+  it('redacts booking references and traveler names from calendar output', () => {
+    const item = makeItem({
+      details_json: {
+        flight_number: 'AF1234',
+        booking_reference: 'BR123',
+        passenger_names: ['Alex Example'],
+      },
+    })
+
+    const ics = generateTripICal(makeTrip(), [item])
+    expect(ics).not.toContain('ABC123')
+    expect(ics).not.toContain('BR123')
+    expect(ics).not.toContain('Alex Example')
   })
 
   it('creates multiple VEVENT blocks for multiple items', () => {

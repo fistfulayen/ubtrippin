@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import type Stripe from 'stripe'
-import { maskEmail } from '@/lib/privacy'
+import { maskEmail, maskId, safeErrorMessage } from '@/lib/privacy'
 import {
   mapStripeSubscriptionStatusToTier,
   unixSecondsToIso,
@@ -13,6 +13,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const GRACE_PERIOD_DAYS = 3
+
+function maskStripeId(id: string | null | undefined): string {
+  return maskId(id)
+}
 
 interface ProfileBillingRow {
   id: string
@@ -113,7 +117,7 @@ async function applyProfilePatch(
 
   const { error } = await supabase.from('profiles').update(updates).eq('id', profile.id)
   if (error) {
-    console.error(`[stripe webhook] ${context} update failed`, error)
+    console.error(`[stripe webhook] ${context} update failed`, safeErrorMessage(error))
   }
 }
 
@@ -127,7 +131,10 @@ async function getProfileById(supabase: ReturnType<typeof createSecretClient>, i
     .maybeSingle()
 
   if (error) {
-    console.error('[stripe webhook] profile lookup by id failed', { id, error })
+    console.error('[stripe webhook] profile lookup by id failed', {
+      id: maskId(id),
+      error: safeErrorMessage(error),
+    })
     return null
   }
 
@@ -147,7 +154,10 @@ async function getProfileByCustomerId(
     .maybeSingle()
 
   if (error) {
-    console.error('[stripe webhook] profile lookup by customer failed', { customerId, error })
+    console.error('[stripe webhook] profile lookup by customer failed', {
+      customerId: maskStripeId(customerId),
+      error: safeErrorMessage(error),
+    })
     return null
   }
 
@@ -167,7 +177,10 @@ async function getProfileBySubscriptionId(
     .maybeSingle()
 
   if (error) {
-    console.error('[stripe webhook] profile lookup by subscription failed', { subscriptionId, error })
+    console.error('[stripe webhook] profile lookup by subscription failed', {
+      subscriptionId: maskStripeId(subscriptionId),
+      error: safeErrorMessage(error),
+    })
     return null
   }
 
@@ -187,7 +200,10 @@ async function getProfileByEmail(
     .maybeSingle()
 
   if (error) {
-    console.error('[stripe webhook] profile lookup by email failed', { email: maskEmail(email), error })
+    console.error('[stripe webhook] profile lookup by email failed', {
+      email: maskEmail(email),
+      error: safeErrorMessage(error),
+    })
     return null
   }
 
@@ -246,7 +262,10 @@ async function getSubscriptionPeriodEnd(subscriptionId: string): Promise<string 
     const subscription = await stripe.subscriptions.retrieve(subscriptionId)
     return unixSecondsToIso(subscription.items.data[0]?.current_period_end)
   } catch (error) {
-    console.error('[stripe webhook] failed to fetch subscription for period end', { subscriptionId, error })
+    console.error('[stripe webhook] failed to fetch subscription for period end', {
+      subscriptionId: maskStripeId(subscriptionId),
+      error: safeErrorMessage(error),
+    })
     return null
   }
 }
@@ -263,7 +282,7 @@ async function handleCheckoutSessionCompleted(
 
   const profile = await getProfileById(supabase, userId)
   if (!profile) {
-    console.error('[stripe webhook] checkout.session.completed profile not found', { userId })
+    console.error('[stripe webhook] checkout.session.completed profile not found', { userId: maskId(userId) })
     return
   }
 
@@ -325,7 +344,7 @@ async function handleCustomerUpdated(
   }
 
   if (!profile) {
-    console.log('[stripe webhook] customer.updated no matching profile', { customerId: customer.id })
+    console.log('[stripe webhook] customer.updated no matching profile', { customerId: maskStripeId(customer.id) })
     return
   }
 
@@ -361,8 +380,8 @@ async function handleSubscriptionCreated(
 
   if (!profile) {
     console.log('[stripe webhook] customer.subscription.created no matching profile', {
-      customerId,
-      subscriptionId: subscription.id,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscription.id),
     })
     return
   }
@@ -392,8 +411,8 @@ async function handleSubscriptionUpdated(
 
   if (!profile) {
     console.log('[stripe webhook] customer.subscription.updated no matching profile', {
-      customerId,
-      subscriptionId: subscription.id,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscription.id),
     })
     return
   }
@@ -429,8 +448,8 @@ async function handleSubscriptionDeleted(
 
   if (!profile) {
     console.log('[stripe webhook] customer.subscription.deleted no matching profile', {
-      customerId,
-      subscriptionId: subscription.id,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscription.id),
     })
     return
   }
@@ -457,8 +476,8 @@ async function handleSubscriptionPaused(
 
   if (!profile) {
     console.log('[stripe webhook] customer.subscription.paused no matching profile', {
-      customerId,
-      subscriptionId: subscription.id,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscription.id),
     })
     return
   }
@@ -484,8 +503,8 @@ async function handleSubscriptionResumed(
 
   if (!profile) {
     console.log('[stripe webhook] customer.subscription.resumed no matching profile', {
-      customerId,
-      subscriptionId: subscription.id,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscription.id),
     })
     return
   }
@@ -516,8 +535,8 @@ async function handleInvoicePaid(
 
   if (!profile) {
     console.log('[stripe webhook] invoice.paid no matching profile', {
-      customerId,
-      subscriptionId,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscriptionId),
     })
     return
   }
@@ -554,8 +573,8 @@ async function handleInvoicePaymentFailed(
 
   if (!profile) {
     console.log('[stripe webhook] invoice.payment_failed no matching profile', {
-      customerId,
-      subscriptionId,
+      customerId: maskStripeId(customerId),
+      subscriptionId: maskStripeId(subscriptionId),
     })
     return
   }
@@ -598,7 +617,7 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, sig, webhookSecret)
   } catch (err) {
-    console.error('[stripe webhook] signature verification failed', err)
+    console.error('[stripe webhook] signature verification failed', safeErrorMessage(err))
     return NextResponse.json(
       { error: { code: 'invalid_signature', message: 'Invalid signature.' } },
       { status: 400 }
@@ -645,16 +664,16 @@ export async function POST(request: NextRequest) {
     }
     case 'customer.subscription.trial_will_end': {
       console.log('[stripe webhook] customer.subscription.trial_will_end', {
-        id: (event.data.object as Stripe.Subscription).id,
+        id: maskStripeId((event.data.object as Stripe.Subscription).id),
       })
       break
     }
     case 'invoice.created': {
-      console.log('[stripe webhook] invoice.created', { id: (event.data.object as Stripe.Invoice).id })
+      console.log('[stripe webhook] invoice.created', { id: maskStripeId((event.data.object as Stripe.Invoice).id) })
       break
     }
     case 'invoice.finalized': {
-      console.log('[stripe webhook] invoice.finalized', { id: (event.data.object as Stripe.Invoice).id })
+      console.log('[stripe webhook] invoice.finalized', { id: maskStripeId((event.data.object as Stripe.Invoice).id) })
       break
     }
     case 'invoice.paid': {
@@ -667,7 +686,7 @@ export async function POST(request: NextRequest) {
     }
     case 'invoice.payment_action_required': {
       console.log('[stripe webhook] invoice.payment_action_required', {
-        id: (event.data.object as Stripe.Invoice).id,
+        id: maskStripeId((event.data.object as Stripe.Invoice).id),
       })
       break
     }

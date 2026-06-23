@@ -10,6 +10,8 @@ export type EventCategory =
   | 'sacred'
   | 'market'
   | 'other'
+export type EventSource = 'outgoing' | 'legacy' | string
+
 export type VenueType =
   | 'museum'
   | 'theater'
@@ -38,6 +40,7 @@ export interface CityEvent {
   significance_score: number
   source: string | null
   source_url: string | null
+  external_id?: string | null
   image_url: string | null
   price_info: string | null
   booking_url: string | null
@@ -59,6 +62,9 @@ export interface TrackedCity {
   timezone: string | null
   hero_image_url: string | null
   last_refreshed_at: string | null
+  h3_cell: string | null
+  event_source: 'outgoing' | 'legacy'
+  outgoing_refresh_started_at: string | null
   active_event_count?: number
   next_notable_event?: { title: string; date: string } | null
 }
@@ -94,10 +100,17 @@ export interface DistanceGroup {
   segments: EventSegment[]
 }
 
+export interface OutgoingShelfData {
+  slug: string
+  displayName: string
+  events: CityEvent[]
+}
+
 export interface CityEventsPageData {
   city: TrackedCity
   events: CityEvent[]
   segments: EventSegment[]
   distanceGroups: DistanceGroup[]
   pipelineDiary: PipelineDiary | null
+  outgoingShelves: OutgoingShelfData[]
 }

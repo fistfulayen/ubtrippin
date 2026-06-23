@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { maskEmail } from '@/lib/privacy'
+import { maskEmail, maskId, safeErrorMessage } from '@/lib/privacy'
 import { createSecretClient } from '@/lib/supabase/service'
 import { verifyWebhookSignature, type ResendEmailPayload } from '@/lib/resend/verify-webhook'
 import { getResendClient } from '@/lib/resend/client'
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         'svix-signature': svixSignature,
       })
     } catch (error) {
-      console.error('Webhook verification failed:', error)
+      console.error('[webhook] verification failed:', safeErrorMessage(error))
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const forwardTarget = FORWARD_ADDRESSES[toAddress]
     if (forwardTarget) {
       try {
-        console.log(`Forwarding email to ${toAddress} → ${maskEmail(forwardTarget)}`)
+        console.log(`[webhook] forwarding support email for ${toAddress} to ${maskEmail(forwardTarget)}`)
         const resendForward = getResendClient()
 
         // Fetch the full email to forward it
@@ -107,22 +107,26 @@ export async function POST(request: NextRequest) {
         }
         return NextResponse.json({ message: 'Email forwarded', to: toAddress })
       } catch (fwdError) {
-        console.error('Failed to forward email:', fwdError)
+        console.error('[webhook] failed to forward support email:', safeErrorMessage(fwdError))
         // Fall through to normal processing as backup
       }
     }
 
     // Webhook only contains metadata - fetch full email content from Resend API
-    console.log('Fetching full email content for:', webhookData.email_id)
+    console.log('[webhook] fetching full email content', { emailId: maskId(webhookData.email_id) })
     const resend = getResendClient()
     const { data: fullEmail, error: fetchError } = await resend.emails.receiving.get(webhookData.email_id)
 
     if (fetchError || !fullEmail) {
-      console.error('Failed to fetch email content:', fetchError)
+      console.error('[webhook] failed to fetch email content:', safeErrorMessage(fetchError))
       return NextResponse.json({ error: 'Failed to fetch email content' }, { status: 500 })
     }
 
-    console.log('Email fetched - text length:', fullEmail.text?.length || 0, 'html length:', fullEmail.html?.length || 0)
+    console.log('[webhook] email fetched', {
+      emailId: maskId(webhookData.email_id),
+      textLength: fullEmail.text?.length || 0,
+      htmlLength: fullEmail.html?.length || 0,
+    })
 
     // Extract sender email (removing display name if present)
     const fromEmail = fullEmail.from.match(/<(.+)>/)?.[1] || fullEmail.from
@@ -168,13 +172,13 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('Failed to store email:', insertError)
+      console.error('[webhook] failed to store source email:', safeErrorMessage(insertError))
       return NextResponse.json({ error: 'Failed to store email' }, { status: 500 })
     }
 
     // If no user found, stop processing but acknowledge receipt
     if (!allowedSender) {
-      console.log(`Email from unrecognized sender: ${maskEmail(fromEmail)}`)
+      console.log(`[webhook] email from unrecognized sender: ${maskEmail(fromEmail)}`)
       return NextResponse.json({
         message: 'Email stored but sender not recognized',
         email_id: sourceEmail.id,
@@ -193,7 +197,7 @@ export async function POST(request: NextRequest) {
     // ── Soft usage gate: check monthly extraction limit ───────────────────────
     const extractionCheck = await checkExtractionLimit(userId, supabase)
     if (!extractionCheck.allowed) {
-      console.log(`Extraction limit reached for user ${userId}: ${extractionCheck.used}/${extractionCheck.limit}`)
+      console.log(`[webhook] extraction limit reached for user ${maskId(userId)}: ${extractionCheck.used}/${extractionCheck.limit}`)
       await supabase
         .from('source_emails')
         .update({
@@ -256,7 +260,7 @@ export async function POST(request: NextRequest) {
                     upsert: true,
                   })
                 if (uploadError) {
-                  console.error('Failed to store attachment:', safeFilename, uploadError)
+                  console.error('[webhook] failed to store attachment:', safeErrorMessage(uploadError))
                   enrichedAttachments.push({
                     filename: attachment.filename ?? 'unknown',
                     content_type: attachment.content_type ?? 'application/octet-stream',
@@ -275,7 +279,7 @@ export async function POST(request: NextRequest) {
                 }
               }
             } catch (pdfError) {
-              console.error('Failed to extract PDF:', attachment.filename, pdfError)
+              console.error('[webhook] failed to extract PDF attachment:', safeErrorMessage(pdfError))
               enrichedAttachments.push({
                 filename: attachment.filename ?? 'unknown',
                 content_type: attachment.content_type ?? 'application/octet-stream',
@@ -335,7 +339,7 @@ export async function POST(request: NextRequest) {
       const isNewsletter = NEWSLETTER_PATTERNS.some((p) => p.test(emailSubject))
 
       if (isNewsletter) {
-        console.log(`[token-filter] Skipping newsletter/marketing email: "${fullEmail.subject}"`)
+        console.log('[token-filter] skipping newsletter/marketing email', { sourceEmailId: maskId(sourceEmail.id) })
         try {
           await supabase.from('token_usage').insert({
             user_id: userId,
@@ -347,7 +351,7 @@ export async function POST(request: NextRequest) {
             extraction_type: 'skipped',
           })
         } catch (trackErr) {
-          console.warn('[token-filter] Failed to log skip (non-fatal):', trackErr)
+          console.warn('[token-filter] failed to log skip (non-fatal):', safeErrorMessage(trackErr))
         }
         await supabase
           .from('source_emails')
@@ -361,7 +365,7 @@ export async function POST(request: NextRequest) {
 
       // Track that this user forwarded their first email (idempotent)
       trackFirstForward(userId, supabase).catch((err) =>
-        console.error('[activation] trackFirstForward failed:', err)
+        console.error('[activation] trackFirstForward failed:', safeErrorMessage(err))
       )
 
       // Extract sender domain for example matching
@@ -548,7 +552,7 @@ export async function POST(request: NextRequest) {
               .single()
 
             if (tripError) {
-              console.error('Failed to create trip:', tripError)
+              console.error('[webhook] failed to create trip:', safeErrorMessage(tripError))
               continue
             }
 
@@ -557,7 +561,7 @@ export async function POST(request: NextRequest) {
 
             // Track activation milestone (idempotent)
             trackTripCreated(userId, supabase).catch((err) =>
-              console.error('[activation] trackTripCreated failed:', err)
+              console.error('[activation] trackTripCreated failed:', safeErrorMessage(err))
             )
 
             // Fetch and set cover image for the new trip
@@ -577,7 +581,10 @@ export async function POST(request: NextRequest) {
               const eventName = eventDetails?.event_name as string | undefined
               // Use Brave Image Search for events — much better for performers/events than Unsplash
               const eventQuery = performer || eventName || smartTitle
-              console.log('Event-driven trip, searching Brave for event image:', eventQuery)
+              console.log('[webhook] event-driven trip cover image search started', {
+                tripId: maskId(newTrip.id),
+                queryLength: eventQuery.length,
+              })
               const braveImage = await searchBraveImages(eventQuery)
               if (braveImage) {
                 // Download and store in Supabase Storage to avoid hotlink issues
@@ -592,19 +599,28 @@ export async function POST(request: NextRequest) {
               } else {
                 coverSearchQuery = eventQuery // Fall back to Unsplash
               }
-              console.log('Event-driven trip, searching for event image:', eventQuery)
+              console.log('[webhook] event-driven trip cover image fallback search', {
+                tripId: maskId(newTrip.id),
+                queryLength: eventQuery.length,
+              })
             } else if (location) {
               // Regular trip — search by location
               coverSearchQuery = location
                 .replace(/\s*\([A-Z]{3}\)\s*/g, ' ')
                 .replace(/^[A-Z]{3}\s*[-–]\s*/, '')
                 .trim()
-              console.log('Fetching cover image for location:', coverSearchQuery)
+              console.log('[webhook] location cover image search started', {
+                tripId: maskId(newTrip.id),
+                queryLength: coverSearchQuery.length,
+              })
             }
 
             if (coverSearchQuery) {
               const coverImageUrl = await getDestinationImageUrl(coverSearchQuery, smartTitle)
-              console.log('Cover image URL:', coverImageUrl)
+              console.log('[webhook] cover image resolved', {
+                tripId: maskId(newTrip.id),
+                hasCoverImage: Boolean(coverImageUrl),
+              })
               if (coverImageUrl) {
                 await supabase
                   .from('trips')
@@ -670,7 +686,7 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (itemError) {
-          console.error('Failed to create trip item:', itemError)
+          console.error('[webhook] failed to create trip item:', safeErrorMessage(itemError))
           continue
         }
 
@@ -698,9 +714,12 @@ export async function POST(request: NextRequest) {
                 },
               })
               .eq('id', tripItem.id)
-            console.log('Linked ticket PDF:', ticketAtt.filename, '→', ticketAtt.storage_path)
+            console.log('[webhook] linked ticket PDF to trip item', {
+              itemId: maskId(tripItem.id),
+              hasStoragePath: Boolean(ticketAtt.storage_path),
+            })
           } else {
-            console.log('No suitable ticket PDF found among', enrichedAttachments.length, 'attachments')
+            console.log('[webhook] no suitable ticket PDF found', { attachmentCount: enrichedAttachments.length })
           }
         }
 
@@ -724,7 +743,7 @@ export async function POST(request: NextRequest) {
             }
           )
         } catch (tripUpdateError) {
-          console.error('[webhooks/resend trip-update-log]', tripUpdateError)
+          console.error('[webhooks/resend trip-update-log]', safeErrorMessage(tripUpdateError))
         }
       }
 
@@ -806,7 +825,7 @@ export async function POST(request: NextRequest) {
         items_created: createdItems.length,
       })
     } catch (error) {
-      console.error('Processing error:', error)
+      console.error('[webhook] processing error:', safeErrorMessage(error))
 
       // Update source email with error
       await supabase
@@ -817,15 +836,14 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', sourceEmail.id)
 
-      // SECURITY: Do not echo raw error details back to webhook sender — internals stay server-side
-      console.error('Processing error detail (not returned to caller):', error instanceof Error ? error.message : error)
+      // SECURITY: Do not echo raw error details back to webhook sender — internals stay server-side.
       return NextResponse.json({
         message: 'Processing failed',
         email_id: sourceEmail.id,
       })
     }
   } catch (error) {
-    console.error('Webhook handler error:', error)
+    console.error('[webhook] handler error:', safeErrorMessage(error))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -1337,7 +1355,7 @@ async function importRecommendationEmail(params: {
 
   const { error } = await params.supabase.from('guide_entries').insert(inserts)
   if (error) {
-    console.error('[webhooks/resend] Failed to import recommendation entries:', error)
+    console.error('[webhooks/resend] failed to import recommendation entries:', safeErrorMessage(error))
     return { importedCount: 0, city }
   }
 
@@ -1404,6 +1422,6 @@ async function sendConfirmationEmail(
       html: emailHtml,
     })
   } catch (error) {
-    console.error('Failed to send confirmation email:', error)
+    console.error('[webhook] failed to send confirmation email:', safeErrorMessage(error))
   }
 }

@@ -77,9 +77,9 @@ export function signWebhookPayload(payload: string, secret: string): string {
   return crypto.createHmac('sha256', secret).update(payload).digest('hex')
 }
 
-function removeSensitiveFields(value: unknown): unknown {
+export function sanitizeWebhookData(value: unknown): unknown {
   if (Array.isArray(value)) {
-    return value.map((entry) => removeSensitiveFields(entry))
+    return value.map((entry) => sanitizeWebhookData(entry))
   }
 
   if (value && typeof value === 'object') {
@@ -92,12 +92,20 @@ function removeSensitiveFields(value: unknown): unknown {
         normalized.includes('key_hash') ||
         normalized.includes('password') ||
         normalized.includes('token') ||
+        normalized.includes('email') ||
+        normalized.includes('confirmation') ||
+        normalized.includes('booking_reference') ||
+        normalized.includes('reservation_number') ||
+        normalized.includes('ticket_number') ||
+        normalized.includes('traveler_name') ||
+        normalized.includes('passenger_name') ||
+        normalized.includes('phone') ||
         normalized.includes('loyalty_number') ||
         normalized.includes('program_number')
       ) {
         continue
       }
-      out[key] = removeSensitiveFields(v)
+      out[key] = sanitizeWebhookData(v)
     }
     return out
   }
@@ -142,7 +150,7 @@ async function queueDeliveriesForWebhooks(
   // request context, queues deliveries for multiple users simultaneously.
   const supabase = createSecretClient()
   const timestamp = new Date().toISOString()
-  const sanitizedData = removeSensitiveFields(data) as Record<string, unknown>
+  const sanitizedData = sanitizeWebhookData(data) as Record<string, unknown>
 
   const deliveries = webhooks.map((webhook) => {
     const deliveryId = crypto.randomUUID()

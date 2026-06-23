@@ -9,10 +9,12 @@ import type {
   EventCategory,
   EventSegment,
   EventTier,
+  OutgoingShelfData,
   PipelineDiary,
   TrackedCity,
   VenueType,
 } from '@/types/events'
+import { getOutgoingShelves, isOutgoingStale, refreshOutgoingForCity } from '@/lib/events/outgoing'
 
 interface CityRow {
   id: string
@@ -25,6 +27,9 @@ interface CityRow {
   timezone: string | null
   hero_image_url: string | null
   last_refreshed_at: string | null
+  h3_cell: string | null
+  event_source: string | null
+  outgoing_refresh_started_at: string | null
 }
 
 interface EventRow {
@@ -44,6 +49,7 @@ interface EventRow {
   significance_score: number | null
   source: string | null
   source_url: string | null
+  external_id: string | null
   image_url: string | null
   price_info: string | null
   booking_url: string | null
@@ -77,6 +83,9 @@ function toTrackedCity(row: CityRow): TrackedCity {
     ...row,
     latitude: row.latitude === null ? null : Number(row.latitude),
     longitude: row.longitude === null ? null : Number(row.longitude),
+    event_source: row.event_source === 'outgoing' ? 'outgoing' : 'legacy',
+    h3_cell: row.h3_cell,
+    outgoing_refresh_started_at: row.outgoing_refresh_started_at,
   }
 }
 
@@ -98,6 +107,7 @@ function toEvent(row: EventRow): CityEvent {
     significance_score: row.significance_score ?? 50,
     source: row.source,
     source_url: row.source_url,
+    external_id: row.external_id,
     image_url: row.image_url,
     price_info: row.price_info,
     booking_url: row.booking_url,
@@ -204,7 +214,7 @@ export function getMonthWindow(date = new Date()): { from: string; to: string } 
 export async function getTrackedCities(supabase: SupabaseClient): Promise<TrackedCity[]> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at')
+    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source, outgoing_refresh_started_at')
     .neq('country', '')
     .order('city', { ascending: true })
 
@@ -215,7 +225,7 @@ export async function getTrackedCities(supabase: SupabaseClient): Promise<Tracke
 export async function getTrackedCityBySlug(supabase: SupabaseClient, slug: string): Promise<TrackedCity | null> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at')
+    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source, outgoing_refresh_started_at')
     .eq('slug', slug)
     .maybeSingle()
 
@@ -250,7 +260,7 @@ export async function getCityEvents(
     .from('city_events')
     .select(`
       id, city_id, venue_id, parent_event_id, title, venue_name, venue_type, category, event_tier,
-      description, start_date, end_date, time_info, significance_score, source, source_url, image_url,
+      description, start_date, end_date, time_info, significance_score, source, source_url, external_id, image_url,
       price_info, booking_url, tags, lineup, last_verified_at, expires_at
     `)
     .eq('city_id', cityId)
@@ -273,7 +283,7 @@ export async function getTrackedCitiesWithEventCounts(supabase: SupabaseClient):
     getTrackedCities(supabase),
     supabase
       .from('city_events')
-      .select('id, city_id, title, start_date, end_date, event_tier, significance_score, category, venue_name, venue_type, venue_id, parent_event_id, description, time_info, source, source_url, image_url, price_info, booking_url, tags, lineup, last_verified_at, expires_at')
+      .select('id, city_id, title, start_date, end_date, event_tier, significance_score, category, venue_name, venue_type, venue_id, parent_event_id, description, time_info, source, source_url, external_id, image_url, price_info, booking_url, tags, lineup, last_verified_at, expires_at')
       .gte('start_date', new Date().toISOString().slice(0, 10)),
   ])
 
@@ -335,6 +345,19 @@ export function matchTrackedCityByName(cities: TrackedCity[], name: string): Tra
   return null
 }
 
+async function refreshStaleOutgoingCities(cities: TrackedCity[]): Promise<void> {
+  const staleOutgoingCities = cities.filter((city) => isOutgoingStale(city))
+  if (staleOutgoingCities.length === 0) return
+
+  const results = await Promise.allSettled(staleOutgoingCities.map((city) => refreshOutgoingForCity(city)))
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'rejected') {
+      const slug = staleOutgoingCities[index]?.slug.replace(/[\r\n]/g, '').slice(0, 100) ?? 'unknown'
+      console.error('[outgoing] refresh failed for', slug, result.reason)
+    }
+  }
+}
+
 export async function getTripTimelineEventPreviews(
   supabase: SupabaseClient,
   segments: CitySegment[]
@@ -342,22 +365,20 @@ export async function getTripTimelineEventPreviews(
   if (segments.length === 0) return {}
 
   const cities = await getTrackedCities(supabase)
-  const uniqueCities = Array.from(
-    new Set(
-      segments
-        .map((segment) => matchTrackedCityByName(cities, segment.city))
-        .filter((city): city is TrackedCity => city !== null)
-        .map((city) => city.id)
-    )
-  )
+  const matchedCities = segments
+    .map((segment) => matchTrackedCityByName(cities, segment.city))
+    .filter((city): city is TrackedCity => city !== null)
+  const uniqueCities = Array.from(new Set(matchedCities.map((city) => city.id)))
 
   if (uniqueCities.length === 0) return {}
+
+  await refreshStaleOutgoingCities(matchedCities)
 
   const { data, error } = await supabase
     .from('city_events')
     .select(`
       id, city_id, venue_id, parent_event_id, title, venue_name, venue_type, category, event_tier,
-      description, start_date, end_date, time_info, significance_score, source, source_url, image_url,
+      description, start_date, end_date, time_info, significance_score, source, source_url, external_id, image_url,
       price_info, booking_url, tags, lineup, last_verified_at, expires_at
     `)
     .in('city_id', uniqueCities)
@@ -403,6 +424,9 @@ export async function getCityEventsPageData(
     getCityEvents(supabase, city.id, options),
     getPipelineDiaryForCity(supabase, city.id),
   ])
+  const outgoingShelves = city.event_source === 'outgoing'
+    ? await getOutgoingShelves(supabase, city.id, events)
+    : [] as OutgoingShelfData[]
 
   return {
     city,
@@ -410,5 +434,6 @@ export async function getCityEventsPageData(
     segments: buildEventSegments(events),
     distanceGroups: buildDistanceGroups(events),
     pipelineDiary,
+    outgoingShelves,
   }
 }

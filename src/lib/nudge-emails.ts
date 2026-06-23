@@ -7,7 +7,7 @@
  */
 
 import { render } from '@react-email/components'
-import { maskEmail } from '@/lib/privacy'
+import { maskEmail, maskId, safeErrorMessage } from '@/lib/privacy'
 import { createSecretClient } from '@/lib/supabase/service'
 import { getResendClient } from '@/lib/resend/client'
 import { OnboardingDay2Email } from '@/components/email/onboarding-day-2'
@@ -45,7 +45,7 @@ export async function checkAndSendNudges(): Promise<number> {
     .select('id, email, full_name, created_at, subscription_tier, nudge_1_sent_at, nudge_2_sent_at, nudge_3_sent_at')
 
   if (error) {
-    console.error('[nudge-emails] Failed to fetch profiles:', error)
+    console.error('[nudge-emails] failed to fetch profiles:', safeErrorMessage(error))
     throw error
   }
 
@@ -61,7 +61,7 @@ export async function checkAndSendNudges(): Promise<number> {
       .eq('user_id', profile.id)
 
     if (tripsError) {
-      console.error(`[nudge-emails] Failed to fetch trips for ${profile.id}:`, tripsError)
+      console.error(`[nudge-emails] failed to fetch trips for ${maskId(profile.id)}:`, safeErrorMessage(tripsError))
       continue
     }
 
@@ -91,7 +91,7 @@ export async function checkAndSendNudges(): Promise<number> {
         console.log(`[nudge-emails] Sent day-2 onboarding email to ${maskEmail(profile.email!)}`)
         continue
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-2 email for ${profile.id}:`, err)
+        console.error(`[nudge-emails] failed day-2 email for ${maskId(profile.id)}:`, safeErrorMessage(err))
       }
     }
 
@@ -122,7 +122,7 @@ export async function checkAndSendNudges(): Promise<number> {
         console.log(`[nudge-emails] Sent day-5 onboarding email to ${maskEmail(profile.email!)}`)
         continue
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-5 email for ${profile.id}:`, err)
+        console.error(`[nudge-emails] failed day-5 email for ${maskId(profile.id)}:`, safeErrorMessage(err))
       }
     }
 
@@ -151,7 +151,7 @@ export async function checkAndSendNudges(): Promise<number> {
         sent++
         console.log(`[nudge-emails] Sent day-14 onboarding email to ${maskEmail(profile.email!)}`)
       } catch (err) {
-        console.error(`[nudge-emails] Failed day-14 email for ${profile.id}:`, err)
+        console.error(`[nudge-emails] failed day-14 email for ${maskId(profile.id)}:`, safeErrorMessage(err))
       }
     }
   }
