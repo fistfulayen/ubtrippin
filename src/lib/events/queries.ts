@@ -27,9 +27,9 @@ interface CityRow {
   timezone: string | null
   hero_image_url: string | null
   last_refreshed_at: string | null
-  h3_cell: string | null
-  event_source: string | null
-  outgoing_refresh_started_at: string | null
+  h3_cell?: string | null
+  event_source?: string | null
+  outgoing_refresh_started_at?: string | null
 }
 
 interface EventRow {
@@ -78,14 +78,21 @@ const tierOrder: Record<EventTier, number> = {
   local: 2,
 }
 
+const BASE_CITY_SELECT = 'id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at'
+const OUTGOING_CITY_SELECT = `${BASE_CITY_SELECT}, h3_cell, event_source, outgoing_refresh_started_at`
+
+function isMissingColumnError(error: { code?: string; message?: string } | null): boolean {
+  return error?.code === '42703'
+}
+
 function toTrackedCity(row: CityRow): TrackedCity {
   return {
     ...row,
     latitude: row.latitude === null ? null : Number(row.latitude),
     longitude: row.longitude === null ? null : Number(row.longitude),
     event_source: row.event_source === 'outgoing' ? 'outgoing' : 'legacy',
-    h3_cell: row.h3_cell,
-    outgoing_refresh_started_at: row.outgoing_refresh_started_at,
+    h3_cell: row.h3_cell ?? null,
+    outgoing_refresh_started_at: row.outgoing_refresh_started_at ?? null,
   }
 }
 
@@ -214,9 +221,20 @@ export function getMonthWindow(date = new Date()): { from: string; to: string } 
 export async function getTrackedCities(supabase: SupabaseClient): Promise<TrackedCity[]> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source, outgoing_refresh_started_at')
+    .select(OUTGOING_CITY_SELECT)
     .neq('country', '')
     .order('city', { ascending: true })
+
+  if (isMissingColumnError(error)) {
+    const fallback = await supabase
+      .from('tracked_cities')
+      .select(BASE_CITY_SELECT)
+      .neq('country', '')
+      .order('city', { ascending: true })
+
+    if (fallback.error) throw fallback.error
+    return ((fallback.data ?? []) as CityRow[]).map(toTrackedCity)
+  }
 
   if (error) throw error
   return ((data ?? []) as CityRow[]).map(toTrackedCity)
@@ -225,9 +243,20 @@ export async function getTrackedCities(supabase: SupabaseClient): Promise<Tracke
 export async function getTrackedCityBySlug(supabase: SupabaseClient, slug: string): Promise<TrackedCity | null> {
   const { data, error } = await supabase
     .from('tracked_cities')
-    .select('id, city, country, country_code, slug, latitude, longitude, timezone, hero_image_url, last_refreshed_at, h3_cell, event_source, outgoing_refresh_started_at')
+    .select(OUTGOING_CITY_SELECT)
     .eq('slug', slug)
     .maybeSingle()
+
+  if (isMissingColumnError(error)) {
+    const fallback = await supabase
+      .from('tracked_cities')
+      .select(BASE_CITY_SELECT)
+      .eq('slug', slug)
+      .maybeSingle()
+
+    if (fallback.error) throw fallback.error
+    return fallback.data ? toTrackedCity(fallback.data as CityRow) : null
+  }
 
   if (error) throw error
   return data ? toTrackedCity(data as CityRow) : null
