@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import { cache } from 'react'
 import path from 'node:path'
-import matter from 'gray-matter'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import remarkRehype from 'remark-rehype'
@@ -37,10 +36,51 @@ export interface Dispatch extends DispatchFrontmatter {
   content: string
 }
 
+function parseFrontmatterValue(value: string): string {
+  const trimmed = value.trim()
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
+
+function parseDispatchMarkdown(fileContents: string): {
+  data: Partial<DispatchFrontmatter>
+  content: string
+} {
+  if (!fileContents.startsWith('---\n')) {
+    return { data: {}, content: fileContents }
+  }
+
+  const endIndex = fileContents.indexOf('\n---', 4)
+  if (endIndex === -1) {
+    return { data: {}, content: fileContents }
+  }
+
+  const rawFrontmatter = fileContents.slice(4, endIndex)
+  const contentStart = fileContents.indexOf('\n', endIndex + 4)
+  const content = contentStart === -1 ? '' : fileContents.slice(contentStart + 1)
+  const data: Partial<DispatchFrontmatter> = {}
+
+  for (const line of rawFrontmatter.split('\n')) {
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/)
+    if (!match) continue
+    const [, key, rawValue] = match
+    if (key === 'title' || key === 'date' || key === 'slug' || key === 'summary' || key === 'author') {
+      data[key] = parseFrontmatterValue(rawValue)
+    }
+  }
+
+  return { data, content }
+}
+
 function parseDispatchFile(fileName: string): Dispatch {
   const fullPath = path.join(dispatchesDirectory, fileName)
   const fileContents = fs.readFileSync(fullPath, 'utf8')
-  const { data, content } = matter(fileContents)
+  const { data, content } = parseDispatchMarkdown(fileContents)
 
   const frontmatter = data as Partial<DispatchFrontmatter>
   const slug = frontmatter.slug ?? fileName.replace(/\.md$/, '')
@@ -49,7 +89,6 @@ function parseDispatchFile(fileName: string): Dispatch {
     throw new Error(`Invalid dispatch frontmatter in ${fileName}`)
   }
 
-  // gray-matter auto-parses YAML dates into Date objects; normalise to string
   const rawDate = frontmatter.date as unknown
   const dateStr = rawDate instanceof Date
     ? rawDate.toISOString().split('T')[0]

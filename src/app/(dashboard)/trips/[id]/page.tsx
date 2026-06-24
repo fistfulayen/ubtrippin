@@ -197,14 +197,20 @@ async function WeatherSectionAsync({
 }: WeatherSectionAsyncProps) {
   if (!userId) return null
 
-  const weather = await loadTripWeatherForStream({
-    tripId: trip.id,
-    userId,
-    requestedUnit: userUnit,
-    includePacking: isPro,
-    trip,
-    items,
-  })
+  let weather: WeatherResponsePayload | null = null
+  try {
+    weather = await loadTripWeatherForStream({
+      tripId: trip.id,
+      userId,
+      requestedUnit: userUnit,
+      includePacking: isPro,
+      trip,
+      items,
+    })
+  } catch (error) {
+    console.error('[trips/:id] weather failed', error)
+    return null
+  }
 
   return (
     <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
@@ -248,9 +254,14 @@ async function TimelineWithEventsAsync({
     .filter((entry) => entry.type === 'segment' && entry.segment != null)
     .map((entry) => entry.segment!)
 
-  const segmentEvents = currentUserId
-    ? await getTripTimelineEventPreviews(await createClient(), segmentEntries)
-    : {}
+  let segmentEvents: Record<string, Awaited<ReturnType<typeof getTripTimelineEventPreviews>>[string]> = {}
+  if (currentUserId) {
+    try {
+      segmentEvents = await getTripTimelineEventPreviews(await createClient(), segmentEntries)
+    } catch (error) {
+      console.error('[trips/:id] event previews failed', error)
+    }
+  }
 
   return (
     <MovementTimeline
