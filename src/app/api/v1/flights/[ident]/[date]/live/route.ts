@@ -288,7 +288,7 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
   if (!flights) return null
 
   // Pick the best flight first so we can check for codeshare resolution
-  let first = pickBestFlight(flights)
+  let first = pickBestFlight(flights, { date })
   if (!first) return null
 
   // Codeshare resolution: if the queried ident is a codeshare and FA returns
@@ -300,7 +300,7 @@ async function fetchFlightFromAware(ident: string, date: string): Promise<Flight
     const operatorFlights = await fetchFlightRaw(operatorIdent, date)
     if (operatorFlights && operatorFlights.length > 0) {
       flights = operatorFlights
-      first = pickBestFlight(flights) ?? first
+      first = pickBestFlight(flights, { date }) ?? first
     }
   }
 

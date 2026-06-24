@@ -43,6 +43,16 @@ export interface FlightStatusResult {
 export interface FlightLookup {
   ident: string
   date: string
+  targetDepartureIso: string | null
+}
+
+export interface FlightStatusLookupOptions {
+  targetDepartureIso?: string | null
+}
+
+interface PickBestFlightOptions {
+  date?: string | null
+  targetDepartureIso?: string | null
 }
 
 export interface FlightAwareDateWindow {
@@ -127,6 +137,20 @@ function toIsoOrNull(value: unknown): string | null {
   const parsed = asString(value)
   if (!parsed) return null
   return Number.isNaN(Date.parse(parsed)) ? null : parsed
+}
+
+function parseTime(value: unknown): number | null {
+  const parsed = toIsoOrNull(value)
+  if (!parsed) return null
+  const ms = Date.parse(parsed)
+  return Number.isNaN(ms) ? null : ms
+}
+
+function requestedUtcDayRange(date: string | null | undefined): { startMs: number; endMs: number } | null {
+  if (!date || !ISO_DATE_RE.test(date)) return null
+  const startMs = Date.parse(`${date}T00:00:00Z`)
+  if (Number.isNaN(startMs)) return null
+  return { startMs, endMs: startMs + 24 * 60 * 60 * 1000 }
 }
 
 function diffMinutes(startIso: string, endIso: string): number | null {
@@ -301,6 +325,7 @@ export function extractFlightIdentFromDetails(detailsJson: unknown): string | nu
 
 export function buildFlightLookup(item: {
   start_date: string | null
+  start_ts?: string | null
   details_json: unknown
 }): FlightLookup | null {
   if (!item.start_date || !ISO_DATE_RE.test(item.start_date)) {
@@ -313,6 +338,7 @@ export function buildFlightLookup(item: {
   return {
     ident,
     date: item.start_date,
+    targetDepartureIso: toIsoOrNull(item.start_ts),
   }
 }
 
@@ -358,32 +384,61 @@ async function fetchFlightsRaw(ident: string, date: string): Promise<Record<stri
   }
 }
 
+function flightDepartureTimeMs(flight: Record<string, unknown>): number | null {
+  return (
+    parseTime(flight.scheduled_out) ??
+    parseTime(flight.scheduled_off) ??
+    parseTime(flight.estimated_out) ??
+    parseTime(flight.estimated_off)
+  )
+}
+
 /**
  * Pick the most relevant flight from a list of FA results.
- * Prefers in-progress flights over completed ones, scored by scheduled departure.
+ * FlightAware can return the next day's recurring flight in the 36-hour lookup
+ * window, so the requested itinerary date/time must win before recency.
  */
-export function pickBestFlight(flights: Record<string, unknown>[]): Record<string, unknown> | null {
+export function pickBestFlight(
+  flights: Record<string, unknown>[],
+  options: PickBestFlightOptions = {}
+): Record<string, unknown> | null {
   if (flights.length === 0) return null
   if (flights.length === 1) return flights[0]
 
+  const requestedDay = requestedUtcDayRange(options.date)
+  const targetMs = parseTime(options.targetDepartureIso)
   const scored = flights.map((fl) => {
-    const schedOut = asString(fl.scheduled_out)
-    const schedMs = schedOut ? new Date(schedOut).getTime() : 0
+    const departureMs = flightDepartureTimeMs(fl)
     const hasLanded = !!(asString(fl.actual_on) || asString(fl.actual_in))
-    return { fl, schedMs, hasLanded }
+    const matchesRequestedDay = requestedDay && departureMs !== null
+      ? departureMs >= requestedDay.startMs && departureMs < requestedDay.endMs
+      : false
+    const targetDiff = targetMs !== null && departureMs !== null
+      ? Math.abs(departureMs - targetMs)
+      : Number.POSITIVE_INFINITY
+    return { fl, departureMs: departureMs ?? 0, hasLanded, matchesRequestedDay, targetDiff }
   })
 
-  const notLanded = scored.filter((s) => !s.hasLanded)
-  const pool = notLanded.length > 0 ? notLanded : scored
-  pool.sort((a, b) => b.schedMs - a.schedMs)
+  const dayMatches = scored.filter((s) => s.matchesRequestedDay)
+  const pool = dayMatches.length > 0 ? dayMatches : scored
+  pool.sort((a, b) => {
+    if (a.targetDiff !== b.targetDiff) return a.targetDiff - b.targetDiff
+    if (a.hasLanded !== b.hasLanded) return a.hasLanded ? 1 : -1
+    if (dayMatches.length > 0) return a.departureMs - b.departureMs
+    return b.departureMs - a.departureMs
+  })
   return pool[0].fl
 }
 
-export async function getFlightStatus(ident: string, date: string): Promise<FlightStatusResult | null> {
+export async function getFlightStatus(
+  ident: string,
+  date: string,
+  options: FlightStatusLookupOptions = {}
+): Promise<FlightStatusResult | null> {
   const flights = await fetchFlightsRaw(ident, date)
   if (!flights || flights.length === 0) return null
 
-  let first = pickBestFlight(flights)
+  let first = pickBestFlight(flights, { date, targetDepartureIso: options.targetDepartureIso })
   if (!first) return null
 
   // Codeshare resolution: if the queried ident is a codeshare, FA returns
@@ -393,7 +448,7 @@ export async function getFlightStatus(ident: string, date: string): Promise<Flig
     console.log(`[flightaware] codeshare detected: ${ident} → operating as ${operatorIdent}, re-fetching`)
     const operatorFlights = await fetchFlightsRaw(operatorIdent, date)
     if (operatorFlights && operatorFlights.length > 0) {
-      const operatorBest = pickBestFlight(operatorFlights)
+      const operatorBest = pickBestFlight(operatorFlights, { date, targetDepartureIso: options.targetDepartureIso })
       if (operatorBest) first = operatorBest
     }
   }

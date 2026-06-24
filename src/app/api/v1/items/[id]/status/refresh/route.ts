@@ -14,6 +14,7 @@ import { dispatchWebhookEvent } from '@/lib/webhooks'
 
 const FREE_DAILY_REFRESH_LIMIT = 3
 const STALENESS_MS = 5 * 60 * 1000 // 5 minutes — don't call FlightAware if data is fresher
+const MAX_CACHED_DEPARTURE_SKEW_MS = 18 * 60 * 60 * 1000
 
 interface FlightItemRow {
   id: string
@@ -32,6 +33,26 @@ function utcDayStartIso(now = new Date()): string {
   const dayStart = new Date(now)
   dayStart.setUTCHours(0, 0, 0, 0)
   return dayStart.toISOString()
+}
+
+function cachedStatusMatchesFlightItem(
+  cachedStatus: Record<string, unknown>,
+  flightItem: FlightItemRow
+): boolean {
+  const estimatedDeparture = cachedStatus.estimated_departure
+  if (typeof estimatedDeparture !== 'string') return true
+
+  const estimatedMs = Date.parse(estimatedDeparture)
+  if (Number.isNaN(estimatedMs)) return true
+
+  if (flightItem.start_ts) {
+    const startMs = Date.parse(flightItem.start_ts)
+    if (!Number.isNaN(startMs)) {
+      return Math.abs(estimatedMs - startMs) <= MAX_CACHED_DEPARTURE_SKEW_MS
+    }
+  }
+
+  return estimatedDeparture.slice(0, 10) === flightItem.start_date
 }
 
 export async function POST(
@@ -75,6 +96,7 @@ export async function POST(
 
   const lookup = buildFlightLookup({
     start_date: flightItem.start_date,
+    start_ts: flightItem.start_ts,
     details_json: flightItem.details_json,
   })
   if (!lookup) {
@@ -146,7 +168,11 @@ export async function POST(
   // Return cached data if checked within the last 5 minutes — avoid unnecessary FA API calls
   if (existingStatus?.last_checked_at) {
     const checkedAt = new Date(existingStatus.last_checked_at as string).getTime()
-    if (!Number.isNaN(checkedAt) && Date.now() - checkedAt < STALENESS_MS) {
+    const cacheMatchesItem = cachedStatusMatchesFlightItem(
+      existingStatus as Record<string, unknown>,
+      flightItem
+    )
+    if (!Number.isNaN(checkedAt) && Date.now() - checkedAt < STALENESS_MS && cacheMatchesItem) {
       const cachedStatus = normalizeStatusRow(itemId, existingStatus as Record<string, unknown>)
       // Strip raw_response — internal FA payload, never sent to clients
       delete cachedStatus.raw_response
@@ -176,7 +202,9 @@ export async function POST(
     }
   }
 
-  const latest = await getFlightStatus(lookup.ident, lookup.date)
+  const latest = await getFlightStatus(lookup.ident, lookup.date, {
+    targetDepartureIso: lookup.targetDepartureIso,
+  })
   if (!latest) {
     return NextResponse.json(
       { error: { code: 'upstream_error', message: 'FlightAware status lookup failed.' } },
