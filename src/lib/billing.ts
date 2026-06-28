@@ -59,6 +59,10 @@ export function mapStripeSubscriptionStatusToTier(status: string | null | undefi
   }
 }
 
+export function hasUnlimitedProAccess(tier: string | null | undefined): boolean {
+  return tier === 'pro' || tier === 'grace'
+}
+
 export function unixSecondsToIso(value: number | null | undefined): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return null

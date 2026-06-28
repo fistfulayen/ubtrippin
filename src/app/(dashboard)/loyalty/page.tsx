@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { LoyaltyVault } from '@/components/loyalty/loyalty-vault'
+import { hasUnlimitedProAccess } from '@/lib/billing'
 
 type ProviderType = 'airline' | 'hotel' | 'car_rental' | 'other'
 
@@ -78,7 +79,7 @@ export default async function LoyaltyProgramsPage() {
     .maybeSingle()
 
   const plan = planData as { subscription_tier?: string | null; full_name?: string | null } | null
-  const isPro = plan?.subscription_tier === 'pro'
+  const isPro = hasUnlimitedProAccess(plan?.subscription_tier)
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

@@ -4,6 +4,7 @@ import {
   EARLY_ADOPTER_LIMIT,
   getEarlyAdopterSpotsRemaining,
   getProSubscriberCount,
+  hasUnlimitedProAccess,
   mapStripeSubscriptionStatusToTier,
   unixSecondsToIso,
 } from './billing'
@@ -41,6 +42,20 @@ describe('getEarlyAdopterSpotsRemaining', () => {
 
   it('returns zero when over limit', () => {
     expect(getEarlyAdopterSpotsRemaining(EARLY_ADOPTER_LIMIT + 10)).toBe(0)
+  })
+})
+
+describe('hasUnlimitedProAccess', () => {
+  it('treats pro and grace tiers as unlimited', () => {
+    expect(hasUnlimitedProAccess('pro')).toBe(true)
+    expect(hasUnlimitedProAccess('grace')).toBe(true)
+  })
+
+  it('does not treat free, paused, or missing tiers as unlimited', () => {
+    expect(hasUnlimitedProAccess('free')).toBe(false)
+    expect(hasUnlimitedProAccess('paused')).toBe(false)
+    expect(hasUnlimitedProAccess(null)).toBe(false)
+    expect(hasUnlimitedProAccess(undefined)).toBe(false)
   })
 })
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { hasUnlimitedProAccess } from '@/lib/billing'
 import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
 
 const PROVIDER_TYPES = ['airline', 'hotel', 'car_rental', 'other'] as const
@@ -46,12 +47,12 @@ async function isProUser(
 ): Promise<boolean> {
   const { data } = await supabase
     .from('profiles')
-    .select('tier, subscription_tier')
+    .select('subscription_tier')
     .eq('id', userId)
     .maybeSingle()
 
-  const row = data as { tier?: string | null; subscription_tier?: string | null } | null
-  return row?.tier === 'pro' || row?.subscription_tier === 'pro'
+  const row = data as { subscription_tier?: string | null } | null
+  return hasUnlimitedProAccess(row?.subscription_tier)
 }
 
 async function getAllianceMap(

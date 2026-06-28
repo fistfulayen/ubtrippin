@@ -21,6 +21,7 @@ import { buildTripItemDetails, sanitizeHtml } from '@/lib/utils'
 import { TripConfirmationEmail } from '@/components/email/trip-confirmation'
 import { render } from '@react-email/components'
 import { checkExtractionLimit, incrementExtractionCount } from '@/lib/usage/limits'
+import { hasUnlimitedProAccess } from '@/lib/billing'
 import { trackFirstForward, trackTripCreated } from '@/lib/activation'
 import { applyEmailLoyaltyFlag } from '@/lib/loyalty-flag'
 import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@/lib/loyalty-crypto'
@@ -1135,12 +1136,12 @@ async function upsertLoyaltyFromSignup(params: {
 
   const { data: profile } = await params.supabase
     .from('profiles')
-    .select('tier, subscription_tier')
+    .select('subscription_tier')
     .eq('id', params.userId)
     .maybeSingle()
 
-  const plan = profile as { tier?: string | null; subscription_tier?: string | null } | null
-  const isPro = plan?.tier === 'pro' || plan?.subscription_tier === 'pro'
+  const plan = profile as { subscription_tier?: string | null } | null
+  const isPro = hasUnlimitedProAccess(plan?.subscription_tier)
   if (!isPro && (count ?? 0) >= 3) return
 
   await params.supabase
