@@ -36,13 +36,10 @@ import {
   Clock,
   Hash,
   Pencil,
-  Share2,
 } from 'lucide-react'
-import type { TripItem, Trip, FlightDetails, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
+import type { TripItem, Trip, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
-import { buildFlightIdent, buildFlightPageUrl } from '@/lib/flight-ident'
 import {
-  FlightDetailsView,
   HotelDetailsView,
   TrainDetailsView,
   TrainStatusBadge,
@@ -50,7 +47,6 @@ import {
   TicketDetailsView,
   GenericDetailsView,
 } from './item-details'
-import { ItemStatusBadge, type StatusPayload } from './item-status-badge'
 import { FlightItemCard } from './flight-item-card'
 
 interface TripItemCardProps {
@@ -151,13 +147,13 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
         allTrips={allTrips}
         currentUserId={currentUserId}
         readOnly={readOnly}
+        defaultExpanded={defaultExpanded}
       />
     )
   }
 
   const router = useRouter()
   const [expanded, setExpanded] = useState(defaultExpanded ?? false)
-  const [liveStatus, setLiveStatus] = useState<StatusPayload | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -185,25 +181,6 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
     // Regenerate trip name in the background (fire-and-forget)
     fetch(`/api/v1/trips/${item.trip_id}/rename`, { method: 'POST' }).catch(() => {})
     router.refresh()
-  }
-
-  // Flight items are handled by FlightItemCard (early return above)
-  const flightPagePath: string | null = null
-
-  const handleShareFlight = async () => {
-    if (!flightPagePath) return
-    
-    const url = `https://www.ubtrippin.xyz${flightPagePath}`
-    
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: item.summary ?? 'Flight', url })
-      } else {
-        await navigator.clipboard.writeText(url)
-      }
-    } catch {
-      // User cancelled share or copy failed — ignore
-    }
   }
 
   const handleMove = async () => {
