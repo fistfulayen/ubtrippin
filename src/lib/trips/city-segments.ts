@@ -225,12 +225,23 @@ function deriveDisplayLocation(location: string): string | null {
   return region && region.length <= 24 ? `${city}, ${region}` : city
 }
 
+function isUsableHotelCityLabel(label: string): boolean {
+  const cleaned = label.trim()
+  if (!cleaned) return false
+
+  // Brand fragments like "part of JdV by Hyatt" are not cities. When the
+  // hotel location parses to that kind of text, fall back to the flight city.
+  if (/\bpart of\b/i.test(cleaned) || /\bby\b/i.test(cleaned)) return false
+
+  return true
+}
+
 function deriveSegmentIdentity(raw: RawSegment): Pick<CitySegment, 'city' | 'countryCode' | 'anchorType'> {
   const hotel = raw.items.find((item) => item.kind === 'hotel')
   if (hotel) {
     const hotelLocation = hotel.start_location ?? hotel.end_location
     const label = hotelLocation ? deriveDisplayLocation(hotelLocation) : null
-    if (label && !looksLikeVenueName(label)) {
+    if (label && !looksLikeVenueName(label) && isUsableHotelCityLabel(label)) {
       return { city: label, countryCode: undefined, anchorType: 'hotel' }
     }
   }

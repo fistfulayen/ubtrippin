@@ -517,6 +517,50 @@ describe('hotel segment assignment', () => {
     expect(miaSegment).toBeDefined()
     expect(miaSegment!.segment!.items.some((i) => i.kind === 'hotel')).toBe(true)
   })
+
+  it('falls back to the airport city when a hotel name is just brand copy', () => {
+    const items: TripItem[] = [
+      makeItem({
+        provider: 'United',
+        start_date: '2026-07-09',
+        end_date: '2026-07-09',
+        start_location: 'MIA',
+        end_location: 'SFO',
+        details_json: {
+          departure_airport: 'MIA',
+          arrival_airport: 'SFO',
+          departure_local_time: '09:00',
+          arrival_local_time: '11:45',
+        },
+      }),
+      makeItem({
+        kind: 'hotel',
+        start_date: '2026-07-09',
+        end_date: '2026-07-12',
+        start_location: 'Hotel Kabuki, part of JdV by Hyatt',
+        summary: 'Hotel Kabuki, part of JdV by Hyatt',
+      }),
+      makeItem({
+        provider: 'United',
+        start_date: '2026-07-12',
+        end_date: '2026-07-12',
+        start_location: 'SFO',
+        end_location: 'CDG',
+        details_json: {
+          departure_airport: 'SFO',
+          arrival_airport: 'CDG',
+          departure_local_time: '14:40',
+          arrival_local_time: '10:25',
+        },
+      }),
+    ]
+
+    const timeline = buildTimeline(items)
+    const segment = timeline.find((entry) => entry.type === 'segment' && entry.segment?.items.some((item) => item.kind === 'hotel'))?.segment
+
+    expect(segment?.city).toBe('San Francisco')
+    expect(segment?.items.some((item) => item.kind === 'hotel')).toBe(true)
+  })
 })
 
 describe('attachWeatherToTimeline — metro aliases', () => {
