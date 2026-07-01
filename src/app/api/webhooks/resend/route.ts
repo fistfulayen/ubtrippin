@@ -773,8 +773,6 @@ export async function POST(request: NextRequest) {
           { start_date: trip.start_date, end_date: trip.end_date }
         )
 
-        const rawNewLocation = getPrimaryLocation(items) || trip.primary_location
-        const newLocation = rawNewLocation ? await locationToCityAsync(rawNewLocation) : null
         const newTravelers = collectTravelerNames(items)
 
         // Merge travelers with existing
@@ -791,6 +789,14 @@ export async function POST(request: NextRequest) {
           })) as ExtractedItem[]
         )
 
+        const { data: allTripItems } = await supabase
+          .from('trip_items')
+          .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
+          .eq('trip_id', tripId)
+
+        const rawNewLocation = getPrimaryLocation((allTripItems ?? []) as ExtractedItem[]) || trip.primary_location
+        const newLocation = rawNewLocation ? await locationToCityAsync(rawNewLocation) : null
+
         // Build update object
         const tripUpdate: Record<string, unknown> = {
           start_date: newDates.start_date,
@@ -799,18 +805,11 @@ export async function POST(request: NextRequest) {
           travelers: mergedTravelers,
         }
 
-        // Re-generate trip name whenever new items are added
-        {
-          const { data: allTripItems } = await supabase
-            .from('trip_items')
-            .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
-            .eq('trip_id', tripId)
-
-          if (allTripItems && allTripItems.length > 0) {
-            const newTitle = await generateTripName(allTripItems, trip.title)
-            if (newTitle) {
-              tripUpdate.title = newTitle
-            }
+        // Re-generate trip name only for generic/default titles.
+        if (allTripItems && allTripItems.length > 0 && isDefaultTitle(trip.title)) {
+          const newTitle = await generateTripName(allTripItems, trip.title)
+          if (newTitle) {
+            tripUpdate.title = newTitle
           }
         }
 

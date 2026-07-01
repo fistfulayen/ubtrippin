@@ -67,6 +67,14 @@ describe('getPrimaryLocation', () => {
     expect(result).toContain('Los Angeles')
   })
 
+  it('keeps the hotel city when a restaurant is added to the trip', () => {
+    const items = [
+      makeItem({ kind: 'hotel', start_location: 'Tokyo, Japan' }),
+      makeItem({ kind: 'restaurant', start_location: 'Sushi Azabu' }),
+    ]
+    expect(getPrimaryLocation(items)).toBe('Tokyo, Japan')
+  })
+
   it('falls back to flight destinations when nothing else', () => {
     const items = [
       makeItem({ kind: 'flight', start_location: 'CDG', end_location: 'Tokyo NRT' }),
