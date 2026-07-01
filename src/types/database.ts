@@ -739,6 +739,18 @@ export interface CarRentalDetails {
   booking_reference?: string
 }
 
+// Restaurant reservation details
+export interface RestaurantDetails {
+  restaurant_name?: string
+  address?: string
+  reservation_time?: string
+  party_size?: number
+  seating?: string
+  purpose?: string
+  contact_phone?: string
+  booking_reference?: string
+}
+
 // Train details
 export interface TrainDetails {
   train_number?: string

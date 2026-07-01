@@ -105,6 +105,32 @@ describe('generateTripICal', () => {
     expect(ics).not.toContain('Travelers: Alex')
   })
 
+  it('uses restaurant reservation time and details in calendar output', () => {
+    const item = makeItem({
+      kind: 'restaurant',
+      provider: 'Sushi Azabu',
+      summary: 'Reservation at Sushi Azabu',
+      start_date: '2026-07-04',
+      start_ts: null,
+      end_ts: null,
+      start_location: 'Sushi Azabu, Tokyo',
+      details_json: {
+        restaurant_name: 'Sushi Azabu',
+        reservation_time: '19:45',
+        party_size: 5,
+        seating: 'Counter',
+        purpose: 'Family',
+        booking_reference: 'VXT7ZY',
+      },
+    })
+
+    const ics = generateTripICal(makeTrip(), [item])
+    expect(ics).toContain('SUMMARY:Sushi Azabu')
+    expect(ics).toContain('DTSTART:20260704T194500')
+    expect(ics).toContain('LOCATION:Sushi Azabu\\, Tokyo')
+    expect(ics).not.toContain('VXT7ZY')
+  })
+
   it('redacts booking references and traveler names from calendar output', () => {
     const item = makeItem({
       details_json: {

@@ -6,6 +6,7 @@ import { getResendClient } from '@/lib/resend/client'
 import { extractTravelData, type ExtractedItem } from '@/lib/ai/extract-travel-data'
 import { extractTextFromPdf } from '@/lib/pdf/parse-attachment'
 import { classifyPdfs, selectTicketPdfIndex } from '@/lib/attachments/classify-pdf'
+import { parseRestaurantReservationEmail, looksLikeRestaurantReservationEmail } from '@/lib/email/restaurant-reservation'
 import {
   assignToTrip,
   updateTripDates,
@@ -380,18 +381,32 @@ export async function POST(request: NextRequest) {
         { senderDomain, supabase, userId, sourceEmailId: sourceEmail.id }
       )
 
+      const restaurantFallback =
+        extractionResult.items.length === 0 &&
+        looksLikeRestaurantReservationEmail(fullEmail.subject || '', `${fullEmail.text || ''}\n${fullEmail.html || ''}\n${attachmentText || ''}`)
+          ? parseRestaurantReservationEmail(fullEmail.subject || '', `${fullEmail.text || ''}\n${fullEmail.html || ''}\n${attachmentText || ''}`)
+          : null
+
+      const finalExtractionResult = restaurantFallback
+        ? {
+            doc_type: 'travel_confirmation',
+            overall_confidence: restaurantFallback.confidence,
+            items: [restaurantFallback],
+          }
+        : extractionResult
+
       // Update source email with extraction result and attachment text
       await supabase
         .from('source_emails')
         .update({
-          extracted_json: extractionResult,
+          extracted_json: finalExtractionResult,
           attachment_text: attachmentText || null,
-          parse_status: extractionResult.items.length > 0 ? 'completed' : 'failed',
-          parse_error: extractionResult.items.length === 0 ? 'No travel items found' : null,
+          parse_status: finalExtractionResult.items.length > 0 ? 'completed' : 'failed',
+          parse_error: finalExtractionResult.items.length === 0 ? 'No travel items found' : null,
         })
         .eq('id', sourceEmail.id)
 
-      if (extractionResult.items.length === 0) {
+      if (finalExtractionResult.items.length === 0) {
         const signupMatch = await detectLoyaltySignupEmail({
           supabase,
           subject: fullEmail.subject || '',
@@ -498,14 +513,14 @@ export async function POST(request: NextRequest) {
       // Process extracted items - all items from same email go to same trip
       const createdItems: { tripId: string; itemId: string }[] = []
       const notificationTripIds = new Set<string>()
-      const tripsToUpdate = new Map<string, { items: typeof extractionResult.items }>()
+      const tripsToUpdate = new Map<string, { items: typeof finalExtractionResult.items }>()
 
       // Determine trip assignment using the first item, then use same trip for all
       let emailTripId: string | null = null
       let emailTripOwnerId: string | null = null
       let familyTripMatch: TripCandidate | null | undefined = undefined
 
-      for (const item of extractionResult.items) {
+      for (const item of finalExtractionResult.items) {
         let tripId: string | null = emailTripId
         let tripOwnerId: string | null = emailTripOwnerId
 
@@ -518,7 +533,7 @@ export async function POST(request: NextRequest) {
           // No own-trip match: try matching family-member trips before creating a new trip.
           if (!tripId) {
             if (familyTripMatch === undefined) {
-              familyTripMatch = await findMatchingFamilyTrip(extractionResult.items, familyTrips)
+                familyTripMatch = await findMatchingFamilyTrip(finalExtractionResult.items, familyTrips)
             }
             if (familyTripMatch) {
               tripId = familyTripMatch.id
@@ -529,15 +544,15 @@ export async function POST(request: NextRequest) {
           // Create new trip if needed
           if (!tripId) {
             // Use all items to determine best trip title and location
-            const primaryLocation = getPrimaryLocation(extractionResult.items)
-            const allTravelers = collectTravelerNames(extractionResult.items)
+            const primaryLocation = getPrimaryLocation(finalExtractionResult.items)
+            const allTravelers = collectTravelerNames(finalExtractionResult.items)
 
             // Convert airport codes to city names for better display (with AI fallback)
             const rawLocation = primaryLocation || item.end_location || item.start_location
             const cityLocation = rawLocation ? await locationToCityAsync(rawLocation) : null
 
             // Generate smart trip name using AI
-            const smartTitle = await generateTripName(extractionResult.items, assignment.tripTitle)
+            const smartTitle = await generateTripName(finalExtractionResult.items, assignment.tripTitle)
 
             const { data: newTrip, error: tripError } = await supabase
               .from('trips')
@@ -570,14 +585,14 @@ export async function POST(request: NextRequest) {
             // Determine cover image search query
             // For event/ticket-driven trips, search for the event, not the city
             // Check if this is an event-driven trip (tickets, activities, or items with event details)
-            const isEventTrip = extractionResult.items.every((i) => 
+            const isEventTrip = finalExtractionResult.items.every((i) => 
               i.kind === 'ticket' || i.kind === 'activity' || 
               (i.details as Record<string, unknown> | undefined)?.event_name != null
             )
             let coverSearchQuery: string | null = null
 
-            if (isEventTrip && extractionResult.items.length > 0) {
-              const eventDetails = extractionResult.items[0].details as Record<string, unknown> | undefined
+            if (isEventTrip && finalExtractionResult.items.length > 0) {
+              const eventDetails = finalExtractionResult.items[0].details as Record<string, unknown> | undefined
               const performer = eventDetails?.performer as string | undefined
               const eventName = eventDetails?.event_name as string | undefined
               // Use Brave Image Search for events — much better for performers/events than Unsplash
@@ -811,7 +826,7 @@ export async function POST(request: NextRequest) {
           userProfile.email,
           userProfile.full_name,
           createdItems,
-          extractionResult.items,
+          finalExtractionResult.items,
           supabase
         )
       }
@@ -1167,11 +1182,16 @@ function normalizeText(text: string): string {
   return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
-function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
+      function looksLikeBookingEmail(subject: string, bodyText: string): boolean {
   const haystack = normalizeText(`${subject}\n${bodyText}`)
   const bookingSignals = [
     'booking confirmation',
     'reservation confirmed',
+    'reservation accepted',
+    'booked your reservation',
+    'restaurant reservation',
+    'table for',
+    'party of',
     'itinerary',
     'ticket number',
     'check-in',
@@ -1373,7 +1393,7 @@ async function sendUnclearEmailReply(params: {
     from: 'UBTRIPPIN <trips@ubtrippin.xyz>',
     to: params.to,
     subject: "We couldn't process your forwarded email",
-    text: `Hi ${displayName}, we received your email but couldn't figure out what to do with it. If you were trying to add a booking, try forwarding the confirmation email from the airline/hotel/car rental. If you were trying to add a loyalty program, forward your membership welcome email.`,
+    text: `Hi ${displayName}, we received your email but couldn't figure out what to do with it. If you were trying to add a booking, try forwarding the confirmation email from the airline, hotel, car rental, or restaurant. If you were trying to add a loyalty program, forward your membership welcome email.`,
   })
 }
 

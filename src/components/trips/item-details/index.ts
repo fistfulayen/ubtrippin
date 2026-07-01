@@ -1,5 +1,6 @@
 export { FlightDetailsView } from './flight-details'
 export { HotelDetailsView } from './hotel-details'
+export { RestaurantDetailsView } from './restaurant-details'
 export { TrainDetailsView } from './train-details'
 export { TrainStatusBadge } from './train-status'
 export { CarDetailsView } from './car-details'

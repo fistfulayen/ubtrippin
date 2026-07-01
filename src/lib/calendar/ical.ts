@@ -301,6 +301,41 @@ function buildTrainDescription(item: TripItem, details: TrainDetails): string {
   return lines.join('\n').trim()
 }
 
+function buildRestaurantDescription(item: TripItem, details: Record<string, unknown>): string {
+  const lines: string[] = []
+
+  const restaurantName = ((details.restaurant_name as string | undefined) ?? item.provider ?? '').trim()
+  if (restaurantName) lines.push(restaurantName)
+
+  const address = ((details.address as string | undefined) ?? item.start_location ?? '').trim()
+  if (address) lines.push(address)
+
+  lines.push('')
+
+  const reservationTime = (details.reservation_time as string | undefined) ?? ''
+  if (reservationTime) lines.push(`Reservation: ${reservationTime}`)
+
+  const partySize = details.party_size
+  if (typeof partySize === 'number' && Number.isFinite(partySize)) {
+    lines.push(`Party Size: ${partySize}`)
+  }
+
+  const seating = (details.seating as string | undefined)?.trim()
+  if (seating) lines.push(`Seating: ${seating}`)
+
+  const purpose = (details.purpose as string | undefined)?.trim()
+  if (purpose) lines.push(`Purpose: ${purpose}`)
+
+  const conf = item.confirmation_code ?? (details.booking_reference as string | undefined) ?? ''
+  if (conf) lines.push(`Booking Reference: ${conf}`)
+
+  if (item.traveler_names?.length) {
+    lines.push(`Guests: ${item.traveler_names.join(', ')}`)
+  }
+
+  return lines.join('\n').trim()
+}
+
 /** Standard 30-minute before alarm block. */
 function buildValarm(): string[] {
   return [
@@ -461,6 +496,26 @@ function buildEventLines(
     if (desc) lines.push(`DESCRIPTION:${escapeIcsText(desc)}`)
 
     lines.push(...buildValarm())
+  } else if (item.kind === 'restaurant') {
+    const summary = (details.restaurant_name as string | undefined)?.trim()
+      || item.summary?.trim()
+      || item.provider?.trim()
+      || 'Restaurant reservation'
+
+    const preferredStartTime = (details.reservation_time as string | undefined) || null
+    const startLocal = localDateTime(item.start_date, preferredStartTime, item.start_ts)
+    const endDate = item.end_date || item.start_date
+
+    lines.push(`SUMMARY:${escapeIcsText(summary)}`)
+    if (startLocal) lines.push(`DTSTART:${startLocal}`)
+    else lines.push(`DTSTART;VALUE=DATE:${toDateValue(item.start_date)}`)
+    lines.push(`DTEND;VALUE=DATE:${toDateValue(addDays(endDate, 1))}`)
+
+    const location = ((details.address as string | undefined)?.trim() || item.start_location?.trim() || item.end_location?.trim() || null)
+    if (location) lines.push(`LOCATION:${escapeIcsText(location)}`)
+
+    const desc = buildRestaurantDescription(item, details)
+    if (desc) lines.push(`DESCRIPTION:${escapeIcsText(desc)}`)
   } else {
     const summary = item.summary?.trim()
       || item.provider?.trim()

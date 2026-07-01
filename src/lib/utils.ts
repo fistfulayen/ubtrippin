@@ -70,6 +70,21 @@ export function extractLocalTime(isoString: string | null | undefined): string |
   return match ? match[1] : null
 }
 
+function normalizeClockTime(value: string | null | undefined): string | null {
+  if (!value) return null
+  const match = value.trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i)
+  if (!match) return value.trim()
+
+  let hours = Number.parseInt(match[1], 10)
+  const minutes = match[2]
+  const meridiem = match[3]?.toUpperCase()
+
+  if (meridiem === 'PM' && hours < 12) hours += 12
+  if (meridiem === 'AM' && hours === 12) hours = 0
+
+  return `${String(hours).padStart(2, '0')}:${minutes}`
+}
+
 /**
  * Build details_json for a trip item, ensuring local times are populated
  * from the ISO timestamps before Postgres normalizes them to UTC.
@@ -84,6 +99,12 @@ export function buildTripItemDetails(
     }
     if (!details.arrival_local_time && item.end_ts) {
       details.arrival_local_time = extractLocalTime(item.end_ts)
+    }
+  } else if (item.kind === 'restaurant') {
+    if (!details.reservation_time && item.start_ts) {
+      details.reservation_time = extractLocalTime(item.start_ts)
+    } else if (typeof details.reservation_time === 'string') {
+      details.reservation_time = normalizeClockTime(details.reservation_time)
     }
   }
   return details
@@ -100,8 +121,9 @@ export function getLocalTimes(
   
   const startTime = (details.departure_local_time as string) 
     || (details.check_in_time as string)
+    || (details.reservation_time as string)
     || formatTime(item.start_ts)
-  
+
   const endTime = (details.arrival_local_time as string)
     || (details.check_out_time as string) 
     || formatTime(item.end_ts)

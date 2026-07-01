@@ -37,10 +37,11 @@ import {
   Hash,
   Pencil,
 } from 'lucide-react'
-import type { TripItem, Trip, HotelDetails, TrainDetails, CarRentalDetails, Json } from '@/types/database'
+import type { TripItem, Trip, HotelDetails, TrainDetails, CarRentalDetails, RestaurantDetails, Json } from '@/types/database'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import {
   HotelDetailsView,
+  RestaurantDetailsView,
   TrainDetailsView,
   TrainStatusBadge,
   CarDetailsView,
@@ -292,12 +293,19 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
 
               {/* Title: hotel name for hotels, event name for tickets, provider/summary for others */}
               <h4 className="mt-1 font-semibold text-gray-900">
-                {(item.kind === 'hotel' && typeof details?.hotel_name === 'string' && details.hotel_name)
+              {(item.kind === 'hotel' && typeof details?.hotel_name === 'string' && details.hotel_name)
+                  || (item.kind === 'restaurant' && typeof details?.restaurant_name === 'string' && details.restaurant_name)
                   || (item.kind === 'ticket' && typeof details?.event_name === 'string' && details.event_name)
                   || item.summary || item.provider || 'Untitled'}
               </h4>
               {item.kind === 'hotel' && typeof details?.hotel_name === 'string' && details.hotel_name && item.provider && (
                 <p className="text-xs text-gray-500">{item.provider}{item.confirmation_code ? ` · ${item.confirmation_code}` : ''}</p>
+              )}
+              {item.kind === 'restaurant' && typeof details?.restaurant_name === 'string' && details.restaurant_name && (
+                <p className="text-xs text-gray-500">
+                  {details.restaurant_name as string}
+                  {item.confirmation_code ? ` · ${item.confirmation_code}` : ''}
+                </p>
               )}
               {item.kind === 'ticket' && typeof details?.venue === 'string' && details.venue && (
                 <p className="text-xs text-gray-500">
@@ -346,6 +354,20 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                         <Clock className="h-3.5 w-3.5" />
                         {item.start_date && formatShortDate(item.start_date)}{ci && `, ${formatLocalTime(ci)}`}
                         {item.end_date && ` → ${formatShortDate(item.end_date)}`}{co && `, ${formatLocalTime(co)}`}
+                      </span>
+                    )
+                  }
+
+                  if (item.kind === 'restaurant' && det) {
+                    const reservationTime = det.reservation_time as string | undefined
+                    const partySize = det.party_size as number | undefined
+                    if (!reservationTime && !partySize && !item.start_ts) return null
+                    return (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {item.start_date && `${formatShortDate(item.start_date)}, `}
+                        {reservationTime ? formatLocalTime(reservationTime) : (item.start_ts ? new Date(item.start_ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }) : '')}
+                        {partySize ? ` · ${partySize} ${partySize === 1 ? 'guest' : 'guests'}` : ''}
                       </span>
                     )
                   }
@@ -483,6 +505,9 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                       checkOutDate={item.end_date}
                     />
                   )}
+                  {item.kind === 'restaurant' && (
+                    <RestaurantDetailsView details={details as RestaurantDetails} />
+                  )}
                   {item.kind === 'train' && (
                     <TrainDetailsView details={details as TrainDetails} />
                   )}
@@ -496,7 +521,7 @@ export function TripItemCard({ item, allTrips, currentUserId, readOnly = false, 
                       itemId={item.id}
                     />
                   )}
-                  {!['flight', 'hotel', 'train', 'car', 'ticket'].includes(item.kind) && (
+                  {!['flight', 'hotel', 'restaurant', 'train', 'car', 'ticket'].includes(item.kind) && (
                     <GenericDetailsView details={details} />
                   )}
                 </div>

@@ -14,7 +14,7 @@ Rules:
 4. For hotels: extract check-in/check-out dates and times, hotel name, address, room type, confirmation number
 5. For trains: extract departure/arrival stations, times, train number, operator, carriage/seat
 6. For car rentals: extract pickup/dropoff locations and times, rental company, vehicle type
-7. For restaurants: extract reservation time, restaurant name, party size
+7. For restaurants: extract reservation time, restaurant name, party size, seating type, purpose/occasion, address, confirmation number
 8. For activities: extract activity name, date/time, location, provider
 9. For tickets/events: ANY concert, theater, sporting event, museum, festival, or show ticket MUST be classified as kind "ticket" (not "activity" or "other"). Extract event name, venue name, venue address, date/time, section/seat/row, ticket count, ticket type (GA/Reserved/VIP), performer/show name, door time if different from event time. Common providers: Ticketmaster, AXS, Eventbrite, Dice, SeeTickets, venue direct sales, StubHub, Viagogo. If the email mentions an order number or barcode for entry to an event, it is a ticket. If the email contains an Apple Wallet link (typically wallet.apple.com or a .pkpass download), extract it as "apple_wallet_url". If the email contains a Google Wallet link (typically pay.google.com/gp/v/save or similar), extract it as "google_wallet_url".
 10. Set confidence score 0.0-1.0 based on how clearly the data is presented:
@@ -90,6 +90,16 @@ Return JSON in this exact format:
         "pickup_location": "string",
         "dropoff_location": "string",
         "vehicle_type": "string or null",
+
+        // For restaurants:
+        "restaurant_name": "string",
+        "address": "string or null",
+        "reservation_time": "HH:MM or HH:MM AM/PM",
+        "party_size": number,
+        "seating": "string or null",
+        "purpose": "string or null",
+        "contact_phone": "string or null",
+        "booking_reference": "string or null",
 
         // For tickets/events:
         "event_name": "string",
