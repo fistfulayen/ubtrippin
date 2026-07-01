@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -28,8 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { buildFlightIdent } from '@/lib/flight-ident'
-import { buildFlightPageUrl } from '@/lib/flight-ident'
+import { buildFlightIdent, buildFlightPageUrl, extractFlightIdentsFromDetails } from '@/lib/flight-ident'
 import { getProviderLogoUrl } from '@/lib/images/provider-logo'
 import { cn, extractLocalTime, formatLocalTime, getLocalTimes } from '@/lib/utils'
 import type { FlightDetails, Json, Trip, TripItem } from '@/types/database'
@@ -91,6 +90,169 @@ function isWithin48Hours(item: { start_ts?: string | null; start_date?: string |
 
   const endTime = item.end_ts ? new Date(item.end_ts).getTime() : dep + 24 * 60 * 60 * 1000
   return now >= dep - h48 && now <= endTime
+}
+
+type FlightLeg = {
+  ident: string
+  date: string
+  pagePath: string
+}
+
+interface FlightLiveResponse {
+  flight: {
+    ident: string
+    airline: string | null
+    origin: {
+      code: string
+      city: string | null
+      name: string | null
+      gate: string | null
+      terminal: string | null
+      timezone: string | null
+    }
+    destination: {
+      code: string
+      city: string | null
+      name: string | null
+      gate: string | null
+      terminal: string | null
+      timezone: string | null
+    }
+    scheduled_departure: string | null
+    estimated_departure: string | null
+    actual_departure: string | null
+    scheduled_arrival: string | null
+    estimated_arrival: string | null
+    actual_arrival: string | null
+    status: string
+    delay_minutes: number | null
+    aircraft_type: string | null
+    progress_percent: number | null
+  }
+  cached: boolean
+  last_updated: string
+}
+
+function buildFlightLegs(item: TripItem, details: FlightDetails & Record<string, unknown>): FlightLeg[] {
+  const idents = extractFlightIdentsFromDetails(details)
+  if (!idents || idents.length === 0) return []
+
+  const finalDate = item.end_date ?? item.start_date ?? ''
+  return idents.map((ident, index) => {
+    const date = index === 0
+      ? item.start_date ?? finalDate
+      : index === idents.length - 1
+      ? finalDate
+      : item.start_date ?? finalDate
+    return {
+      ident,
+      date,
+      pagePath: buildFlightPageUrl({ ...details, flight_number: ident }, date) ?? `/flights/${ident}/${date}`,
+    }
+  })
+}
+
+function flightStatusMeta(flight: FlightLiveResponse['flight'] | null, loading: boolean, errored: boolean) {
+  if (loading) {
+    return { label: 'Loading status', className: 'bg-slate-100 text-slate-700' }
+  }
+
+  if (errored || !flight) {
+    return { label: 'Status unavailable', className: 'bg-slate-100 text-slate-500' }
+  }
+
+  if (flight.status === 'delayed') {
+    return {
+      label: `Delayed${flight.delay_minutes ? ` · ${flight.delay_minutes} min` : ''}`,
+      className: 'bg-amber-100 text-amber-800',
+    }
+  }
+
+  if (flight.status === 'boarding') {
+    return { label: 'Boarding', className: 'bg-indigo-100 text-indigo-800' }
+  }
+
+  if (flight.status === 'en_route') {
+    return { label: 'In flight', className: 'bg-blue-100 text-blue-800' }
+  }
+
+  if (flight.status === 'landed' || flight.status === 'arrived') {
+    return { label: 'Landed', className: 'bg-emerald-100 text-emerald-800' }
+  }
+
+  if (flight.status === 'cancelled') {
+    return { label: 'Cancelled', className: 'bg-red-100 text-red-800' }
+  }
+
+  if (flight.status === 'diverted') {
+    return { label: 'Diverted', className: 'bg-red-100 text-red-800' }
+  }
+
+  if (flight.status === 'unknown') {
+    return { label: 'Status pending', className: 'bg-slate-100 text-slate-500' }
+  }
+
+  return { label: 'On time', className: 'bg-emerald-100 text-emerald-800' }
+}
+
+function FlightLegRow({ leg }: { leg: FlightLeg }) {
+  const [flight, setFlight] = useState<FlightLiveResponse['flight'] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [errored, setErrored] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      setErrored(false)
+
+      try {
+        const response = await fetch(`/api/v1/flights/${leg.ident}/${leg.date}/live`, { cache: 'no-store' })
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        const payload = await response.json() as { flight?: FlightLiveResponse['flight'] }
+        if (!cancelled) setFlight(payload.flight ?? null)
+      } catch {
+        if (!cancelled) {
+          setFlight(null)
+          setErrored(true)
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [leg.date, leg.ident])
+
+  const meta = flightStatusMeta(flight, loading, errored)
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+            {leg.date}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <Link href={leg.pagePath} className="text-base font-bold text-indigo-600 hover:underline" target="_blank">
+              {leg.ident}
+            </Link>
+          </div>
+          <p className="mt-2 text-sm text-slate-600">
+            {flight ? `${flight.origin.code} → ${flight.destination.code}` : 'Loading flight route…'}
+          </p>
+        </div>
+
+        <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', meta.className)}>
+          {meta.label}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 function deriveOffsetMs(localTime: string | null | undefined, utcIso: string | null | undefined): number | null {
@@ -215,6 +377,8 @@ export function FlightItemCard({
       ? (item.details_json as Record<string, Json>)
       : null
   const flightDetails = (details ?? {}) as FlightDetails & Record<string, unknown>
+  const flightLegs = buildFlightLegs(item, flightDetails)
+  const isMultiLeg = flightLegs.length > 1
   const safeAllTrips = Array.isArray(allTrips) ? allTrips : []
   const otherTrips = safeAllTrips.filter((trip) => trip.id !== item.trip_id)
   const isMyItem = !currentUserId || item.user_id === currentUserId
@@ -495,6 +659,11 @@ export function FlightItemCard({
                   ) : (
                     <span className="text-lg font-bold text-gray-900">{flightIdent}</span>
                   )}
+                  {isMultiLeg ? (
+                    <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                      {flightLegs.length} flights
+                    </span>
+                  ) : null}
                   {loyalty ? (
                     <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', loyalty.className)}>
                       {loyalty.text}
@@ -688,6 +857,24 @@ export function FlightItemCard({
                       )}
                     </div>
                   </div>
+
+                  {isMultiLeg ? (
+                    <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                          Connecting flights
+                        </p>
+                        <span className="text-xs text-sky-700">
+                          {flightLegs.length} legs
+                        </span>
+                      </div>
+                      <div className="mt-3 space-y-3">
+                        {flightLegs.map((leg) => (
+                          <FlightLegRow key={`${leg.ident}-${leg.date}`} leg={leg} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>

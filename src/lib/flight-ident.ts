@@ -36,6 +36,7 @@ const AIRLINE_IATA: Record<string, string> = {
   'qatar': 'QR',
   'qatar airways': 'QR',
   'etihad': 'EY',
+  'etihad airways': 'EY',
   'singapore airlines': 'SQ',
   'cathay pacific': 'CX',
   'ana': 'NH',
@@ -62,21 +63,7 @@ const AIRLINE_IATA: Record<string, string> = {
  * Build the flight ident string (e.g. "NK457") from flight details.
  * Returns null if we can't determine the ident.
  */
-export function buildFlightIdent(details: Record<string, unknown> | null | undefined): string | null {
-  if (!details) return null
-
-  const rawFlightNumber = typeof details.flight_number === 'string' ? details.flight_number : null
-  if (!rawFlightNumber) return null
-
-  const normalized = rawFlightNumber.toUpperCase().replace(/[^A-Z0-9]/g, '')
-  if (normalized.length < 2 || normalized.length > 8) return null
-  if (!/\d/.test(normalized)) return null
-
-  // If flight number already has letters (e.g. "AA2400"), use as-is
-  if (/[A-Z]/.test(normalized)) return normalized
-
-  // Digits-only — need airline prefix
-  const airline = typeof details.airline === 'string' ? details.airline : null
+function guessAirlinePrefix(details: Record<string, unknown>): string | null {
   const code = typeof details.airline_code === 'string'
     ? details.airline_code
     : typeof details.carrier_code === 'string'
@@ -84,15 +71,51 @@ export function buildFlightIdent(details: Record<string, unknown> | null | undef
     : null
 
   if (code && /^[A-Z0-9]{2}$/i.test(code.trim())) {
-    return code.trim().toUpperCase() + normalized
+    return code.trim().toUpperCase()
   }
 
-  if (airline) {
-    const iata = AIRLINE_IATA[airline.toLowerCase().trim()]
-    if (iata) return iata + normalized
-  }
+  const airline = typeof details.airline === 'string' ? details.airline : null
+  if (!airline) return null
+  const iata = AIRLINE_IATA[airline.toLowerCase().trim()]
+  return iata ?? null
+}
 
-  return null
+function normalizeFlightNumberPart(rawPart: string, details: Record<string, unknown>): string | null {
+  const normalized = rawPart.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (normalized.length < 2 || normalized.length > 8) return null
+  if (!/\d/.test(normalized)) return null
+
+  if (/[A-Z]/.test(normalized)) return normalized
+
+  const prefix = guessAirlinePrefix(details)
+  if (!prefix) return null
+
+  const withPrefix = prefix + normalized
+  return withPrefix.length > 8 ? null : withPrefix
+}
+
+function splitFlightNumber(rawFlightNumber: string): string[] {
+  return rawFlightNumber
+    .split(/\s*(?:[,/;]|\band\b|\bor\b)\s*/i)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+export function extractFlightIdentsFromDetails(details: Record<string, unknown> | null | undefined): string[] | null {
+  if (!details) return null
+
+  const rawFlightNumber = typeof details.flight_number === 'string' ? details.flight_number : null
+  if (!rawFlightNumber) return null
+
+  const idents = splitFlightNumber(rawFlightNumber)
+    .map((part) => normalizeFlightNumberPart(part, details))
+    .filter((part): part is string => Boolean(part))
+
+  return idents.length > 0 ? idents : null
+}
+
+export function buildFlightIdent(details: Record<string, unknown> | null | undefined): string | null {
+  return extractFlightIdentsFromDetails(details)?.[0] ?? null
 }
 
 /**
