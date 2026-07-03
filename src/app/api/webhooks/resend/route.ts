@@ -11,6 +11,7 @@ import {
   assignToTrip,
   updateTripDates,
   getPrimaryLocation,
+  recomputeTripPrimaryLocation,
   collectTravelerNames,
 } from '@/lib/trips/assignment'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
@@ -547,10 +548,6 @@ export async function POST(request: NextRequest) {
             const primaryLocation = getPrimaryLocation(finalExtractionResult.items)
             const allTravelers = collectTravelerNames(finalExtractionResult.items)
 
-            // Convert airport codes to city names for better display (with AI fallback)
-            const rawLocation = primaryLocation || item.end_location || item.start_location
-            const cityLocation = rawLocation ? await locationToCityAsync(rawLocation) : null
-
             // Generate smart trip name using AI
             const smartTitle = await generateTripName(finalExtractionResult.items, assignment.tripTitle)
 
@@ -561,7 +558,7 @@ export async function POST(request: NextRequest) {
                 title: smartTitle,
                 start_date: item.start_date,
                 end_date: item.end_date,
-                primary_location: cityLocation,
+                primary_location: primaryLocation,
                 travelers: allTravelers.length > 0 ? allTravelers : (item.traveler_names || []),
               })
               .select()
@@ -791,11 +788,18 @@ export async function POST(request: NextRequest) {
 
         const { data: allTripItems } = await supabase
           .from('trip_items')
-          .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names')
+          .select('kind, start_location, end_location, start_date, end_date, provider, summary, traveler_names, details_json')
           .eq('trip_id', tripId)
 
-        const rawNewLocation = getPrimaryLocation((allTripItems ?? []) as ExtractedItem[]) || trip.primary_location
-        const newLocation = rawNewLocation ? await locationToCityAsync(rawNewLocation) : null
+        const newLocation = recomputeTripPrimaryLocation(
+          (allTripItems ?? []).map((item) => ({
+            kind: item.kind,
+            start_location: item.start_location,
+            end_location: item.end_location,
+            details_json: item.details_json as Record<string, unknown> | null,
+          })),
+          trip.primary_location
+        )
 
         // Build update object
         const tripUpdate: Record<string, unknown> = {

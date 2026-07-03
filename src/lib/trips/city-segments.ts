@@ -215,7 +215,7 @@ function deriveDisplayLocation(location: string): string | null {
   }
   if (index >= parts.length) return null
 
-  const rawCity = normaliseToCity(parts[index])
+  const rawCity = normaliseToCity(parts[index]) ?? parts[index]
   // Resolve metro aliases (e.g. "Minato-ku" → "Tokyo", "Roppongi" → "Tokyo")
   const resolved = resolveMetroAlias(rawCity)
   const city = resolved !== rawCity.toLowerCase().replace(/[^a-z\s]+/g, '').trim()
@@ -260,7 +260,7 @@ function deriveSegmentIdentity(raw: RawSegment): Pick<CitySegment, 'city' | 'cou
 
   const fallback = hotel?.start_location ?? activity?.end_location ?? activity?.start_location ?? 'Unknown'
   return {
-    city: normaliseToCity(fallback),
+    city: normaliseToCity(fallback) ?? fallback,
     countryCode: undefined,
     anchorType: hotel ? 'hotel' : 'activity',
   }

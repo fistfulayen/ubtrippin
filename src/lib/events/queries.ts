@@ -356,20 +356,25 @@ export async function getItineraryCities(
       .map((trip) => (trip.primary_location as string | null) ?? '')
       .filter(Boolean)
       .map((location) => normaliseToCity(location))
+      .filter((city): city is string => !!city)
   )
 
-  return cities.filter((city) => tripCityNames.has(normaliseToCity(city.city)))
+  return cities.filter((city) => {
+    const normalizedCity = normaliseToCity(city.city)
+    return normalizedCity ? tripCityNames.has(normalizedCity) : false
+  })
 }
 
 export function matchTrackedCityByName(cities: TrackedCity[], name: string): TrackedCity | null {
-  const normalized = normaliseToCity(name).toLowerCase()
+  const normalized = normaliseToCity(name)?.toLowerCase()
+  if (!normalized) return null
   // Try exact match first
-  const exact = cities.find((city) => normaliseToCity(city.city).toLowerCase() === normalized)
+  const exact = cities.find((city) => normaliseToCity(city.city)?.toLowerCase() === normalized)
   if (exact) return exact
   // Try metro alias match (Surfside → Miami, Brooklyn → New York, etc.)
   const metro = resolveMetroAlias(name).toLowerCase()
   if (metro !== normalized) {
-    return cities.find((city) => normaliseToCity(city.city).toLowerCase() === metro) ?? null
+    return cities.find((city) => normaliseToCity(city.city)?.toLowerCase() === metro) ?? null
   }
   return null
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getPrimaryLocation, collectTravelerNames } from './assignment'
+import { getPrimaryLocation, collectTravelerNames, normaliseToCity } from './assignment'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 
 function makeItem(overrides: Partial<ExtractedItem>): ExtractedItem {
@@ -75,6 +75,21 @@ describe('getPrimaryLocation', () => {
     expect(getPrimaryLocation(items)).toBe('Tokyo, Japan')
   })
 
+  it('does not treat a restaurant venue name as the trip city', () => {
+    const items = [
+      makeItem({ kind: 'restaurant', start_location: 'Sushi Azabu' }),
+    ]
+    expect(getPrimaryLocation(items)).toBeNull()
+  })
+
+  it('resolves Tokyo from a hotel name when the city is embedded in the venue name', () => {
+    const items = [
+      makeItem({ kind: 'hotel', start_location: 'OMO5 Tokyo Gotanda by Hoshino Resorts' }),
+      makeItem({ kind: 'flight', start_location: 'CDG', end_location: 'Tokyo NRT' }),
+    ]
+    expect(getPrimaryLocation(items)).toBe('Tokyo')
+  })
+
   it('falls back to flight destinations when nothing else', () => {
     const items = [
       makeItem({ kind: 'flight', start_location: 'CDG', end_location: 'Tokyo NRT' }),
@@ -124,6 +139,10 @@ describe('getPrimaryLocation', () => {
     const result = getPrimaryLocation(items)
     expect(result).not.toBe('UT')
     expect(result).toContain('Salt Lake City')
+  })
+
+  it('returns null for restaurant venue names without a city', () => {
+    expect(normaliseToCity('Sushi Azabu')).toBeNull()
   })
 })
 

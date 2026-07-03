@@ -1,5 +1,6 @@
 import type { Trip } from '@/types/database'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
+import { resolveAirportCity, resolveKnownCityFromText } from './airport-cities'
 
 const GAP_TOLERANCE_DAYS = 1
 
@@ -72,7 +73,9 @@ export function assignToTrip(
 }
 
 function suggestTripTitle(item: ExtractedItem): string {
-  const location = item.end_location || item.start_location
+  const location =
+    getPrimaryLocation([item]) ||
+    (item.kind !== 'restaurant' ? item.end_location || item.start_location : null)
 
   // Format the date for the title
   const date = new Date(item.start_date)
@@ -122,54 +125,6 @@ export function updateTripDates(
 }
 
 /**
- * Derive the primary location for a trip from its items.
- *
- * Priority:
- * 1. Hotel/accommodation start_location (where you sleep = where you are)
- * 2. Most-repeated city across all non-flight items (activities, restaurants, trains)
- * 3. Most-repeated flight destination as fallback
- *
- * Normalises city names so "Paris CDG", "Paris, France", and "Paris" all count as "Paris".
- */
-export function getPrimaryLocation(items: ExtractedItem[]): string | null {
-  // Single pass to categorise locations
-  const hotelLocations: string[] = []
-  const groundLocations: string[] = []
-  const flightDests: string[] = []
-
-  for (const item of items) {
-    if (item.kind === 'hotel') {
-      if (item.start_location) hotelLocations.push(item.start_location)
-    } else if (item.kind !== 'flight') {
-      const loc = item.end_location || item.start_location
-      if (loc) groundLocations.push(loc)
-    } else {
-      if (item.end_location) flightDests.push(item.end_location)
-    }
-  }
-
-  // 1. Prefer hotel locations — where you sleep is where you are
-  if (hotelLocations.length > 0) {
-    const best = mostFrequentCity(hotelLocations)
-    if (best) return best
-  }
-
-  // 2. Non-flight items: activities, restaurants, trains, etc.
-  if (groundLocations.length > 0) {
-    const best = mostFrequentCity(groundLocations)
-    if (best) return best
-  }
-
-  // 3. Flight destinations as last resort
-  if (flightDests.length > 0) {
-    const best = mostFrequentCity(flightDests)
-    if (best) return best
-  }
-
-  return null
-}
-
-/**
  * Returns true if the string looks like a venue/hotel name rather than a city.
  *
  * Uses leading articles and hospitality keywords — NOT word count, which incorrectly
@@ -178,37 +133,198 @@ export function getPrimaryLocation(items: ExtractedItem[]): string | null {
 export function looksLikeVenueName(name: string): boolean {
   return (
     /^(The|A|An)\s/i.test(name) ||
-    /\b(Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Apartments?|Villas?|Palace|House|Gardens|Manor|Hall|Centre|Center|Venue|Club)\b/i.test(name)
+    /\b(Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Apartments?|Villas?|Palace|House|Gardens|Manor|Hall|Centre|Center|Venue|Club|Restaurant|Cafe|Café|Bar|Bistro|Omakase|Ramen|Sushi)\b/i.test(name)
   )
 }
 
 /**
- * Normalise a location string to just the city name.
+ * Extract a city from a raw location string, or null if it is only a venue name.
  * "Paris CDG" → "Paris", "The Vendue, Charleston, SC" → "Charleston",
  * "New York JFK" → "New York", "New York (JFK)" → "New York",
- * "New York City, NY" → "New York City", "Tokyo, Japan" → "Tokyo"
+ * "Tokyo, Japan" → "Tokyo", "Sushi Azabu" → null
  */
-export function normaliseToCity(location: string): string {
-  let city = location.trim()
+export function normaliseToCity(location: string | null | undefined): string | null {
+  if (!location) return null
+  const extracted = extractCityFromLocation(location, null)
+  if (!extracted) return null
+  return extracted.split(',')[0].trim()
+}
 
-  // Strip airport codes: parenthesized "(JFK)" style and trailing " JFK" style
-  city = city.replace(/\s*\([A-Z]{3}\)/g, '') // Remove (JFK) style
-  city = city.replace(/\s+[A-Z]{3}$/, '')     // Remove trailing " JFK" style
+export function isCityLikeLocation(location: string | null | undefined): boolean {
+  return normaliseToCity(location) !== null
+}
 
-  // If it contains a comma, figure out which segment is the city
+export function recomputeTripPrimaryLocation(
+  items: TripLocationSource[],
+  currentPrimaryLocation: string | null | undefined = null
+): string | null {
+  const derived = getPrimaryLocation(items)
+  if (derived) return derived
+  return isCityLikeLocation(currentPrimaryLocation) ? currentPrimaryLocation!.trim() : null
+}
+
+interface TripLocationSource {
+  kind: string
+  start_location?: string | null
+  end_location?: string | null
+  details?: Record<string, unknown> | null
+  details_json?: Record<string, unknown> | null
+}
+
+function getItemDetails(item: TripLocationSource): Record<string, unknown> | null {
+  if (item.details && typeof item.details === 'object' && !Array.isArray(item.details)) {
+    return item.details
+  }
+  if (item.details_json && typeof item.details_json === 'object' && !Array.isArray(item.details_json)) {
+    return item.details_json
+  }
+  return null
+}
+
+function cityFromAirportCode(location: string | null | undefined): string | null {
+  if (!location) return null
+  const trimmed = location.trim().toUpperCase()
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    return resolveAirportCity(trimmed)?.city ?? null
+  }
+
+  const codeInParens = trimmed.match(/\(([A-Z]{3})\)$/)?.[1]
+  if (codeInParens) return resolveAirportCity(codeInParens)?.city ?? null
+
+  const codePrefix = trimmed.match(/^([A-Z]{3})\s*[-–]\s*/)?.[1]
+  if (codePrefix) return resolveAirportCity(codePrefix)?.city ?? null
+
+  return null
+}
+
+function extractCityFromLocation(
+  location: string | null | undefined,
+  kind: string | null
+): string | null {
+  if (!location) return null
+
+  const city = location.trim()
+  if (!city) return null
+
+  const airportCity = cityFromAirportCode(city)
+  if (airportCity) return airportCity
+
   if (city.includes(',')) {
-    const segments = city.split(',').map(s => s.trim())
-    const first = segments[0]
-    // Venue detection uses article/keyword signals — not word count, which would
-    // incorrectly mangle multi-word cities like "New York City" or "Salt Lake City"
-    if (looksLikeVenueName(first) && segments.length >= 2 && segments[1].length > 1) {
-      city = segments[1]
-    } else {
-      city = first
+    const segments = city.split(',').map((segment) => segment.trim()).filter(Boolean)
+    if (segments.length > 0) {
+      const first = segments[0]
+      if (looksLikeVenueName(first) && segments.length >= 2) {
+        const second = segments[1]
+        const third = segments[2]
+        if (second) {
+          if (third && third.length <= 24 && !looksLikeVenueName(third)) {
+            return `${second}, ${third}`
+          }
+          return resolveKnownCityFromText(second) || second
+        }
+        return null
+      }
+
+      return city
     }
   }
 
-  return city
+  if (kind === 'restaurant') {
+    return null
+  }
+
+  if (looksLikeVenueName(city)) {
+    const stripped = city
+      .replace(/\b(The|A|An|Hotel|Inn|Hostel|Resort|Suites?|Lodge|Motel|Apartments?|Villas?|Palace|House|Gardens|Manor|Hall|Centre|Center|Venue|Club|Restaurant|Cafe|Café|Bar|Bistro|Omakase|Ramen|Sushi|Grand|Royal|Park|Hyatt|Marriott|Hilton|Sheraton|Westin|Radisson|Novotel|Ibis|Sofitel|Intercontinental|Hampton|Courtyard|Best|Western|Hoshino|OMO)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (stripped) {
+      const resolved = resolveKnownCityFromText(stripped)
+      if (resolved) return resolved
+    }
+    return null
+  }
+
+  return resolveKnownCityFromText(city) || city
+}
+
+function candidateLocationForItem(item: TripLocationSource): string | null {
+  const details = getItemDetails(item)
+  const detailAddress = typeof details?.address === 'string' ? details.address : null
+
+  if (item.kind === 'flight') {
+    return (
+      extractCityFromLocation(detailAddress, item.kind) ||
+      extractCityFromLocation(item.end_location, item.kind) ||
+      extractCityFromLocation(item.start_location, item.kind)
+    )
+  }
+
+  if (item.kind === 'hotel') {
+    return (
+      extractCityFromLocation(detailAddress, item.kind) ||
+      extractCityFromLocation(item.start_location, item.kind) ||
+      extractCityFromLocation(item.end_location, item.kind)
+    )
+  }
+
+  if (item.kind === 'restaurant') {
+    return (
+      extractCityFromLocation(detailAddress, item.kind) ||
+      extractCityFromLocation(item.end_location, item.kind) ||
+      extractCityFromLocation(item.start_location, item.kind)
+    )
+  }
+
+  return (
+    extractCityFromLocation(detailAddress, item.kind) ||
+    extractCityFromLocation(item.end_location, item.kind) ||
+    extractCityFromLocation(item.start_location, item.kind)
+  )
+}
+
+/**
+ * Derive the primary location for a trip from its items.
+ *
+ * Priority:
+ * 1. Hotel/accommodation city
+ * 2. Most-repeated city across all non-flight items (activities, restaurants, trains)
+ * 3. Most-repeated flight destination as fallback
+ */
+export function getPrimaryLocation(items: TripLocationSource[]): string | null {
+  const hotelLocations: string[] = []
+  const groundLocations: string[] = []
+  const flightDests: string[] = []
+
+  for (const item of items) {
+    const city = candidateLocationForItem(item)
+    if (!city) continue
+
+    if (item.kind === 'hotel') {
+      hotelLocations.push(city)
+    } else if (item.kind === 'flight') {
+      flightDests.push(city)
+    } else {
+      groundLocations.push(city)
+    }
+  }
+
+  if (hotelLocations.length > 0) {
+    const best = mostFrequentCity(hotelLocations)
+    if (best) return best
+  }
+
+  if (groundLocations.length > 0) {
+    const best = mostFrequentCity(groundLocations)
+    if (best) return best
+  }
+
+  if (flightDests.length > 0) {
+    const best = mostFrequentCity(flightDests)
+    if (best) return best
+  }
+
+  return null
 }
 
 /** Return the most frequent city from a list of location strings. */
@@ -216,7 +332,7 @@ function mostFrequentCity(locations: string[]): string | null {
   const counts: Record<string, { count: number; original: string }> = {}
 
   for (const loc of locations) {
-    const city = normaliseToCity(loc)
+    const city = extractCityFromLocation(loc, null) || loc.trim()
     if (!city) continue
     if (!counts[city]) {
       counts[city] = { count: 0, original: loc }
@@ -231,7 +347,7 @@ function mostFrequentCity(locations: string[]): string | null {
 
   const best = entries[0]
   const orig = best.original
-  const normalised = normaliseToCity(orig)
+  const normalised = extractCityFromLocation(orig, null) || orig
 
   // If original is a clean "City, Country" or "City, State" (2 segments, not a venue),
   // prefer it for display. Otherwise use the normalised city.

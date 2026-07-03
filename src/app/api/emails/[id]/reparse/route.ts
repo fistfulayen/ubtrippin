@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { extractTravelData } from '@/lib/ai/extract-travel-data'
-import { assignToTrip, updateTripDates, collectTravelerNames } from '@/lib/trips/assignment'
+import { assignToTrip, updateTripDates, getPrimaryLocation, recomputeTripPrimaryLocation } from '@/lib/trips/assignment'
 import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
@@ -80,6 +80,7 @@ export async function POST(
 
     // Create items
     let itemsCreated = 0
+    const affectedTripIds = new Set<string>()
 
     for (const item of extractionResult.items) {
       const assignment = assignToTrip(item, existingTrips || [])
@@ -94,14 +95,15 @@ export async function POST(
             title: assignment.tripTitle || 'Untitled Trip',
             start_date: item.start_date,
             end_date: item.end_date,
-            primary_location: item.end_location || item.start_location,
+            primary_location: getPrimaryLocation([item]),
             travelers: item.traveler_names || [],
-          })
-          .select()
-          .single()
+        })
+        .select()
+        .single()
 
         if (tripError) continue
         tripId = newTrip.id
+        if (tripId) affectedTripIds.add(tripId)
 
         existingTrips?.push({
           id: newTrip.id,
@@ -138,6 +140,7 @@ export async function POST(
 
       if (!itemError) {
         itemsCreated++
+        if (tripId) affectedTripIds.add(tripId)
 
         // Update trip dates
         const trip = existingTrips?.find((t) => t.id === tripId)
@@ -152,6 +155,10 @@ export async function POST(
             .eq('id', tripId)
         }
       }
+    }
+
+    for (const tripId of affectedTripIds) {
+      await refreshTripPrimaryLocation(secretClient, tripId)
     }
 
     return NextResponse.json({
@@ -172,4 +179,37 @@ export async function POST(
       { status: 500 }
     )
   }
+}
+
+async function refreshTripPrimaryLocation(
+  supabase: ReturnType<typeof createSecretClient>,
+  tripId: string
+): Promise<void> {
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('primary_location')
+    .eq('id', tripId)
+    .maybeSingle()
+
+  if (!trip) return
+
+  const { data: items } = await supabase
+    .from('trip_items')
+    .select('kind, start_location, end_location, details_json')
+    .eq('trip_id', tripId)
+
+  const nextLocation = recomputeTripPrimaryLocation(
+    (items ?? []).map((item) => ({
+      kind: item.kind,
+      start_location: item.start_location,
+      end_location: item.end_location,
+      details_json: item.details_json as Record<string, unknown> | null,
+    })),
+    trip.primary_location
+  )
+
+  await supabase
+    .from('trips')
+    .update({ primary_location: nextLocation })
+    .eq('id', tripId)
 }

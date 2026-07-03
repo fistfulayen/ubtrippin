@@ -4,6 +4,7 @@ import { createSecretClient } from '@/lib/supabase/service'
 import { createEmailSnippet } from '@/lib/ai/example-selection'
 import type { ExtractedItem } from '@/lib/ai/extract-travel-data'
 import type { Json } from '@/types/database'
+import { getPrimaryLocation, recomputeTripPrimaryLocation } from '@/lib/trips/assignment'
 import { buildTripItemDetails } from '@/lib/utils'
 import { isValidUUID } from '@/lib/validation'
 
@@ -99,7 +100,10 @@ export async function POST(
       .eq('id', id)
 
     // 3. Update/create trip_items based on corrected data
-    await syncTripItems(secretClient, user.id, id, corrected_items)
+    const affectedTripIds = await syncTripItems(secretClient, user.id, id, corrected_items)
+    for (const tripId of affectedTripIds) {
+      await refreshTripPrimaryLocation(secretClient, tripId)
+    }
 
     // 4. Create learning example if requested
     if (create_example && corrected_items.length > 0) {
@@ -237,21 +241,23 @@ async function syncTripItems(
   userId: string,
   emailId: string,
   items: ExtractedItem[]
-) {
+): Promise<Set<string>> {
   // Get existing trip items for this email
   const { data: existingItems } = await supabase
     .from('trip_items')
-    .select('id, kind, confirmation_code')
+    .select('id, trip_id, kind, confirmation_code')
     .eq('source_email_id', emailId)
 
   // Simple approach: update existing items and create new ones as needed
   // For more sophisticated matching, could compare confirmation_code + kind
+  const affectedTripIds = new Set<string>()
 
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const existingItem = existingItems?.[i]
 
     if (existingItem) {
+      if (existingItem.trip_id) affectedTripIds.add(existingItem.trip_id)
       // Update existing item
       await supabase
         .from('trip_items')
@@ -285,15 +291,16 @@ async function syncTripItems(
       let tripId = trips?.[0]?.id
 
       if (!tripId) {
+        const primaryLocation = getPrimaryLocation([item])
         // Create a new trip
         const { data: newTrip } = await supabase
           .from('trips')
           .insert({
             user_id: userId,
-            title: `Trip to ${item.end_location || item.start_location || 'Unknown'}`,
+            title: primaryLocation ? `Trip to ${primaryLocation}` : 'Untitled Trip',
             start_date: item.start_date,
             end_date: item.end_date,
-            primary_location: item.end_location || item.start_location,
+            primary_location: primaryLocation,
           })
           .select()
           .single()
@@ -302,6 +309,7 @@ async function syncTripItems(
       }
 
       if (tripId) {
+        affectedTripIds.add(tripId)
         // Create new item
         await supabase.from('trip_items').insert({
           user_id: userId,
@@ -331,7 +339,45 @@ async function syncTripItems(
   if (existingItems && existingItems.length > items.length) {
     const idsToRemove = existingItems.slice(items.length).map((item) => item.id)
     await supabase.from('trip_items').delete().in('id', idsToRemove)
+    for (const item of existingItems.slice(items.length)) {
+      if (item.trip_id) affectedTripIds.add(item.trip_id)
+    }
   }
+
+  return affectedTripIds
+}
+
+async function refreshTripPrimaryLocation(
+  supabase: ReturnType<typeof createSecretClient>,
+  tripId: string
+): Promise<void> {
+  const { data: trip } = await supabase
+    .from('trips')
+    .select('primary_location')
+    .eq('id', tripId)
+    .maybeSingle()
+
+  if (!trip) return
+
+  const { data: items } = await supabase
+    .from('trip_items')
+    .select('kind, start_location, end_location, details_json')
+    .eq('trip_id', tripId)
+
+  const nextLocation = recomputeTripPrimaryLocation(
+    (items ?? []).map((item) => ({
+      kind: item.kind,
+      start_location: item.start_location,
+      end_location: item.end_location,
+      details_json: item.details_json as Record<string, unknown> | null,
+    })),
+    trip.primary_location
+  )
+
+  await supabase
+    .from('trips')
+    .update({ primary_location: nextLocation })
+    .eq('id', tripId)
 }
 
 async function createExtractionExample(

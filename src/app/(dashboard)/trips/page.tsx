@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { TripCard } from '@/components/trips/trip-card'
 import { normaliseToCity } from '@/lib/trips/assignment'
+import { getPrimaryLocation } from '@/lib/trips/assignment'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { OnboardingCard } from '@/components/trips/onboarding-card'
 import { FirstTripBanner } from '@/components/trips/first-trip-banner'
@@ -37,7 +38,7 @@ export default async function TripsPage() {
 
   const { data: trips } = await supabase
     .from('trips')
-    .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts)')
+    .select('*, trip_items(id, kind, needs_review, provider, details_json, start_date, start_ts, start_location, end_location)')
     .order('start_date', { ascending: true })
 
   // Build a city→slug map for "What's on" links on trip cards
@@ -103,10 +104,19 @@ export default async function TripsPage() {
   const showFirstTripBanner = hasTrips && profile && !profile.onboarding_completed
   const firstTrip = trips?.[0]
 
-  function getEventsSlug(trip: { primary_location?: string | null }): string | undefined {
-    if (!trip.primary_location) return undefined
-    const city = normaliseToCity(trip.primary_location).toLowerCase()
-    return citySlugMap.get(city)
+  function getEventsSlug(trip: { primary_location?: string | null; trip_items?: Array<{ kind: string; start_location: string | null; end_location: string | null; details_json: unknown }> }): string | undefined {
+    const displayLocation = getPrimaryLocation(
+      (trip.trip_items ?? []).map((item) => ({
+        kind: item.kind,
+        start_location: item.start_location,
+        end_location: item.end_location,
+        details_json: item.details_json as Record<string, unknown> | null,
+      }))
+    ) || trip.primary_location
+
+    if (!displayLocation) return undefined
+    const city = normaliseToCity(displayLocation)?.toLowerCase()
+    return city ? citySlugMap.get(city) : undefined
   }
 
   return (

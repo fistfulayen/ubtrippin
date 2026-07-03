@@ -82,7 +82,9 @@ function toDemandCity(raw: string | null | undefined): string | null {
   city = city.replace(/\s+T\d+$/i, '').trim()
 
   // Delegate comma/venue normalisation to the shared function
-  city = normaliseToCity(city)
+  const normalizedCity = normaliseToCity(city)
+  if (!normalizedCity) return null
+  city = normalizedCity
 
   // Skip if non-city keywords remain after normalisation
   if (NON_CITY_KEYWORDS.test(city)) return null

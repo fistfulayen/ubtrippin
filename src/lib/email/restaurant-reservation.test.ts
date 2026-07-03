@@ -28,6 +28,7 @@ describe('restaurant reservation email parser', () => {
     expect(item?.kind).toBe('restaurant')
     expect(item?.provider).toBe('Sushi Azabu')
     expect(item?.start_date).toBe('2026-07-04')
+    expect(item?.start_location).toBeNull()
     expect(item?.summary).toContain('Sushi Azabu')
     expect(item?.details).toMatchObject({
       restaurant_name: 'Sushi Azabu',

@@ -101,6 +101,16 @@ function parsePurpose(text: string): string | null {
   return match?.[1]?.trim() ?? null
 }
 
+function looksLikeAddressLine(line: string): boolean {
+  if (/^\d+\s+(people|guests?|covers?)$/i.test(line)) return false
+  if (/^\bparty of\b/i.test(line)) return false
+  return (
+    /,\s*[A-Za-z]{2,}\b/.test(line) ||
+    /\b\d{5}(?:-\d{4})?\b/.test(line) ||
+    /\d+\s+[A-Za-z].*(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Place|Pl\.?)/i.test(line)
+  )
+}
+
 function isMetadataLine(line: string): boolean {
   return /^(reservation accepted|we'?ve successfully booked your reservation|reservation confirmed|confirmation #|confirmation number|reservation #|call|view|cancel|purpose|category|party of|table for|people?|guests?|covers?|date|time|name|restaurant)$/i.test(line)
     || /^\d{1,2}:\d{2}(?:\s*[AP]M)?$/i.test(line)
@@ -174,7 +184,7 @@ export function parseRestaurantReservationEmail(subject: string, bodyText: strin
 
   if (!restaurantName || !date) return null
 
-  const addressLine = lines.find((line) => /,\s*[A-Z]{2}\b/.test(line) || /\b\d{5}(?:-\d{4})?\b/.test(line) || /\d+\s+[A-Za-z].*(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Boulevard|Blvd\.?|Lane|Ln\.?|Drive|Dr\.?|Way|Place|Pl\.?)/i.test(line)) ?? null
+  const addressLine = lines.find((line) => looksLikeAddressLine(line)) ?? null
 
   const confidence =
     0.95 -
@@ -192,7 +202,7 @@ export function parseRestaurantReservationEmail(subject: string, bodyText: strin
     end_date: null,
     start_ts: null,
     end_ts: null,
-    start_location: addressLine || restaurantName,
+    start_location: addressLine,
     end_location: null,
     summary: `Reservation at ${restaurantName}${partySize ? ` for ${partySize}` : ''}${time ? ` at ${time}` : ''}`.trim(),
     status: 'confirmed',
