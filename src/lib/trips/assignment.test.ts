@@ -97,6 +97,28 @@ describe('getPrimaryLocation', () => {
     expect(getPrimaryLocation(items)).toBe('Tokyo')
   })
 
+  it('resolves a complete multi-word city embedded in a hotel name', () => {
+    expect(getPrimaryLocation([
+      makeItem({ kind: 'hotel', start_location: 'Hotel New York Central' }),
+    ])).toBe('New York')
+  })
+
+  it('does not extract a city substring from a hotel brand', () => {
+    expect(getPrimaryLocation([
+      makeItem({ kind: 'hotel', start_location: 'The Parisian Hotel' }),
+    ])).toBeNull()
+  })
+
+  it('does not infer a restaurant destination from an embedded city name', () => {
+    expect(getPrimaryLocation([
+      makeItem({ kind: 'restaurant', start_location: 'Tokyo Sushi' }),
+    ])).toBeNull()
+  })
+
+  it('preserves an unknown trailing token instead of stripping any three letters', () => {
+    expect(normaliseToCity('Example XYZ')).toBe('Example XYZ')
+  })
+
   it('ignores layover cities in favor of destination', () => {
     // NYC → Atlanta (connection) → SF: hotel is in SF
     const items = [

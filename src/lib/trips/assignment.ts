@@ -194,6 +194,22 @@ function cityFromAirportCode(location: string | null | undefined): string | null
   const codePrefix = trimmed.match(/^([A-Z]{3})\s*[-–]\s*/)?.[1]
   if (codePrefix) return resolveAirportCity(codePrefix)?.city ?? null
 
+  const codeSuffix = trimmed.match(/\s([A-Z]{3})$/)?.[1]
+  if (codeSuffix) return resolveAirportCity(codeSuffix)?.city ?? null
+
+  return null
+}
+
+function cityEmbeddedInVenue(location: string): string | null {
+  const words = location.split(/[^\p{L}]+/u).filter(Boolean)
+  // Match complete city names, longest first, without accepting substrings
+  // such as "Paris" in "Parisian". Known cities contain at most four words.
+  for (let length = Math.min(4, words.length); length > 0; length--) {
+    for (let start = 0; start + length <= words.length; start++) {
+      const city = resolveKnownCityFromText(words.slice(start, start + length).join(' '))
+      if (city) return city
+    }
+  }
   return null
 }
 
@@ -231,6 +247,11 @@ function extractCityFromLocation(
 
   if (kind === 'restaurant') {
     return null
+  }
+
+  if (kind === 'hotel') {
+    const embeddedCity = cityEmbeddedInVenue(city)
+    if (embeddedCity) return embeddedCity
   }
 
   if (looksLikeVenueName(city)) {
