@@ -21,7 +21,6 @@ interface LoyaltyProgramRow {
 interface ProfileRow {
   id: string
   full_name: string | null
-  email: string | null
 }
 
 export async function GET(_request: NextRequest, { params }: Params) {
@@ -49,13 +48,13 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   const { data: profileRows } = memberUserIds.length
     ? await scoped
-        .from('profiles')
-        .select('id, full_name, email')
+        .from('shared_profiles')
+        .select('id, full_name')
         .in('id', memberUserIds)
     : { data: [] }
 
   const nameByUserId = new Map<string, string | null>(
-    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || row.email || null])
+    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || null])
   )
 
   const rows = (loyaltyRows ?? []) as LoyaltyProgramRow[]

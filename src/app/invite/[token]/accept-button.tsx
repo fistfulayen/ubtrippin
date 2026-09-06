@@ -10,14 +10,12 @@ import { Loader2 } from 'lucide-react'
 interface AcceptInviteButtonProps {
   token: string
   tripId: string
-  invitedEmail: string
   isLoggedIn: boolean
 }
 
 export function AcceptInviteButton({
   token,
   tripId,
-  invitedEmail,
   isLoggedIn,
 }: AcceptInviteButtonProps) {
   const router = useRouter()
@@ -59,7 +57,6 @@ export function AcceptInviteButton({
         redirectTo: buildOAuthCallbackUrl(window.location.origin, redirectTo),
         queryParams: {
           prompt: 'select_account',
-          login_hint: invitedEmail,
         },
       },
     })

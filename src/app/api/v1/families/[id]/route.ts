@@ -86,28 +86,28 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const scoped = await createUserScopedClient(auth.userId)
   const { data: profileRows } = profileIds.size
     ? await scoped
-        .from('profiles')
-        .select('id, full_name, email, avatar_url')
+        .from('shared_profiles')
+        .select('id, full_name, avatar_url')
         .in('id', Array.from(profileIds))
     : { data: [] }
 
   const profileMap = new Map(
-    ((profileRows ?? []) as Array<{ id: string; full_name: string | null; email: string | null; avatar_url: string | null }>)
+    ((profileRows ?? []) as Array<{ id: string; full_name: string | null; avatar_url: string | null }>)
       .map((profile) => [profile.id, profile])
   )
 
   const enrichedMembers = members.map((member) => {
     const memberProfile = member.user_id ? profileMap.get(member.user_id) : null
     const inviterProfile = profileMap.get(member.invited_by)
-    const displayName = memberProfile?.full_name || memberProfile?.email || null
-    const inviterName = inviterProfile?.full_name || inviterProfile?.email || 'Someone'
+    const displayName = memberProfile?.full_name || null
+    const inviterName = inviterProfile?.full_name || 'Someone'
 
     return {
       id: member.id,
       user_id: member.user_id,
       role: member.role,
       name: displayName,
-      email: memberProfile?.email || member.invited_email,
+      email: member.invited_email,
       invited_email: member.invited_email,
       avatar_url: memberProfile?.avatar_url || null,
       accepted_at: member.accepted_at,

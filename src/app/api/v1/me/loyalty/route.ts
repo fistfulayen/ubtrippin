@@ -69,6 +69,36 @@ async function getAllianceMap(
   return new Map(rows.map((row) => [row.provider_key, row.alliance_group]))
 }
 
+async function getAuthorizedLoyaltyUserIds(
+  userId: string,
+  supabase: SupabaseClient
+): Promise<string[] | null> {
+  const { data: memberships, error: membershipError } = await supabase
+    .from('family_members')
+    .select('family_id')
+    .eq('user_id', userId)
+    .not('accepted_at', 'is', null)
+
+  if (membershipError) return null
+  const familyIds = [...new Set(
+    ((memberships ?? []) as Array<{ family_id: string }>).map((row) => row.family_id)
+  )]
+  if (familyIds.length === 0) return [userId]
+
+  const { data: familyMembers, error: familyMembersError } = await supabase
+    .from('family_members')
+    .select('user_id')
+    .in('family_id', familyIds)
+    .not('accepted_at', 'is', null)
+    .not('user_id', 'is', null)
+
+  if (familyMembersError) return null
+  return [...new Set([
+    userId,
+    ...((familyMembers ?? []) as Array<{ user_id: string }>).map((row) => row.user_id),
+  ])]
+}
+
 function withPlaintext(
   row: LoyaltyProgramRow,
   allianceGroup: string | null
@@ -95,10 +125,20 @@ export async function GET() {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  // RLS handles visibility: own programs + family members' programs
+  // API-key requests use a service client, so bind visibility explicitly before
+  // any encrypted value is decrypted.
+  const authorizedUserIds = await getAuthorizedLoyaltyUserIds(auth.userId, auth.supabase)
+  if (!authorizedUserIds) {
+    return NextResponse.json(
+      { error: { code: 'internal_error', message: 'Failed to authorize loyalty programs.' } },
+      { status: 500 }
+    )
+  }
+
   const { data, error } = await auth.supabase
     .from('loyalty_programs')
     .select('*')
+    .in('user_id', authorizedUserIds)
     .order('user_id', { ascending: true })
     .order('preferred', { ascending: false })
     .order('created_at', { ascending: true })

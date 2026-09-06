@@ -21,17 +21,15 @@ function decodeURIComponentSafely(value: string): string {
 function toSafePath(value: string, origin?: string): string | null {
   const decoded = decodeURIComponentSafely(value.trim())
   if (!decoded) return null
-  if (decoded.startsWith('//')) return null
-  if (/[\r\n]/.test(decoded)) return null
-
-  if (decoded.startsWith('/')) {
-    return decoded
-  }
+  if (/[\\\u0000-\u001f\u007f]/.test(decoded)) return null
 
   try {
-    if (!origin) return null
-    const url = new URL(decoded)
-    if (url.origin !== origin) return null
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) return null
+    if (!origin) return decoded
+
+    const trustedOrigin = new URL(origin).origin
+    const url = new URL(decoded, trustedOrigin)
+    if (url.origin !== trustedOrigin) return null
     return `${url.pathname}${url.search}${url.hash}`
   } catch {
     return null

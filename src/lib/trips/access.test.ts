@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { resolveTripWriteAccess } from './access'
+import { resolveTripReadAccess, resolveTripWriteAccess } from './access'
 
 type QueryResponse = { data: unknown; error: { message: string } | null }
 
@@ -195,5 +195,31 @@ describe('resolveTripWriteAccess', () => {
     })
 
     expect(result).toEqual({ allowed: false, reason: 'internal_error' })
+  })
+})
+
+describe('resolveTripReadAccess', () => {
+  it('allows an accepted viewer without granting write access', async () => {
+    const readSupabase = makeSupabaseWithQuerySequence([
+      makeTripsQuery({ data: { id: 'trip-1', user_id: 'owner-1' }, error: null }),
+      makeCollabQuery({ data: { role: 'viewer' }, error: null }),
+      makeFamilyListQuery({ data: [], error: null }),
+    ])
+    const writeSupabase = makeSupabaseWithQuerySequence([
+      makeTripsQuery({ data: { id: 'trip-1', user_id: 'owner-1' }, error: null }),
+      makeCollabQuery({ data: { role: 'viewer' }, error: null }),
+      makeFamilyListQuery({ data: [], error: null }),
+    ])
+
+    await expect(resolveTripReadAccess({
+      supabase: readSupabase as never,
+      tripId: 'trip-1',
+      userId: 'viewer-1',
+    })).resolves.toMatchObject({ allowed: true, role: 'viewer' })
+    await expect(resolveTripWriteAccess({
+      supabase: writeSupabase as never,
+      tripId: 'trip-1',
+      userId: 'viewer-1',
+    })).resolves.toMatchObject({ allowed: false, reason: 'viewer' })
   })
 })

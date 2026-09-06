@@ -60,12 +60,12 @@ export default async function TripsPage() {
   const ownerNameMap = new Map<string, string>()
   if (ownerIds.length > 0) {
     const { data: ownerProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
+      .from('shared_profiles')
+      .select('id, full_name')
       .in('id', ownerIds)
 
-    for (const owner of (ownerProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
-      ownerNameMap.set(owner.id, owner.full_name || owner.email || 'Shared')
+    for (const owner of ownerProfiles ?? []) {
+      ownerNameMap.set(owner.id, owner.full_name || 'Shared')
     }
   }
 

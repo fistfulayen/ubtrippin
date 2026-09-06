@@ -13,13 +13,19 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const secret = await createClient()
+  const supabase = await createClient()
 
-  const { data: invite, error: inviteError } = await secret
-    .from('family_members')
-    .select('id, family_id, invited_email, invited_by, role, accepted_at')
-    .eq('invite_token', token)
-    .maybeSingle()
+  const { data: previewRows, error: inviteError } = await supabase.rpc(
+    'preview_family_invite',
+    { p_token: token }
+  )
+  const invite = (previewRows as Array<{
+    family_id: string
+    family_name: string
+    invited_email_hint: string
+    inviter_name: string
+    role: string
+  }> | null)?.[0]
 
   if (inviteError) {
     console.error('[v1/family-invites/:token GET] invite lookup failed', inviteError)
@@ -36,37 +42,14 @@ export async function GET(_request: NextRequest, { params }: Params) {
     )
   }
 
-  const [{ data: family }, { data: inviterProfile }] = await Promise.all([
-    secret
-      .from('families')
-      .select('id, name')
-      .eq('id', invite.family_id as string)
-      .maybeSingle(),
-    secret
-      .from('profiles')
-      .select('full_name, email')
-      .eq('id', invite.invited_by as string)
-      .maybeSingle(),
-  ])
-
-  if (!family) {
-    return NextResponse.json(
-      { error: { code: 'not_found', message: 'Family not found for this invite.' } },
-      { status: 404 }
-    )
-  }
-
-  const inviter = inviterProfile as { full_name?: string | null; email?: string | null } | null
-  const invitedByName = inviter?.full_name || inviter?.email || 'Someone'
-
   return NextResponse.json({
     data: {
-      family_id: family.id,
-      family_name: family.name,
-      invited_email: invite.invited_email,
-      invited_by_name: invitedByName,
+      family_id: invite.family_id,
+      family_name: invite.family_name,
+      invited_email_hint: invite.invited_email_hint,
+      invited_by_name: invite.inviter_name,
       role: invite.role,
-      already_accepted: invite.accepted_at !== null,
+      already_accepted: false,
     },
   })
 }

@@ -43,27 +43,42 @@ export async function GET(request: NextRequest) {
   let failed = 0
 
   for (const item of expiredItems || []) {
-    const pdfPath = (item.details_json as Record<string, unknown>)?.ticket_pdf_path as string
+    const details = (item.details_json as Record<string, unknown>) || {}
+    const pdfPath = details.ticket_pdf_path as string
+    const bucket = (details.ticket_pdf_bucket as string | undefined) ?? 'ticket-attachments'
     if (!pdfPath) continue
 
-    // Delete from storage
-    const { error: deleteError } = await supabase.storage
-      .from('ticket-attachments')
-      .remove([pdfPath])
+    // email-attachments objects also back the Inbox source and may be referenced
+    // by sibling items. Only legacy dedicated objects belong to this cleanup job.
+    if (bucket === 'ticket-attachments') {
+      const { error: deleteError } = await supabase.storage
+        .from(bucket)
+        .remove([pdfPath])
 
-    if (deleteError) {
-      console.error('Cron: failed to delete PDF:', pdfPath, deleteError)
+      if (deleteError) {
+        console.error('Cron: failed to delete PDF:', pdfPath, deleteError)
+        failed++
+        continue
+      }
+    } else if (bucket !== 'email-attachments') {
+      console.error('Cron: refusing unexpected ticket bucket:', bucket)
       failed++
       continue
     }
 
-    // Clear ticket_pdf_path from details_json
-    const details = (item.details_json as Record<string, unknown>) || {}
-    const { ticket_pdf_path: _removed, ...remainingDetails } = details
-    await supabase
+    const remainingDetails = { ...details }
+    delete remainingDetails.ticket_pdf_path
+    delete remainingDetails.ticket_pdf_bucket
+    const { error: clearError } = await supabase
       .from('trip_items')
       .update({ details_json: remainingDetails })
       .eq('id', item.id)
+
+    if (clearError) {
+      console.error('Cron: failed to clear PDF reference:', item.id, clearError)
+      failed++
+      continue
+    }
 
     deleted++
   }

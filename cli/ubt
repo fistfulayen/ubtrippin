@@ -134,6 +134,11 @@ _resolve_id() {
     exit 1
   fi
 
+  if [[ ! "$id_prefix" =~ ^[0-9a-fA-F-]{4,36}$ ]]; then
+    echo "Error: ${type_name} must be a UUID or a hexadecimal UUID prefix." >&2
+    exit 1
+  fi
+
   local response ids count
   # Use authenticated API endpoint — map table names to API routes
   local api_route=""
@@ -146,7 +151,7 @@ _resolve_id() {
   response=$(_api "${api_route}")
   ids=$(echo "$response" | _python3c "
 import json, sys
-prefix = '${id_prefix}'
+prefix = sys.argv[1]
 data = json.load(sys.stdin)
 # Handle {data: [...]} wrapper or plain array
 if isinstance(data, dict):
@@ -163,7 +168,7 @@ for row in rows:
     rid = row.get('id', '')
     if rid.startswith(prefix):
         print(rid)
-")
+" "$id_prefix")
   count=$(echo "$ids" | awk 'NF {c++} END {print c+0}')
 
   if [ "$count" -eq 1 ]; then

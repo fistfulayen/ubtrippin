@@ -19,28 +19,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
   const supabase = await createClient()
 
-  const { data: invite, error } = await supabase
-    .from('trip_collaborators')
-    .select(`
-      id,
-      role,
-      invited_email,
-      accepted_at,
-      trip:trips (
-        id,
-        title,
-        primary_location,
-        start_date,
-        end_date,
-        cover_image_url
-      ),
-      inviter:profiles!invited_by (
-        full_name,
-        email
-      )
-    `)
-    .eq('invite_token', token)
-    .maybeSingle()
+  const { data: previewRows, error } = await supabase.rpc(
+    'preview_trip_collaborator_invite',
+    { p_token: token }
+  )
+  const invite = (previewRows as Array<Record<string, unknown>> | null)?.[0]
 
   if (error) {
     console.error('[v1/invites GET]', error)
@@ -54,13 +37,6 @@ export async function GET(_request: NextRequest, { params }: Params) {
     return NextResponse.json(
       { error: { code: 'not_found', message: 'Invite not found or already used.' } },
       { status: 404 }
-    )
-  }
-
-  if (invite.accepted_at) {
-    return NextResponse.json(
-      { error: { code: 'gone', message: 'This invite has already been accepted.' } },
-      { status: 410 }
     )
   }
 

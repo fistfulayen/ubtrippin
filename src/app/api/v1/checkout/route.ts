@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getEarlyAdopterSpotsRemaining, getProSubscriberCount } from '@/lib/billing'
 import { stripe } from '@/lib/stripe'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
+import { createSecretClient } from '@/lib/supabase/service'
 
 interface CheckoutBody {
   priceId?: unknown
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     customerId = customer.id
 
-    const { error: updateError } = await auth.supabase
+    const { error: updateError } = await createSecretClient()
       .from('profiles')
       .update({ stripe_customer_id: customerId })
       .eq('id', auth.userId)

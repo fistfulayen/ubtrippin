@@ -4,6 +4,12 @@ import { createSecretClient } from '@/lib/supabase/service'
 
 type Params = { params: Promise<{ token: string }> }
 
+function maskEmail(email: string): string {
+  const [local, domain] = email.toLowerCase().split('@')
+  if (!local || !domain) return '***'
+  return `${local.slice(0, 2)}***@${domain}`
+}
+
 export async function POST(_request: NextRequest, { params }: Params) {
   const { token } = await params
 
@@ -57,7 +63,7 @@ export async function POST(_request: NextRequest, { params }: Params) {
       {
         error: {
           code: 'forbidden',
-          message: `This invite was sent to ${invite.invited_email}. You are signed in as ${userEmail || 'a different account'}.`,
+          message: `This invite was sent to ${maskEmail(invitedEmail)}. Please sign in with the invited account.`,
         },
       },
       { status: 403 }

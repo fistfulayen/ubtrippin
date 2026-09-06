@@ -76,14 +76,14 @@ export async function GET(
 
   const { data: authorProfiles } = authorIds.length
     ? await supabase
-        .from('profiles')
-        .select('id, full_name, email')
+        .from('shared_profiles')
+        .select('id, full_name')
         .in('id', authorIds)
     : { data: [] }
 
   const authorNameById = new Map<string, string | null>(
-    ((authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>)
-      .map((profile) => [profile.id, profile.full_name || profile.email || null])
+    ((authorProfiles ?? []) as Array<{ id: string; full_name?: string | null }>)
+      .map((profile) => [profile.id, profile.full_name || null])
   )
 
   const entriesWithAuthor = rawEntries.map((entry) => {

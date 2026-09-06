@@ -133,6 +133,19 @@ export function resolveMetroAlias(cityName: string): string {
   return METRO_ALIASES[key] ?? key
 }
 
+/** Resolve only recognized city/metro names; unlike resolveMetroAlias, unknown input returns null. */
+export function resolveKnownCityFromText(cityName: string): string | null {
+  const key = cityName.split(',')[0].toLowerCase().replace(/[^a-z\s]+/g, '').trim()
+  if (!key) return null
+  const alias = METRO_ALIASES[key]
+  if (alias) return alias
+
+  const known = Object.values(AIRPORT_CITIES).find(
+    ({ city }) => city.split(',')[0].toLowerCase().replace(/[^a-z\s]+/g, '').trim() === key
+  )
+  return known?.city ?? null
+}
+
 export function isSameMetroArea(code1: string, code2: string): boolean {
   const left = resolveAirportCity(code1)
   const right = resolveAirportCity(code2)

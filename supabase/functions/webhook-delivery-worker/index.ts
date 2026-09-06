@@ -10,18 +10,36 @@
 
 const APP_URL = Deno.env.get('APP_URL') || 'https://www.ubtrippin.xyz'
 const CRON_SECRET = Deno.env.get('CRON_SECRET') || ''
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
   const startMs = Date.now()
+
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ ok: false, error: 'Method not allowed' }), {
+      status: 405,
+      headers: { 'content-type': 'application/json', allow: 'POST' },
+    })
+  }
+  if (!SERVICE_ROLE_KEY || req.headers.get('authorization') !== `Bearer ${SERVICE_ROLE_KEY}`) {
+    return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+  if (!CRON_SECRET) {
+    return new Response(JSON.stringify({ ok: false, error: 'Worker is not configured' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
 
   try {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
     }
 
-    if (CRON_SECRET) {
-      headers['authorization'] = `Bearer ${CRON_SECRET}`
-    }
+    headers['authorization'] = `Bearer ${CRON_SECRET}`
 
     const response = await fetch(`${APP_URL}/api/internal/webhooks/process`, {
       method: 'POST',

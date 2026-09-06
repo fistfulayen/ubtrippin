@@ -91,12 +91,12 @@ export default async function GuidePage({ params, searchParams }: GuidePageProps
   const authorNameById = new Map<string, string | null>()
   if (authorIds.length > 0) {
     const { data: authorProfiles } = await supabase
-      .from('profiles')
-      .select('id, full_name, email')
+      .from('shared_profiles')
+      .select('id, full_name')
       .in('id', authorIds)
 
-    for (const profile of (authorProfiles ?? []) as Array<{ id: string; full_name?: string | null; email?: string | null }>) {
-      authorNameById.set(profile.id, profile.full_name || profile.email || null)
+    for (const profile of (authorProfiles ?? []) as Array<{ id: string; full_name?: string | null }>) {
+      authorNameById.set(profile.id, profile.full_name || null)
     }
   }
 

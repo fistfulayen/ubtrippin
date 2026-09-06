@@ -7,7 +7,6 @@ type Params = { params: Promise<{ id: string }> }
 interface ProfileRow {
   id: string
   full_name: string | null
-  email: string | null
   avatar_url: string | null
 }
 
@@ -34,8 +33,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
     await Promise.all([
       memberUserIds.length
         ? scoped
-            .from('profiles')
-            .select('id, full_name, email, avatar_url')
+            .from('shared_profiles')
+            .select('id, full_name, avatar_url')
             .in('id', memberUserIds)
         : Promise.resolve({ data: [], error: null }),
       memberUserIds.length
@@ -67,8 +66,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     return {
       user_id: memberUserId,
-      full_name: profile?.full_name ?? profile?.email ?? null,
-      email: profile?.email ?? null,
+      full_name: profile?.full_name ?? null,
       avatar_url: profile?.avatar_url ?? null,
       seat_preference: userProfile?.seat_preference ?? null,
       meal_preference: userProfile?.meal_preference ?? null,

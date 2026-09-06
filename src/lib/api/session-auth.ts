@@ -21,6 +21,17 @@ export async function requireSessionAuth(): Promise<SessionAuth | NextResponse> 
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('admitted_at')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (!profile?.admitted_at) {
+      return NextResponse.json(
+        { error: { code: 'forbidden', message: 'This account has not been admitted.' } },
+        { status: 403 }
+      )
+    }
     return { userId: user.id, supabase }
   }
 

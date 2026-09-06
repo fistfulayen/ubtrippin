@@ -8,7 +8,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 
 export async function GET(
@@ -53,12 +52,19 @@ export async function GET(
 
   // Determine which bucket (new items use email-attachments, old ones use ticket-attachments)
   const bucket = (details?.ticket_pdf_bucket as string) || 'ticket-attachments'
+  if (!['email-attachments', 'ticket-attachments'].includes(bucket)) {
+    return NextResponse.json({ error: 'Invalid ticket attachment' }, { status: 404 })
+  }
 
-  // Generate a 1-hour signed URL using service client
-  const service = createSecretClient()
-  const { data, error } = await service.storage
+  const normalizedPath = pdfPath.replace(/^\/+/, '')
+  if (normalizedPath !== pdfPath || !normalizedPath.startsWith(`${user.id}/`)) {
+    return NextResponse.json({ error: 'Ticket attachment does not belong to this account' }, { status: 403 })
+  }
+
+  // Use the end-user client so owner-prefix storage RLS remains authoritative.
+  const { data, error } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(pdfPath, 3600) // 1 hour
+    .createSignedUrl(normalizedPath, 3600) // 1 hour
 
   if (error || !data) {
     console.error('Failed to create signed URL:', error)

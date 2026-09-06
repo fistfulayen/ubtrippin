@@ -30,6 +30,14 @@ import { decryptLoyaltyNumber, encryptLoyaltyNumber, maskLoyaltyNumber } from '@
 import { resolveProviderKey } from '@/lib/loyalty-matching'
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { logTripEvent, scheduleTripNotificationProcessing } from '@/lib/notifications/trip-events'
+import { verifyInboundAuthentication } from '@/lib/email/authentication-results'
+import { requestPublicUrl } from '@/lib/security/public-http'
+
+const MAX_ATTACHMENTS = 20
+const MAX_PDF_ATTACHMENTS = 5
+const MAX_PDF_BYTES = 5 * 1024 * 1024
+const MAX_AGGREGATE_PDF_BYTES = 15 * 1024 * 1024
+const MAX_AGGREGATE_PDF_TEXT = 200_000
 
 // Force dynamic rendering - webhooks must never be cached/static
 export const dynamic = 'force-dynamic'
@@ -138,21 +146,35 @@ export async function POST(request: NextRequest) {
       fromEmail.split('@')[0] ||
       null
 
+    const trustedAuthservIds = (process.env.RESEND_AUTH_RESULTS_HOSTS ?? '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean)
+    const mailAuthentication = verifyInboundAuthentication(
+      fullEmail.headers as Record<string, string> | undefined,
+      fromEmail,
+      trustedAuthservIds
+    )
+
     // Look up user by sender email in allowed_senders
-    // Use .limit(1) + .maybeSingle() instead of .single() to handle edge case
-    // where the same email appears in multiple allowed_senders rows (e.g. duplicate accounts).
-    const { data: allowedSender } = await supabase
+    const { data: allowedSender, error: senderLookupError } = mailAuthentication.authenticated
+      ? await supabase
       .from('allowed_senders')
       .select('user_id, profiles(id, email, full_name)')
       .eq('email', fromEmail.toLowerCase())
-      .limit(1)
+      .eq('verified', true)
       .maybeSingle()
+      : { data: null, error: null }
+
+    if (senderLookupError) {
+      console.error('[webhook] ambiguous sender identity:', safeErrorMessage(senderLookupError))
+    }
 
     // Store the raw email with content from API
     const { data: sourceEmail, error: insertError } = await supabase
       .from('source_emails')
       .insert({
-        user_id: allowedSender?.user_id || null,
+        user_id: !senderLookupError ? allowedSender?.user_id || null : null,
         from_email: fromEmail,
         to_email: fullEmail.to?.[0] || null,
         subject: fullEmail.subject || null,
@@ -163,13 +185,8 @@ export async function POST(request: NextRequest) {
           filename: a.filename,
           content_type: a.content_type,
         })) || [],
-        parse_status: allowedSender ? 'processing' : 'unassigned',
-        auth_results: {
-          // Auth results come from webhook headers, not API response
-          spf: fullEmail.headers?.['received-spf'] ? 'pass' : null,
-          dkim: fullEmail.headers?.['dkim-signature'] ? 'pass' : null,
-          dmarc: null,
-        },
+        parse_status: allowedSender && !senderLookupError ? 'processing' : 'unassigned',
+        auth_results: mailAuthentication,
       })
       .select()
       .single()
@@ -180,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If no user found, stop processing but acknowledge receipt
-    if (!allowedSender) {
+    if (!allowedSender || senderLookupError) {
       console.log(`[webhook] email from unrecognized sender: ${maskEmail(fromEmail)}`)
       return NextResponse.json({
         message: 'Email stored but sender not recognized',
@@ -220,7 +237,7 @@ export async function POST(request: NextRequest) {
       // Extract text from PDF attachments using Resend attachments API
       // Download and store ALL PDFs in email-attachments bucket for inbox access
       let attachmentText = ''
-      const pdfBuffers: ArrayBuffer[] = [] // indexed same as fullEmail.attachments (PDF-only)
+      let totalPdfBytes = 0
       const enrichedAttachments: Array<{
         filename: string
         content_type: string
@@ -230,6 +247,20 @@ export async function POST(request: NextRequest) {
       }> = []
 
       if (fullEmail.attachments?.length) {
+        const pdfCount = fullEmail.attachments.filter(
+          (attachment) => attachment.content_type === 'application/pdf'
+        ).length
+        if (fullEmail.attachments.length > MAX_ATTACHMENTS || pdfCount > MAX_PDF_ATTACHMENTS) {
+          await supabase
+            .from('source_emails')
+            .update({
+              parse_status: 'failed',
+              parse_error: 'Attachment count exceeds safe processing limits.',
+            })
+            .eq('id', sourceEmail.id)
+          return NextResponse.json({ message: 'Attachment limits exceeded', email_id: sourceEmail.id })
+        }
+
         // SECURITY (L-003): Using createSecretClient() for Storage uploads. Supabase Storage
         // bucket operations are not user-scoped — service role required for email-attachments bucket.
         const storageClient = createSecretClient()
@@ -243,15 +274,24 @@ export async function POST(request: NextRequest) {
               })
               if (attachmentData?.download_url) {
                 // Download PDF
-                const pdfResponse = await fetch(attachmentData.download_url)
-                const pdfBuffer = await pdfResponse.arrayBuffer()
-                // Extract text for AI
-                const pdfBase64 = Buffer.from(pdfBuffer).toString('base64')
-                const text = await extractTextFromPdf(pdfBase64)
-                if (text) {
-                  attachmentText += `\n\n--- PDF: ${attachment.filename} ---\n${text}`
+                const remainingPdfBytes = MAX_AGGREGATE_PDF_BYTES - totalPdfBytes
+                if (remainingPdfBytes <= 0) throw new Error('Aggregate PDF limit reached')
+                const pdfResponse = await requestPublicUrl(attachmentData.download_url, {
+                  maxResponseBytes: Math.min(MAX_PDF_BYTES, remainingPdfBytes),
+                  maxRedirects: 2,
+                  timeoutMs: 10_000,
+                })
+                const pdfBuffer = pdfResponse.body
+                totalPdfBytes += pdfBuffer.byteLength
+                if (totalPdfBytes > MAX_AGGREGATE_PDF_BYTES) {
+                  throw new Error('Aggregate PDF attachment size exceeds safe limit')
                 }
-                pdfBuffers.push(pdfBuffer)
+                // Extract text for AI
+                const text = await extractTextFromPdf(pdfBuffer)
+                if (text) {
+                  attachmentText = `${attachmentText}\n\n--- PDF: ${attachment.filename} ---\n${text}`
+                    .slice(0, MAX_AGGREGATE_PDF_TEXT)
+                }
 
                 // Store in email-attachments bucket (all PDFs, not just tickets)
                 const safeFilename = (attachment.filename ?? 'attachment.pdf').replace(/^\//, '').replace(/[^a-zA-Z0-9._-]/g, '_')

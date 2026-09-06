@@ -4,6 +4,7 @@ import { extractFlightIdentFromDetails, normalizeStatusRow } from '@/lib/flight-
 import { extractTrainNumberFromItem } from '@/lib/train/sncf'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
+import { resolveTripReadAccess } from '@/lib/trips/access'
 
 interface StatusItemRow {
   id: string
@@ -33,16 +34,16 @@ export async function GET(
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const { data: trip } = await auth.supabase
-    .from('trips')
-    .select('id')
-    .eq('id', tripId)
-    .maybeSingle()
-
-  if (!trip) {
+  const access = await resolveTripReadAccess({
+    supabase: auth.supabase,
+    tripId,
+    userId: auth.userId,
+  })
+  if (!access.allowed) {
+    const status = access.reason === 'not_found' ? 404 : access.reason === 'internal_error' ? 500 : 403
     return NextResponse.json(
-      { error: { code: 'not_found', message: 'Trip not found.' } },
-      { status: 404 }
+      { error: { code: status === 404 ? 'not_found' : status === 500 ? 'internal_error' : 'forbidden', message: status === 404 ? 'Trip not found.' : status === 500 ? 'Failed to authorize trip.' : 'You cannot access this trip.' } },
+      { status }
     )
   }
 

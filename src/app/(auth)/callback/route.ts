@@ -3,6 +3,7 @@ import { resolveSafeRedirectFromSearchParams } from '@/lib/supabase/auth'
 import { normalizeReferralCode, resolveReferrerIdByCode, upsertSignedUpReferral } from '@/lib/referrals'
 import { NextResponse } from 'next/server'
 import type { EmailOtpType } from '@supabase/supabase-js'
+import { createSecretClient } from '@/lib/supabase/service'
 
 function redirectToLoginWithError(origin: string, error: string, errorDescription?: string) {
   const loginUrl = new URL('/login', origin)
@@ -76,7 +77,7 @@ async function applyReferralAttribution(
     return
   }
 
-  const { error: updateError } = await supabase
+  const { error: updateError } = await createSecretClient()
     .from('profiles')
     .update({ referred_by: referrerId })
     .eq('id', user.id)
@@ -88,6 +89,80 @@ async function applyReferralAttribution(
   }
 
   await upsertSignedUpReferral(supabase, referrerId, user.id)
+}
+
+async function admitFromRelationshipInvite(
+  userId: string,
+  userEmail: string,
+  redirectTo: string,
+  origin: string
+): Promise<boolean> {
+  let pathname: string
+  try {
+    pathname = new URL(redirectTo, origin).pathname
+  } catch {
+    return false
+  }
+
+  const collaboratorToken = pathname.match(/^\/invite\/([^/]+)$/)?.[1]
+  const familyToken = pathname.match(/^\/invite\/family\/([^/]+)$/)?.[1]
+  if (!collaboratorToken && !familyToken) return false
+
+  const secret = createSecretClient()
+  const query = collaboratorToken
+    ? secret
+        .from('trip_collaborators')
+        .select('id')
+        .eq('invite_token', collaboratorToken)
+        .eq('invited_email', userEmail)
+        .is('accepted_at', null)
+    : secret
+        .from('family_members')
+        .select('id')
+        .eq('invite_token', familyToken as string)
+        .eq('invited_email', userEmail)
+        .is('accepted_at', null)
+  const { data: pendingInvite } = await query.maybeSingle()
+  if (!pendingInvite) return false
+
+  const { error } = await secret
+    .from('profiles')
+    .update({ admitted_at: new Date().toISOString() })
+    .eq('id', userId)
+    .is('admitted_at', null)
+  return !error
+}
+
+async function enforceDurableAdmission(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  redirectTo: string,
+  origin: string
+): Promise<NextResponse | null> {
+  const { data: userData, error: userError } = await supabase.auth.getUser()
+  if (userError || !userData.user) return null
+
+  const user = userData.user
+  const secret = createSecretClient()
+  const { data: profile } = await secret
+    .from('profiles')
+    .select('admitted_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profile?.admitted_at) return null
+
+  const email = user.email?.trim().toLowerCase()
+  if (email && await admitFromRelationshipInvite(user.id, email, redirectTo, origin)) {
+    return null
+  }
+
+  await supabase.auth.signOut()
+  const { error: deleteError } = await secret.auth.admin.deleteUser(user.id)
+  if (deleteError) console.error('[auth callback] failed to delete unadmitted OAuth account')
+  return redirectToLoginWithError(
+    origin,
+    'invite_required',
+    'UB Trippin is invite-only. Ask a member for an invite link to sign up.'
+  )
 }
 
 export async function GET(request: Request) {
@@ -113,37 +188,8 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
-      // Velvet Rope: block new accounts created via OAuth without an invite.
-      // Supabase auto-creates users on first OAuth sign-in. If the account
-      // was just created (within 5 min) and has no invite record, reject it.
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-
-      if (userError) {
-        const sanitized = userError.message.replace(/\n/g, ' ').slice(0, 200)
-        console.error('[auth callback] error fetching user:', sanitized)
-      } else if (userData.user) {
-        const oauthUser = userData.user
-        const createdAt = new Date(oauthUser.created_at).getTime()
-        const isNewAccount = !Number.isNaN(createdAt) && Date.now() - createdAt < 5 * 60 * 1000
-
-        if (isNewAccount) {
-          const { data: inviteRecord } = await supabase
-            .from('invites')
-            .select('id')
-            .eq('invitee_id', oauthUser.id)
-            .maybeSingle()
-
-          if (!inviteRecord) {
-            // New user with no invite — sign them out and reject
-            await supabase.auth.signOut()
-            return redirectToLoginWithError(
-              origin,
-              'invite_required',
-              'UB Trippin is invite-only. Ask a member for an invite link to sign up.'
-            )
-          }
-        }
-      }
+      const admissionRedirect = await enforceDurableAdmission(supabase, redirectTo, origin)
+      if (admissionRedirect) return admissionRedirect
 
       await applyReferralAttribution(supabase, {
         redirectReferralCode,
@@ -165,6 +211,8 @@ export async function GET(request: Request) {
     })
 
     if (!error) {
+      const admissionRedirect = await enforceDurableAdmission(supabase, redirectTo, origin)
+      if (admissionRedirect) return admissionRedirect
       await applyReferralAttribution(supabase, {
         redirectReferralCode,
         origin,

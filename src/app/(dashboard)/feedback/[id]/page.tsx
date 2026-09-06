@@ -48,7 +48,7 @@ export default async function FeedbackDetailPage({ params }: FeedbackDetailPageP
 
   let profilesData: Array<{ id: string; full_name: string | null }> = []
   if (userIds.length > 0) {
-    const { data } = await supabase.from('profiles').select('id, full_name').in('id', userIds)
+    const { data } = await supabase.from('shared_profiles').select('id, full_name').in('id', userIds)
     profilesData = (data ?? []) as Array<{ id: string; full_name: string | null }>
   }
 

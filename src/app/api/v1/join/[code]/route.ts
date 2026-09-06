@@ -10,15 +10,19 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSecretClient } from '@/lib/supabase/service'
+import { consumePublicRateLimit } from '@/lib/api/durable-rate-limit'
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   const { code } = await params
 
-  const MIN_INVITE_CODE_LENGTH = 4
-  if (!code || typeof code !== 'string' || code.length < MIN_INVITE_CODE_LENGTH) {
+  if (!await consumePublicRateLimit(request, 'invite-preview', 30, 60)) {
+    return NextResponse.json({ valid: false, reason: 'not_found' }, { status: 429 })
+  }
+
+  if (!code || typeof code !== 'string' || !/^[A-Fa-f0-9]{32}$/.test(code)) {
     return NextResponse.json({ valid: false, reason: 'not_found' })
   }
 
@@ -42,12 +46,8 @@ export async function GET(
     return NextResponse.json({ valid: false, reason: 'not_found' })
   }
 
-  if (invite.used_at) {
-    return NextResponse.json({ valid: false, reason: 'used' })
-  }
-
-  if (new Date(invite.expires_at) < new Date()) {
-    return NextResponse.json({ valid: false, reason: 'expired' })
+  if (invite.used_at || new Date(invite.expires_at) < new Date()) {
+    return NextResponse.json({ valid: false, reason: 'not_found' })
   }
 
   // Fetch inviter's first name (no PII beyond first name needed here)

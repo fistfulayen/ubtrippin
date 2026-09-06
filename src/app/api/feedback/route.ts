@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
-const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
-const MAX_IMAGES = 3
+const MAX_IMAGES = 1
 
 function normalizeFeedbackType(value: unknown): 'bug' | 'feature' | 'general' {
   if (value === 'bug' || value === 'feature' || value === 'general') return value
@@ -61,6 +60,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Title and details are required.' }, { status: 400 })
   }
 
+  const submittedImages = imageEntries.filter(
+    (entry): entry is File => entry instanceof File && entry.size > 0
+  )
+  if (submittedImages.length > MAX_IMAGES) {
+    return NextResponse.json({ error: 'Attach at most one image.' }, { status: 400 })
+  }
+
   // Rate limiting: max 5 submissions per user per hour
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
   const { count: recentCount } = await supabase
@@ -73,9 +79,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Process up to MAX_IMAGES images
-  const imageFiles = imageEntries
-    .filter((entry): entry is File => entry instanceof File && entry.size > 0)
-    .slice(0, MAX_IMAGES)
+  const imageFiles = submittedImages
 
   const uploadedUrls: string[] = []
   const uploadedPaths: string[] = []

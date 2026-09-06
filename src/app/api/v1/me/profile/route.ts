@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
+import { createSecretClient } from '@/lib/supabase/service'
 import {
   canChangePublicUsername,
   getPublicUsernameChangeAllowedAt,
@@ -326,7 +327,7 @@ async function upsertProfile(request: NextRequest) {
 
   if (publicUsernameChanged) {
     const updatedPublicUsernameChangedAt = new Date().toISOString()
-    const { error: profileUpdateError } = await supabase
+    const { error: profileUpdateError } = await createSecretClient()
       .from('profiles')
       .update({
         public_username: nextPublicUsername,

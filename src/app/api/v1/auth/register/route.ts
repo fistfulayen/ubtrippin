@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createSecretClient } from '@/lib/supabase/service'
 import { sendInviteJoinedEmail } from '@/lib/email/invite-joined'
+import { consumePublicRateLimit } from '@/lib/api/durable-rate-limit'
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -29,6 +30,13 @@ function isValidPassword(value: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  if (!await consumePublicRateLimit(request, 'invite-registration', 10, 3600)) {
+    return NextResponse.json(
+      { error: { code: 'rate_limited', message: 'Too many registration attempts.' } },
+      { status: 429 }
+    )
+  }
+
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -62,20 +70,24 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-  if (!inviteCode) {
+  if (!/^[A-F0-9]{32}$/.test(inviteCode)) {
     return NextResponse.json(
-      { error: { code: 'validation_error', message: 'invite_code is required.' } },
+      { error: { code: 'validation_error', message: 'invite_code is invalid.' } },
       { status: 400 }
     )
   }
 
   const supabase = createSecretClient()
 
-  // 1. Validate invite
+  // 1. Atomically claim the invitation before creating an external auth user.
+  const claimedAt = new Date().toISOString()
   const { data: invite, error: inviteError } = await supabase
     .from('invites')
-    .select('id, inviter_id, used_at, expires_at')
+    .update({ used_at: claimedAt, email_used: email })
     .eq('code', inviteCode)
+    .is('used_at', null)
+    .gt('expires_at', claimedAt)
+    .select('id, inviter_id')
     .maybeSingle()
 
   if (inviteError) {
@@ -88,23 +100,18 @@ export async function POST(request: NextRequest) {
 
   if (!invite) {
     return NextResponse.json(
-      { error: { code: 'invalid_invite', message: 'Invite code not found.' } },
+      { error: { code: 'invalid_invite', message: 'Invite code is invalid or unavailable.' } },
       { status: 400 }
     )
   }
 
-  if (invite.used_at) {
-    return NextResponse.json(
-      { error: { code: 'invalid_invite', message: 'This invite has already been used.' } },
-      { status: 400 }
-    )
-  }
-
-  if (new Date(invite.expires_at) < new Date()) {
-    return NextResponse.json(
-      { error: { code: 'invalid_invite', message: 'This invite has expired.' } },
-      { status: 400 }
-    )
+  const releaseInvite = async () => {
+    await supabase
+      .from('invites')
+      .update({ used_at: null, email_used: null })
+      .eq('id', invite.id)
+      .eq('used_at', claimedAt)
+      .is('invitee_id', null)
   }
 
   // 2. Create auth user — service role is required here to create auth users
@@ -116,6 +123,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (authError || !authData.user) {
+    await releaseInvite()
     // Check for specific Supabase error codes first, then fall back to message matching
     const errorCode = (authError as { code?: string })?.code
     const msg = authError?.message ?? 'Unknown error'
@@ -147,30 +155,42 @@ export async function POST(request: NextRequest) {
         id: userId,
         email,
         full_name: fullName,
+        admitted_at: claimedAt,
       },
       { onConflict: 'id' }
     )
 
   if (profileError) {
     console.error('[register] profile upsert error:', profileError.message)
-    // Log for monitoring but don't fail — profile may have been created by DB trigger
-    // If both upsert AND trigger failed, user will see incomplete profile on first login
-    // which they can fix by updating their profile settings
+    await supabase.auth.admin.deleteUser(userId)
+    await releaseInvite()
+    return NextResponse.json(
+      { error: { code: 'internal_error', message: 'Failed to create account profile.' } },
+      { status: 500 }
+    )
   }
 
-  // 4. Mark invite used — service role bypasses RLS update restriction
-  const { error: updateError } = await supabase
+  // 4. Finalize only the claim made by this request.
+  const { data: finalizedInvite, error: updateError } = await supabase
     .from('invites')
     .update({
-      used_at: new Date().toISOString(),
-      email_used: email,
       invitee_id: userId,
     })
     .eq('id', invite.id)
+    .eq('used_at', claimedAt)
+    .eq('email_used', email)
+    .is('invitee_id', null)
+    .select('id')
+    .maybeSingle()
 
-  if (updateError) {
-    console.error('[register] invite update error:', updateError.message)
-    // Non-fatal: account was created; invite tracking failure is acceptable
+  if (updateError || !finalizedInvite) {
+    console.error('[register] invite update error:', updateError?.message ?? 'claim was lost')
+    await supabase.auth.admin.deleteUser(userId)
+    await releaseInvite()
+    return NextResponse.json(
+      { error: { code: 'internal_error', message: 'Failed to consume invitation.' } },
+      { status: 500 }
+    )
   }
 
   // 5. Notify inviter — fire-and-forget, no await

@@ -14,7 +14,6 @@ interface ProviderCatalogRow {
 interface ProfileRow {
   id: string
   full_name: string | null
-  email: string | null
 }
 
 interface LoyaltyProgramRow {
@@ -110,13 +109,13 @@ export async function GET(request: NextRequest, { params }: Params) {
   const secret = createSecretClient()
   const { data: profileRows } = memberUserIds.length
     ? await secret
-        .from('profiles')
-        .select('id, full_name, email')
+        .from('shared_profiles')
+        .select('id, full_name')
         .in('id', memberUserIds)
     : { data: [] }
 
   const nameByUserId = new Map<string, string | null>(
-    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || row.email || null])
+    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || null])
   )
 
   const data = memberUserIds.map((memberUserId) => {

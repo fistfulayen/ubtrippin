@@ -7,7 +7,6 @@ type Params = { params: Promise<{ id: string }> }
 interface ProfileRow {
   id: string
   full_name: string | null
-  email: string | null
 }
 
 type GuideRow = {
@@ -74,13 +73,13 @@ export async function GET(_request: NextRequest, { params }: Params) {
   const scoped = await createUserScopedClient(access.ctx.viewerId)
   const { data: profileRows } = memberUserIds.length
     ? await scoped
-        .from('profiles')
-        .select('id, full_name, email')
+        .from('shared_profiles')
+        .select('id, full_name')
         .in('id', memberUserIds)
     : { data: [] }
 
   const nameByUserId = new Map<string, string | null>(
-    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || row.email || null])
+    ((profileRows ?? []) as ProfileRow[]).map((row) => [row.id, row.full_name || null])
   )
 
   const entriesByGuideId = new Map<string, GuideEntryRow[]>()

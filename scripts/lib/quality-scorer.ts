@@ -271,24 +271,36 @@ Return JSON: { "events": [...] }`,
       },
     ])
 
-    return (result.events ?? []).slice(0, maxEvents).map((e) => ({
-      isEvent: true,
-      title: e.title,
-      start_date: e.start_date,
-      end_date: e.end_date ?? undefined,
-      venue_name: e.venue_name ?? null,
-      time_info: e.time_info ?? null,
-      category: (e.category as DiscoveredEventCandidate['category']) ?? 'other',
-      description: e.description ?? null,
-      booking_url: (e.booking_url && /^https?:\/\//i.test(e.booking_url)) ? e.booking_url : args.sourceUrl,
-      price_info: e.price_info ?? null,
-      lineup: (e.lineup ?? []).map((name) => (typeof name === 'string' ? { name } : name)),
-      source: args.sourceName,
-      source_url: args.sourceUrl,
-      tags: [],
-      image_url: null,
-      venue_type: null,
-    }))
+    return (result.events ?? []).slice(0, maxEvents).map((e) => {
+      let bookingUrl = args.sourceUrl
+      if (e.booking_url) {
+        try {
+          const parsed = new URL(e.booking_url)
+          bookingUrl = parsed.protocol === 'https:' ? parsed.toString() : args.sourceUrl
+        } catch {
+          bookingUrl = args.sourceUrl
+        }
+      }
+
+      return {
+        isEvent: true,
+        title: e.title,
+        start_date: e.start_date,
+        end_date: e.end_date ?? undefined,
+        venue_name: e.venue_name ?? null,
+        time_info: e.time_info ?? null,
+        category: (e.category as DiscoveredEventCandidate['category']) ?? 'other',
+        description: e.description ?? null,
+        booking_url: bookingUrl,
+        price_info: e.price_info ?? null,
+        lineup: (e.lineup ?? []).map((name) => (typeof name === 'string' ? { name } : name)),
+        source: args.sourceName,
+        source_url: args.sourceUrl,
+        tags: [],
+        image_url: null,
+        venue_type: null,
+      }
+    })
   } catch {
     return []
   }

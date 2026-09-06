@@ -11,7 +11,7 @@ import { sanitizeTrip, sanitizeItem, sanitizeTripInput } from '@/lib/api/sanitiz
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
-import { resolveTripWriteAccess } from '@/lib/trips/access'
+import { resolveTripReadAccess, resolveTripWriteAccess } from '@/lib/trips/access'
 
 export async function GET(
   request: NextRequest,
@@ -35,6 +35,14 @@ export async function GET(
   }
 
   const supabase = await createUserScopedClient(auth.userId)
+  const access = await resolveTripReadAccess({ supabase, tripId, userId: auth.userId })
+  if (!access.allowed) {
+    const status = access.reason === 'internal_error' ? 500 : access.reason === 'not_found' ? 404 : 403
+    return NextResponse.json(
+      { error: { code: status === 500 ? 'internal_error' : status === 404 ? 'not_found' : 'forbidden', message: status === 500 ? 'Failed to authorize trip.' : status === 404 ? 'Trip not found.' : 'You cannot access this trip.' } },
+      { status }
+    )
+  }
 
   const TRIP_FIELDS = `id,
        title,
@@ -48,37 +56,13 @@ export async function GET(
        created_at,
        updated_at`
 
-  // 4. Fetch the trip — accessible to owner or accepted collaborator
-  const { data: trip, error: tripError } = await supabase
+  // 4. Fetch only after explicit object authorization. This matters for the
+  // service-role client used by API-key sessions.
+  const { data: effectiveTrip, error: tripError } = await supabase
     .from('trips')
     .select(TRIP_FIELDS)
     .eq('id', tripId)
-    .eq('user_id', auth.userId)
     .maybeSingle()
-
-  // If not owner, check collaborator access
-  let collabRole: string | null = null
-  let effectiveTrip = trip
-
-  if (!trip) {
-    const { data: collab } = await supabase
-      .from('trip_collaborators')
-      .select('role')
-      .eq('trip_id', tripId)
-      .eq('user_id', auth.userId)
-      .not('accepted_at', 'is', null)
-      .maybeSingle()
-
-    if (collab) {
-      collabRole = collab.role
-      const { data: sharedTrip } = await supabase
-        .from('trips')
-        .select(TRIP_FIELDS)
-        .eq('id', tripId)
-        .single()
-      effectiveTrip = sharedTrip
-    }
-  }
 
   if (tripError || !effectiveTrip) {
     return NextResponse.json(
@@ -127,7 +111,7 @@ export async function GET(
   return NextResponse.json({
     data: {
       ...sanitizedTrip,
-      role: collabRole ?? 'owner',
+      role: access.role,
       items: sanitizedItems,
     },
     meta: { item_count: sanitizedItems.length },

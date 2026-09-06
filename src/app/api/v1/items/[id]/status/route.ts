@@ -4,10 +4,12 @@ import { extractFlightIdentFromDetails, normalizeStatusRow } from '@/lib/flight-
 import { extractTrainNumberFromItem } from '@/lib/train/sncf'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
+import { resolveTripReadAccess } from '@/lib/trips/access'
 
 interface StatusItemRow {
   id: string
   trip_id: string | null
+  user_id: string
   kind: string
   provider: string | null
   summary: string | null
@@ -35,7 +37,7 @@ export async function GET(
 
   const { data: item, error: itemError } = await auth.supabase
     .from('trip_items')
-    .select('id, trip_id, kind, provider, summary, start_date, end_date, start_ts, end_ts, details_json')
+    .select('id, trip_id, user_id, kind, provider, summary, start_date, end_date, start_ts, end_ts, details_json')
     .eq('id', itemId)
     .in('kind', ['flight', 'train'])
     .maybeSingle()
@@ -55,6 +57,27 @@ export async function GET(
     )
   }
 
+  const statusItem = item as StatusItemRow
+  if (statusItem.trip_id) {
+    const access = await resolveTripReadAccess({
+      supabase: auth.supabase,
+      tripId: statusItem.trip_id,
+      userId: auth.userId,
+    })
+    if (!access.allowed) {
+      const status = access.reason === 'internal_error' ? 500 : 403
+      return NextResponse.json(
+        { error: { code: status === 500 ? 'internal_error' : 'forbidden', message: status === 500 ? 'Failed to authorize item.' : 'You cannot access this item.' } },
+        { status }
+      )
+    }
+  } else if (statusItem.user_id !== auth.userId) {
+    return NextResponse.json(
+      { error: { code: 'forbidden', message: 'You cannot access this item.' } },
+      { status: 403 }
+    )
+  }
+
   const { data: statusRow, error: statusError } = await auth.supabase
     .from('trip_item_status')
     .select('item_id, status, delay_minutes, gate, terminal, platform, estimated_departure, estimated_arrival, actual_departure, actual_arrival, source, last_checked_at, status_changed_at, previous_status, raw_response')
@@ -68,8 +91,6 @@ export async function GET(
       { status: 500 }
     )
   }
-
-  const statusItem = item as StatusItemRow
 
   return NextResponse.json({
     data: {

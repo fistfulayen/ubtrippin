@@ -11,6 +11,7 @@ import {
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { isValidUUID } from '@/lib/validation'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
+import { resolveTripWriteAccess } from '@/lib/trips/access'
 
 const FREE_DAILY_REFRESH_LIMIT = 3
 const STALENESS_MS = 5 * 60 * 1000 // 5 minutes — don't call FlightAware if data is fresher
@@ -93,6 +94,26 @@ export async function POST(
   }
 
   const flightItem = item as FlightItemRow
+
+  if (flightItem.trip_id) {
+    const access = await resolveTripWriteAccess({
+      supabase: auth.supabase,
+      tripId: flightItem.trip_id,
+      userId: auth.userId,
+    })
+    if (!access.allowed) {
+      const status = access.reason === 'internal_error' ? 500 : 403
+      return NextResponse.json(
+        { error: { code: status === 500 ? 'internal_error' : 'forbidden', message: status === 500 ? 'Failed to authorize item.' : 'You cannot refresh this item.' } },
+        { status }
+      )
+    }
+  } else if (flightItem.user_id !== auth.userId) {
+    return NextResponse.json(
+      { error: { code: 'forbidden', message: 'You cannot refresh this item.' } },
+      { status: 403 }
+    )
+  }
 
   const lookup = buildFlightLookup({
     start_date: flightItem.start_date,

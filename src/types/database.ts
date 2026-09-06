@@ -34,6 +34,7 @@ export interface Database {
           public_username: string | null
           public_username_changed_at: string | null
           is_admin: boolean
+          admitted_at: string | null
         }
         Insert: {
           id: string
@@ -51,30 +52,25 @@ export interface Database {
           subscription_grace_until?: string | null
           referral_code?: string | null
           referred_by?: string | null
-          public_username?: string | null
-          public_username_changed_at?: string | null
           is_admin?: boolean
+          admitted_at?: string | null
         }
         Update: {
-          id?: string
-          email?: string
           full_name?: string | null
           avatar_url?: string | null
           calendar_token?: string | null
           notification_preferences?: Json
-          created_at?: string
-          updated_at?: string
-          subscription_tier?: string | null
-          stripe_customer_id?: string | null
-          stripe_subscription_id?: string | null
-          subscription_current_period_end?: string | null
-          subscription_grace_until?: string | null
-          referral_code?: string | null
-          referred_by?: string | null
-          public_username?: string | null
-          public_username_changed_at?: string | null
-          is_admin?: boolean
         }
+      }
+      shared_profiles: {
+        Row: {
+          id: string
+          full_name: string | null
+          avatar_url: string | null
+          public_username: string | null
+        }
+        Insert: never
+        Update: never
       }
       user_profiles: {
         Row: {

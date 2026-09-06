@@ -4,6 +4,7 @@ import path from 'path'
 import { createClient } from '@/lib/supabase/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { ItineraryDocument } from '@/components/pdf/itinerary-document'
+import { normalizeCoverImageUrl } from '@/lib/images/cover-url'
 import { isValidUUID } from '@/lib/validation'
 
 export async function GET(
@@ -60,7 +61,18 @@ export async function GET(
 
   // Generate PDF
   const pdfBuffer = await renderToBuffer(
-    ItineraryDocument({ trip, items: items || [], logoDataUri })
+    ItineraryDocument({
+      trip: {
+        ...trip,
+        // Old rows may predate write-time URL validation. Never hand an
+        // arbitrary persisted URL to the server-side PDF renderer.
+        cover_image_url: trip.cover_image_url
+          ? normalizeCoverImageUrl(trip.cover_image_url)
+          : null,
+      },
+      items: items || [],
+      logoDataUri,
+    })
   )
 
   // Create filename

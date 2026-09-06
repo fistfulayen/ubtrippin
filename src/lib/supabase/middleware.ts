@@ -48,7 +48,18 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith(path)
   ) && request.nextUrl.pathname !== '/trips/demo'
 
-  if (isProtectedPath && !user) {
+  const isLoginPath = request.nextUrl.pathname === '/login'
+  let admitted = false
+  if (user && (isProtectedPath || isLoginPath)) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('admitted_at')
+      .eq('id', user.sub)
+      .maybeSingle()
+    admitted = Boolean(profile?.admitted_at)
+  }
+
+  if (isProtectedPath && (!user || !admitted)) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.search = ''
@@ -66,7 +77,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is logged in and trying to access login, honor redirect target.
-  if (request.nextUrl.pathname === '/login' && user) {
+  if (isLoginPath && user && admitted) {
     const redirectPath = resolveSafeRedirectFromSearchParams(request.nextUrl.searchParams, {
       fallbackPath: '/trips',
       origin: request.nextUrl.origin,

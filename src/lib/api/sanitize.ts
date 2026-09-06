@@ -1,3 +1,5 @@
+import { normalizeCoverImageUrl } from '@/lib/images/cover-url'
+
 /**
  * Field sanitizers for REST API v1 responses and write inputs.
  *
@@ -13,15 +15,64 @@
 type RawTrip = Record<string, unknown>
 type RawItem = Record<string, unknown>
 
+const SHARED_SECRET_KEYS = new Set([
+  'confirmation_code',
+  'confirmation_number',
+  'booking_reference',
+  'booking_ref',
+  'record_locator',
+  'pnr',
+  'ticket_pdf_bucket',
+  'ticket_pdf_path',
+  'storage_bucket',
+  'storage_path',
+  'barcode',
+  'barcode_data',
+  'qr_code',
+])
+
+function redactSharedSecrets(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactSharedSecrets)
+  if (!value || typeof value !== 'object') return value
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !SHARED_SECRET_KEYS.has(key.toLowerCase()))
+      .map(([key, child]) => [key, redactSharedSecrets(child)])
+  )
+}
+
+const PUBLIC_DETAIL_FIELDS: Record<string, ReadonlySet<string>> = {
+  flight: new Set(['airline', 'flight_number', 'departure_airport', 'arrival_airport', 'departure_city', 'arrival_city', 'departure_local_time', 'arrival_local_time', 'departure_terminal', 'arrival_terminal', 'duration']),
+  hotel: new Set(['hotel_name', 'check_in_date', 'check_in_time', 'check_out_date', 'check_out_time', 'city', 'country']),
+  train: new Set(['train_number', 'operator', 'departure_station', 'arrival_station', 'departure_local_time', 'arrival_local_time', 'duration']),
+  car_rental: new Set(['rental_company', 'pickup_location', 'dropoff_location', 'pickup_time', 'dropoff_time', 'vehicle_type']),
+  restaurant: new Set(['restaurant_name', 'reservation_time']),
+  activity: new Set(['activity_name', 'venue', 'start_time', 'end_time']),
+  ticket: new Set(['event_name', 'venue', 'date', 'time']),
+  other: new Set(),
+}
+
+export function sanitizePublicItemDetails(
+  kind: string,
+  details: unknown
+): Record<string, unknown> {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return {}
+  const allowed = PUBLIC_DETAIL_FIELDS[kind] ?? PUBLIC_DETAIL_FIELDS.other
+  return Object.fromEntries(
+    Object.entries(details as Record<string, unknown>)
+      .filter(([key]) => allowed.has(key))
+      .map(([key, value]) => [key, redactSharedSecrets(value)])
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Response sanitizers (GET)
 // ---------------------------------------------------------------------------
 
 /** Sanitize a trip row for public API consumption. */
 export function sanitizeTrip(trip: RawTrip): RawTrip {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { ...safe } = trip
-  return safe
+  return { ...trip }
 }
 
 /** Sanitize a trip_item row for public API consumption. */
@@ -29,12 +80,10 @@ export function sanitizeItem(item: RawItem): RawItem {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { confirmation_code, source_email_id, details_json, ...safe } = item
 
-  // Strip booking_reference from details_json but keep everything else
+  // Recursively strip reservation capabilities and server-owned locators.
   let cleanDetails: Record<string, unknown> | null = null
   if (details_json && typeof details_json === 'object') {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { booking_reference, ...rest } = details_json as Record<string, unknown>
-    cleanDetails = rest
+    cleanDetails = redactSharedSecrets(details_json) as Record<string, unknown>
   }
 
   return {
@@ -161,7 +210,15 @@ export function sanitizeTripInput(
       if (val === undefined) {
         return { error: { code: 'invalid_param', field: 'cover_image_url', message: '"cover_image_url" must be a string ≤500 chars.' } }
       }
-      out.cover_image_url = val || null
+      if (!val) {
+        out.cover_image_url = null
+      } else {
+        const normalizedUrl = normalizeCoverImageUrl(val)
+        if (!normalizedUrl) {
+          return { error: { code: 'invalid_param', field: 'cover_image_url', message: '"cover_image_url" must be an application-managed or Unsplash image URL.' } }
+        }
+        out.cover_image_url = normalizedUrl
+      }
     }
   }
 
@@ -327,11 +384,15 @@ export function sanitizeItemInput(
     } else if (typeof body.details_json !== 'object' || Array.isArray(body.details_json)) {
       return { error: { code: 'invalid_param', field: 'details_json', message: '"details_json" must be a JSON object.' } }
     } else {
+      const details = body.details_json as Record<string, unknown>
+      if ('ticket_pdf_bucket' in details || 'ticket_pdf_path' in details) {
+        return { error: { code: 'invalid_param', field: 'details_json', message: 'Ticket attachment locators are server-managed.' } }
+      }
       const jsonStr = JSON.stringify(body.details_json)
       if (Buffer.byteLength(jsonStr, 'utf8') > DETAILS_JSON_MAX_BYTES) {
         return { error: { code: 'invalid_param', field: 'details_json', message: '"details_json" must not exceed 10KB.' } }
       }
-      out.details_json = body.details_json as Record<string, unknown>
+      out.details_json = details
     }
   }
 

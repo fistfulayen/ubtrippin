@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { detectImageMime } from '@/lib/images/image-bytes'
+import { getHeaderValue, requestPublicUrl } from '@/lib/security/public-http'
 import { isValidUUID } from '@/lib/validation'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -79,37 +81,34 @@ export async function POST(
     // Download external image and upload to Supabase Storage
     // This avoids hotlink issues and ensures images persist
     try {
-      const parsed = new URL(externalUrl)
-      if (parsed.protocol !== 'https:') {
-        return NextResponse.json({ error: 'Only HTTPS URLs allowed' }, { status: 400 })
-      }
-
-      const imgRes = await fetch(externalUrl, {
+      const imgRes = await requestPublicUrl(externalUrl, {
         headers: { 'User-Agent': 'UBTRIPPIN/1.0' },
-        signal: AbortSignal.timeout(10000),
+        maxResponseBytes: MAX_FILE_SIZE_BYTES,
+        timeoutMs: 10_000,
+        maxRedirects: 3,
       })
-      if (!imgRes.ok) {
+      if (imgRes.status < 200 || imgRes.status >= 300) {
         return NextResponse.json({ error: 'Failed to fetch image' }, { status: 400 })
       }
 
-      const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+      const contentType = getHeaderValue(imgRes.headers, 'content-type')
       const mimeBase = contentType.split(';')[0].trim()
       if (!ALLOWED_MIME_TYPES.has(mimeBase)) {
         return NextResponse.json({ error: 'Invalid image type from URL' }, { status: 400 })
       }
 
-      const buffer = await imgRes.arrayBuffer()
-      if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-        return NextResponse.json({ error: 'Image too large (max 5MB)' }, { status: 400 })
+      const detectedMime = detectImageMime(imgRes.body)
+      if (!detectedMime || detectedMime !== mimeBase.replace('image/jpg', 'image/jpeg')) {
+        return NextResponse.json({ error: 'Image content does not match its type' }, { status: 400 })
       }
 
-      const ext = mimeBase === 'image/png' ? 'png' : mimeBase === 'image/webp' ? 'webp' : 'jpg'
+      const ext = detectedMime === 'image/png' ? 'png' : detectedMime === 'image/webp' ? 'webp' : detectedMime === 'image/gif' ? 'gif' : 'jpg'
       const path = `${user.id}/${tripId}.${ext}`
 
       const serviceClient = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
       const { error: uploadErr } = await serviceClient.storage
         .from('trip-images')
-        .upload(path, buffer, { upsert: true, contentType: mimeBase })
+        .upload(path, imgRes.body, { upsert: true, contentType: detectedMime })
 
       if (uploadErr) {
         console.error('Storage upload error (external):', uploadErr)
@@ -191,8 +190,10 @@ export async function POST(
     return NextResponse.json({ error: 'No file or URL provided' }, { status: 400 })
   }
 
-  // Update trip (uses RLS-enforced user client — only owner can update)
-  const { error: updateError } = await supabase
+  // Ownership was checked above; use the service client for the final write so
+  // locally hosted storage URLs do not need to be exposed as client-writable.
+  const tripWriter = createServiceClient(SUPABASE_URL, SUPABASE_SECRET_KEY)
+  const { error: updateError } = await tripWriter
     .from('trips')
     .update({ cover_image_url: coverImageUrl })
     .eq('id', tripId)

@@ -13,6 +13,7 @@ import { isValidUUID } from '@/lib/validation'
 import { searchBraveImages } from '@/lib/images/brave-image-search'
 import { storeCoverImage } from '@/lib/images/store-cover-image'
 import { getDestinationImageUrl } from '@/lib/images/unsplash'
+import { createSecretClient } from '@/lib/supabase/service'
 
 export async function POST(
   _request: NextRequest,
@@ -93,7 +94,7 @@ export async function POST(
   }
 
   if (coverImageUrl) {
-    await supabase
+    await createSecretClient()
       .from('trips')
       .update({ cover_image_url: coverImageUrl })
       .eq('id', tripId)

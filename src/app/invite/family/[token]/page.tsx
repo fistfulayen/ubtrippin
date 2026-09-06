@@ -1,7 +1,6 @@
 import Image from 'next/image'
 import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
-import { Lock } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/server'
 import { AcceptFamilyInviteButton } from './accept-family-invite-button'
@@ -13,7 +12,7 @@ interface FamilyInvitePageProps {
 interface FamilyInvitePreview {
   family_id: string
   family_name: string
-  invited_email: string
+  invited_email_hint: string
   invited_by_name: string
   role: 'admin' | 'member'
   already_accepted: boolean
@@ -65,24 +64,6 @@ export default async function FamilyInvitePage({ params }: FamilyInvitePageProps
     redirect('/settings/family')
   }
 
-  if (user.email?.toLowerCase() !== invite.invited_email.toLowerCase()) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-slate-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-6 text-center">
-          <Lock className="mx-auto h-10 w-10 text-gray-500" />
-          <h1 className="text-xl font-bold text-gray-900">Wrong account</h1>
-          <p className="text-gray-600">
-            This invite was sent to <strong>{invite.invited_email}</strong>. You are signed in as{' '}
-            <strong>{user.email}</strong>.
-          </p>
-          <p className="text-sm text-gray-500">
-            Please sign out and sign in with the invited email to accept this family invite.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
@@ -111,7 +92,7 @@ export default async function FamilyInvitePage({ params }: FamilyInvitePageProps
 
           <div className="rounded-xl bg-slate-50 p-4 space-y-2">
             <p className="text-sm text-gray-500">Invited email</p>
-            <p className="font-medium text-gray-900">{invite.invited_email}</p>
+            <p className="font-medium text-gray-900">{invite.invited_email_hint}</p>
           </div>
 
           <AcceptFamilyInviteButton token={token} />

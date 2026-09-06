@@ -1,11 +1,22 @@
 import { extractText, getDocumentProxy } from 'unpdf'
 
-export async function extractTextFromPdf(base64Content: string): Promise<string> {
+const MAX_PDF_PAGES = 50
+const MAX_EXTRACTED_TEXT_CHARS = 100_000
+
+export function hasPdfMagic(bytes: Uint8Array): boolean {
+  return bytes.length >= 5 && String.fromCharCode(...bytes.slice(0, 5)) === '%PDF-'
+}
+
+export async function extractTextFromPdf(bytes: Uint8Array): Promise<string> {
   try {
-    const buffer = Buffer.from(base64Content, 'base64')
-    const pdf = await getDocumentProxy(new Uint8Array(buffer))
+    if (!hasPdfMagic(bytes)) return ''
+    const pdf = await getDocumentProxy(bytes)
+    if (pdf.numPages > MAX_PDF_PAGES) {
+      console.error(`Refusing PDF with ${pdf.numPages} pages (max ${MAX_PDF_PAGES})`)
+      return ''
+    }
     const { text } = await extractText(pdf, { mergePages: true })
-    return text
+    return text.slice(0, MAX_EXTRACTED_TEXT_CHARS)
   } catch (error) {
     console.error('Failed to parse PDF:', error)
     return ''

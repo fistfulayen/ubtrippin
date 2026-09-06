@@ -10,12 +10,13 @@ import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createSecretClient } from '@/lib/supabase/service'
+import { requestPublicUrl } from '@/lib/security/public-http'
 import { decryptWebhookSecret } from '@/lib/webhook-crypto'
 
 const REQUEST_TIMEOUT_MS = 10_000
 const MAX_QUEUE_FETCH = 500
 const PER_USER_CONCURRENCY = 10
-const MAX_RESPONSE_BODY_CHARS = 500
+const MAX_ERROR_MESSAGE_CHARS = 500
 const RETRY_DELAYS_MS: Record<number, number> = {
   2: 1_000,
   3: 10_000,
@@ -27,9 +28,9 @@ function signPayload(payload: string, secret: string): string {
   return `sha256=${digest}`
 }
 
-function truncateResponseBody(body: string): string {
-  if (body.length <= MAX_RESPONSE_BODY_CHARS) return body
-  return body.slice(0, MAX_RESPONSE_BODY_CHARS)
+function truncateErrorMessage(body: string): string {
+  if (body.length <= MAX_ERROR_MESSAGE_CHARS) return body
+  return body.slice(0, MAX_ERROR_MESSAGE_CHARS)
 }
 
 function firstRow(value: unknown): Record<string, unknown> | null {
@@ -89,32 +90,31 @@ async function deliverOne(queueRow: Record<string, unknown>): Promise<'success' 
     const secret = decryptWebhookSecret(webhook.secret_encrypted as string)
     const timestamp = Math.floor(Date.now() / 1000).toString()
 
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    let response: Response
-    try {
-      response = await fetch(webhook.url as string, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-ubt-signature': signPayload(body, secret),
-          'x-ubt-event': delivery.event as string,
-          'x-ubt-delivery': deliveryId,
-          'x-ubt-timestamp': timestamp,
-        },
-        body,
-        signal: controller.signal,
-      })
-    } finally {
-      clearTimeout(timer)
-    }
-
+    // Revalidate and pin DNS at delivery time. Redirects are deliberately
+    // disabled so a saved public endpoint cannot bounce the signed request to
+    // a private address or a different origin.
+    const response = await requestPublicUrl(webhook.url as string, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-ubt-signature': signPayload(body, secret),
+        'x-ubt-event': delivery.event as string,
+        'x-ubt-delivery': deliveryId,
+        'x-ubt-timestamp': timestamp,
+      },
+      body,
+      maxRedirects: 0,
+      maxResponseBytes: 0,
+      timeoutMs: REQUEST_TIMEOUT_MS,
+    })
     responseCode = response.status
-    responseBody = truncateResponseBody(await response.text())
-    ok = response.ok
+    // Target response bodies are neither needed nor persisted. This prevents
+    // response exfiltration and bounds body streaming work.
+    responseBody = ''
+    ok = response.status >= 200 && response.status < 300
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown delivery error'
-    responseBody = truncateResponseBody(message)
+    responseBody = truncateErrorMessage(message)
   }
 
   const nowIso = new Date().toISOString()

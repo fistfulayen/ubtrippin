@@ -431,7 +431,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-gray-700" htmlFor="feedback-image">
-                Screenshots (optional)
+                Screenshot (optional)
               </label>
               <div
                 className="rounded-md border-2 border-dashed border-gray-200 p-3 text-center text-sm text-gray-500 transition-colors hover:border-gray-300 focus-within:border-blue-400"
@@ -446,7 +446,7 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
                   }
                   if (newFiles.length > 0) {
                     e.preventDefault()
-                    setImageFiles((prev) => [...prev, ...newFiles].slice(0, 3))
+                    setImageFiles((prev) => [...prev, ...newFiles].slice(0, 1))
                   }
                 }}
                 tabIndex={0}
@@ -455,15 +455,14 @@ export function FeedbackBoard({ initialItems, currentUserId, currentUserName, av
                   id="feedback-image"
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/gif"
-                  multiple
                   className="mb-2"
                   onChange={(event) => {
                     const files = Array.from(event.target.files ?? [])
-                    setImageFiles((prev) => [...prev, ...files].slice(0, 3))
+                    setImageFiles((prev) => [...prev, ...files].slice(0, 1))
                     event.target.value = ''
                   }}
                 />
-                <p className="text-xs text-gray-400">Or paste from clipboard (⌘V / Ctrl+V). Max 3 images, 5MB each.</p>
+                <p className="text-xs text-gray-400">Or paste from clipboard (⌘V / Ctrl+V). Max 1 image, 5MB.</p>
               </div>
               {imageFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">

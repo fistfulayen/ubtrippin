@@ -13,6 +13,7 @@ import {
   trimEventsForFreeTier,
 } from '@/lib/events/queries'
 import { getUserTier } from '@/lib/usage/limits'
+import { serializeJsonForHtmlScript } from '@/lib/security/json-script'
 
 interface CityPageProps {
   params: Promise<{ slug: string }>
@@ -201,7 +202,7 @@ export default async function CityPage({ params, searchParams }: CityPageProps) 
 
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonForHtmlScript(structuredData) }}
         />
     </div>
   )

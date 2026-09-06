@@ -69,15 +69,19 @@ export default async function TripPage({ params }: TripPageProps) {
   if (!isOwner && user) {
     const { data: collab } = await supabase
       .from('trip_collaborators')
-      .select('role, inviter:profiles!invited_by (full_name, email)')
+      .select('role, invited_by')
       .eq('trip_id', id)
       .eq('user_id', user.id)
       .maybeSingle()
 
     if (collab) {
       collabRole = collab.role
-      const inviterData = collab.inviter as { full_name?: string; email?: string } | null
-      inviterName = inviterData?.full_name || inviterData?.email || null
+      const { data: inviterData } = await supabase
+        .from('shared_profiles')
+        .select('full_name')
+        .eq('id', collab.invited_by)
+        .maybeSingle()
+      inviterName = inviterData?.full_name || null
     }
   }
 
@@ -164,6 +168,7 @@ export default async function TripPage({ params }: TripPageProps) {
           currentUserId={user?.id}
           userUnit={userUnit}
           isPro={isPro}
+          readOnly={!canEdit}
         />
       </Suspense>
 
@@ -174,6 +179,7 @@ export default async function TripPage({ params }: TripPageProps) {
           userId={user?.id}
           userUnit={userUnit}
           isPro={isPro}
+          allowRefresh={canEdit}
         />
       </Suspense>
     </div>
@@ -186,6 +192,7 @@ interface WeatherSectionAsyncProps {
   userId?: string
   userUnit: TemperatureUnit
   isPro: boolean
+  allowRefresh: boolean
 }
 
 async function WeatherSectionAsync({
@@ -194,6 +201,7 @@ async function WeatherSectionAsync({
   userId,
   userUnit,
   isPro,
+  allowRefresh,
 }: WeatherSectionAsyncProps) {
   if (!userId) return null
 
@@ -213,7 +221,12 @@ async function WeatherSectionAsync({
   }
 
   return (
-    <WeatherSection endpoint={`/api/trips/${trip.id}/weather`} initialData={weather} showPacking />
+    <WeatherSection
+      endpoint={`/api/trips/${trip.id}/weather`}
+      initialData={weather}
+      allowRefresh={allowRefresh}
+      showPacking
+    />
   )
 }
 
@@ -224,6 +237,7 @@ interface TimelineWithEventsAsyncProps {
   currentUserId?: string
   userUnit: TemperatureUnit
   isPro: boolean
+  readOnly: boolean
   weather?: WeatherResponsePayload | null
 }
 
@@ -234,6 +248,7 @@ async function TimelineWithEventsAsync({
   currentUserId,
   userUnit,
   isPro,
+  readOnly,
   weather,
 }: TimelineWithEventsAsyncProps) {
   const resolvedWeather =
@@ -269,6 +284,7 @@ async function TimelineWithEventsAsync({
       allTrips={allTrips}
       currentUserId={currentUserId}
       segmentEvents={segmentEvents}
+      readOnly={readOnly}
     />
   )
 }

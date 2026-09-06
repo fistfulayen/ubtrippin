@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type TripWriteAccessRole = 'owner' | 'editor' | 'family_member'
+export type TripReadAccessRole = TripWriteAccessRole | 'viewer'
 export type TripWriteDeniedReason = 'not_found' | 'forbidden' | 'viewer' | 'internal_error'
 
 interface TripOwnerRow {
@@ -26,12 +27,31 @@ interface ResolveTripWriteAccessParams {
   userId: string
 }
 
+export type TripReadAccessResult =
+  | { allowed: true; role: TripReadAccessRole; trip: TripOwnerRow }
+  | { allowed: false; reason: Exclude<TripWriteDeniedReason, 'viewer'>; trip?: TripOwnerRow }
+
 interface FamilyMembershipRow {
   family_id: string
 }
 
 interface CollaboratorRow {
   role: 'editor' | 'viewer' | 'owner'
+}
+
+/** Explicit object authorization for service-role-backed API-key reads. */
+export async function resolveTripReadAccess({
+  supabase,
+  tripId,
+  userId,
+}: ResolveTripWriteAccessParams): Promise<TripReadAccessResult> {
+  const writeAccess = await resolveTripWriteAccess({ supabase, tripId, userId })
+  if (writeAccess.allowed) return writeAccess
+  if (writeAccess.reason !== 'viewer') {
+    return { allowed: false, reason: writeAccess.reason, trip: writeAccess.trip }
+  }
+  if (!writeAccess.trip) return { allowed: false, reason: 'forbidden' }
+  return { allowed: true, role: 'viewer', trip: writeAccess.trip }
 }
 
 /**

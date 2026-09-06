@@ -116,7 +116,8 @@ export async function POST(request: NextRequest) {
     .insert({
       user_id: auth.userId,
       email,
-      name,
+      label: name,
+      verified: false,
     })
     .select('*')
     .single()

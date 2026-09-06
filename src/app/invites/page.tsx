@@ -251,11 +251,10 @@ export default function InvitesPage() {
     if (!user) return
 
     setCreating(true)
-    const { data: invite, error } = await supabase
-      .from('invites')
-      .insert({ inviter_id: user.id })
-      .select('id, code, created_at, expires_at')
-      .single()
+    const { data: inviteRows, error } = await supabase.rpc('create_weekly_invite', {
+      p_user_id: user.id,
+    })
+    const invite = inviteRows?.[0]
 
     if (error || !invite) {
       setCreating(false)

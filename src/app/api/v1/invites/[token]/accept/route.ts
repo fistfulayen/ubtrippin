@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSessionAuth, isSessionAuthError } from '@/lib/api/session-auth'
 import { sendInviteAcceptedEmail } from '@/lib/email/collaborator-invite'
 import { dispatchWebhookEvent } from '@/lib/webhooks'
+import { createSecretClient } from '@/lib/supabase/service'
 
 type Params = { params: Promise<{ token: string }> }
 
@@ -32,7 +33,15 @@ export async function POST(request: NextRequest, { params }: Params) {
   const auth = await requireSessionAuth()
   if (isSessionAuthError(auth)) return auth
 
-  const supabase = auth.supabase
+  const { data: { user: authUser } } = await auth.supabase.auth.getUser()
+  const userEmail = authUser?.email?.toLowerCase() ?? ''
+  if (!userEmail) {
+    return NextResponse.json(
+      { error: { code: 'forbidden', message: 'A verified account email is required.' } },
+      { status: 403 }
+    )
+  }
+  const supabase = createSecretClient()
 
   // Lookup the invite
   const { data: invite, error: lookupError } = await supabase
@@ -65,9 +74,6 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // Verify email matches (case-insensitive)
-  // Get user email for invite verification
-  const { data: { user: authUser } } = await auth.supabase.auth.getUser()
-  const userEmail = authUser?.email?.toLowerCase() ?? ''
   if (userEmail !== invite.invited_email.toLowerCase()) {
     return NextResponse.json(
       {
@@ -81,16 +87,18 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // Accept the invite
-  const { data: updated, error: updateError } = await supabase
-    .from('trip_collaborators')
-    .update({
-      user_id: auth.userId,
-      accepted_at: new Date().toISOString(),
-      invite_token: null,   // consume the token
-    })
-    .eq('id', invite.id)
-    .select('id, trip_id, role, invited_email, accepted_at')
-    .single()
+  const { data: acceptedRows, error: updateError } = await supabase.rpc(
+    'accept_trip_collaborator',
+    { p_token: token, p_user_id: auth.userId, p_email: userEmail }
+  )
+  const updated = (acceptedRows as Array<{
+    id: string
+    trip_id: string
+    role: string
+    invited_email: string
+    invited_by: string
+    accepted_at: string
+  }> | null)?.[0]
 
   if (updateError || !updated) {
     console.error('[v1/invites/accept]', updateError)

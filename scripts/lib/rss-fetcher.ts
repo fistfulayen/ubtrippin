@@ -1,39 +1,7 @@
 import type { FeedItem } from './types'
+import { getHeaderValue, requestPublicUrl } from '../../src/lib/security/public-http'
 
-/**
- * Validate that a URL is safe to fetch: must be https and must resolve to a
- * public hostname (not loopback/RFC-1918/metadata ranges).
- * Throws if the URL is not acceptable.
- */
-function assertSafeUrl(url: string): void {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new Error(`Invalid URL: ${url}`)
-  }
-  if (parsed.protocol !== 'https:') {
-    throw new Error(`Unsafe URL scheme "${parsed.protocol}" — only https:// is allowed: ${url}`)
-  }
-  const host = parsed.hostname.toLowerCase()
-  // Block loopback, link-local, and cloud metadata endpoints
-  const blocked = [
-    /^localhost$/,
-    /^127\./,
-    /^::1$/,
-    /^0\.0\.0\.0$/,
-    /^10\./,
-    /^172\.(1[6-9]|2\d|3[01])\./,
-    /^192\.168\./,
-    /^169\.254\./,   // link-local / AWS metadata
-    /^fd[0-9a-f]{2}:/i, // ULA IPv6
-  ]
-  for (const pattern of blocked) {
-    if (pattern.test(host)) {
-      throw new Error(`Blocked private/metadata host: ${host}`)
-    }
-  }
-}
+const MAX_DISCOVERY_RESPONSE_BYTES = 2 * 1024 * 1024
 
 interface ParsedFeedLike {
   items?: Array<Record<string, unknown>>
@@ -101,20 +69,18 @@ function parseXmlItems(xml: string): FeedItem[] {
     .filter((item): item is FeedItem => Boolean(item))
 }
 
-async function parseWithDependency(url: string): Promise<FeedItem[] | null> {
-  // URL safety already validated by the public callers; assert here as defence-in-depth.
-  assertSafeUrl(url)
+async function parseWithDependency(xml: string): Promise<FeedItem[] | null> {
   try {
     const imported = await importOptionalModule('rss-parser')
     if (!imported || typeof imported !== 'object' || !('default' in imported)) return null
 
     const ParserCtor = (imported as {
       default: new () => {
-        parseURL: (feedUrl: string) => Promise<ParsedFeedLike>
+        parseString: (feedXml: string) => Promise<ParsedFeedLike>
       }
     }).default
     const parser = new ParserCtor()
-    const parsed = (await parser.parseURL(url)) as ParsedFeedLike
+    const parsed = (await parser.parseString(xml)) as ParsedFeedLike
     return (parsed.items ?? [])
       .map((item) => {
         const title = String(item.title ?? '').trim()
@@ -137,41 +103,47 @@ async function parseWithDependency(url: string): Promise<FeedItem[] | null> {
 }
 
 export async function fetchFeedItems(url: string): Promise<FeedItem[]> {
-  assertSafeUrl(url)
-
-  const parsed = await parseWithDependency(url)
-  if (parsed) return parsed
-
-  const response = await fetch(url, {
+  const response = await requestPublicUrl(url, {
     headers: {
       Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml',
       'User-Agent': 'ubtrippin-event-pipeline/1.0',
     },
+    maxRedirects: 3,
+    maxResponseBytes: MAX_DISCOVERY_RESPONSE_BYTES,
+    timeoutMs: 10_000,
   })
 
-  if (!response.ok) {
-    throw new Error(`Feed request failed: ${response.status} ${response.statusText}`)
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Feed request failed: ${response.status}`)
   }
 
-  const xml = await response.text()
+  const contentType = getHeaderValue(response.headers, 'content-type')
+  if (contentType && !/(rss|atom|xml|text\/plain)/i.test(contentType)) {
+    throw new Error(`Feed request returned unsupported content type: ${contentType}`)
+  }
+
+  const xml = new TextDecoder().decode(response.body)
+  const parsed = await parseWithDependency(xml)
+  if (parsed) return parsed
   return parseXmlItems(xml)
 }
 
 export async function discoverFeedsFromPage(url: string): Promise<string[]> {
-  assertSafeUrl(url)
-
-  const response = await fetch(url, {
+  const response = await requestPublicUrl(url, {
     headers: {
       Accept: 'text/html,application/xhtml+xml',
       'User-Agent': 'ubtrippin-event-pipeline/1.0',
     },
+    maxRedirects: 3,
+    maxResponseBytes: MAX_DISCOVERY_RESPONSE_BYTES,
+    timeoutMs: 10_000,
   })
 
-  if (!response.ok) {
-    throw new Error(`Page request failed: ${response.status} ${response.statusText}`)
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`Page request failed: ${response.status}`)
   }
 
-  const html = await response.text()
+  const html = new TextDecoder().decode(response.body)
   const matches = Array.from(
     html.matchAll(/<link[^>]+rel=["'][^"']*alternate[^"']*["'][^>]+type=["']application\/(rss\+xml|atom\+xml|xml)["'][^>]+href=["']([^"']+)["'][^>]*>/gi)
   )

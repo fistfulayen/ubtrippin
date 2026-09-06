@@ -85,34 +85,26 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Check weekly remaining
   const serviceClient = createSecretClient()
-  const { data: remainingData } = await serviceClient.rpc('weekly_invites_remaining', {
-    user_id: auth.userId,
-  })
-  const remaining: number = remainingData ?? 0
-
-  if (remaining <= 0) {
-    return NextResponse.json(
-      {
-        error: {
-          code: 'invite_limit_reached',
-          message: 'You have used all your invites for this week. Resets next Monday UTC.',
-        },
-      },
-      { status: 429 }
-    )
-  }
-
-  // Create invite — RLS policy requires inviter_id = auth.uid(), handled by user-scoped client
-  const { data: invite, error: insertError } = await supabase
-    .from('invites')
-    .insert({ inviter_id: auth.userId })
-    .select('id, code, created_at, expires_at')
-    .single()
+  const { data: inviteRows, error: insertError } = await serviceClient.rpc(
+    'create_weekly_invite',
+    { p_user_id: auth.userId }
+  )
+  const invite = (inviteRows as Array<{
+    id: string
+    code: string
+    created_at: string
+    expires_at: string
+  }> | null)?.[0]
 
   if (insertError || !invite) {
     console.error('[v1/invites POST]', insertError?.message)
+    if (insertError?.message.includes('weekly invite limit reached')) {
+      return NextResponse.json(
+        { error: { code: 'invite_limit_reached', message: 'You have used all your invites for this week. Resets next Monday UTC.' } },
+        { status: 429 }
+      )
+    }
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to create invite.' } },
       { status: 500 }

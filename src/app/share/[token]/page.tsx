@@ -10,11 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { WeatherSection } from '@/components/trips/weather/weather-section'
 import { buildWeatherPayload, getTemperatureUnit, getTripWeather } from '@/lib/weather/service'
+import { normalizeCoverImageUrl } from '@/lib/images/cover-url'
 import type { Json, TripItem } from '@/types/database'
 import type { WeatherTripItem } from '@/lib/weather/types'
 import { attachWeatherToTimeline, buildTimeline } from '@/lib/trips/city-segments'
 import { MovementTimeline } from '@/components/trips/movement-timeline'
 import { ShareTripButton } from './share-trip-button'
+import { sanitizePublicItemDetails } from '@/lib/api/sanitize'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.ubtrippin.xyz'
 const DEFAULT_OG_IMAGE_URL = `${APP_URL}/x-header.png`
@@ -30,7 +32,6 @@ interface ShareTrip {
   end_date: string | null
   primary_location: string | null
   travelers: string[] | null
-  notes: string | null
   cover_image_url: string | null
   share_enabled: boolean | null
 }
@@ -70,12 +71,19 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: ShareTrip
   const supabase = createSecretClient()
   const { data: tripRow } = await supabase
     .from('trips')
-    .select('id, title, start_date, end_date, primary_location, travelers, notes, cover_image_url, share_enabled')
+    .select('id, title, start_date, end_date, primary_location, travelers, cover_image_url, share_enabled')
     .eq('share_token', token)
     .eq('share_enabled', true)
     .single()
 
-  const trip = tripRow as ShareTrip | null
+  const trip = tripRow
+    ? {
+        ...(tripRow as ShareTrip),
+        cover_image_url: tripRow.cover_image_url
+          ? normalizeCoverImageUrl(tripRow.cover_image_url)
+          : null,
+      }
+    : null
   if (!trip) return { trip: null, items: null }
 
   const { data: rawItems } = await supabase
@@ -86,13 +94,7 @@ const getSharedTripData = cache(async (token: string): Promise<{ trip: ShareTrip
     .order('start_ts', { ascending: true })
 
   const items = rawItems?.map((item): TripItem => {
-    let safeDetails: Record<string, unknown> | null = null
-    if (item.details_json && typeof item.details_json === 'object' && !Array.isArray(item.details_json)) {
-      const { confirmation_code, booking_reference, ...remaining } = item.details_json as Record<string, unknown>
-      void confirmation_code
-      void booking_reference
-      safeDetails = remaining
-    }
+    const safeDetails = sanitizePublicItemDetails(item.kind, item.details_json)
 
     return {
       id: item.id,
@@ -262,7 +264,7 @@ export default async function SharePage({ params }: SharePageProps) {
     ])
 
     if (accessibleTrip) {
-      const { data: ownerProfile } = await sessionSupabase
+      const { data: ownerProfile } = await createSecretClient()
         .from('profiles')
         .select('subscription_tier')
         .eq('id', accessibleTrip.user_id)
@@ -381,14 +383,6 @@ export default async function SharePage({ params }: SharePageProps) {
                 </Badge>
               ) : null}
             </div>
-          ) : null}
-
-          {trip.notes ? (
-            <Card className="mb-6 border-[#cbd5e1] bg-[#ffffff]">
-              <CardContent className="p-4">
-                <p className="text-sm leading-relaxed text-gray-700">{trip.notes}</p>
-              </CardContent>
-            </Card>
           ) : null}
 
           {sharedWeather ? (

@@ -6,6 +6,7 @@ import { isAuthError, validateApiKey } from '@/lib/api/auth'
 import { createUserScopedClient } from '@/lib/supabase/user-scoped'
 import { canRefreshWeather, getTripWeather } from '@/lib/weather/service'
 import type { TemperatureUnit } from '@/lib/weather/types'
+import { resolveTripReadAccess, resolveTripWriteAccess } from '@/lib/trips/access'
 
 function parseUnit(value: string | null): TemperatureUnit | undefined {
   if (value === 'celsius') return 'celsius'
@@ -45,13 +46,24 @@ export async function GET(
 
   const { id } = await params
   const supabase = await createUserScopedClient(auth.userId)
+  const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true'
+  const access = forceRefresh
+    ? await resolveTripWriteAccess({ supabase, tripId: id, userId: auth.userId })
+    : await resolveTripReadAccess({ supabase, tripId: id, userId: auth.userId })
+  if (!access.allowed) {
+    const status = access.reason === 'not_found' ? 404 : access.reason === 'internal_error' ? 500 : 403
+    return NextResponse.json(
+      { error: { code: status === 404 ? 'not_found' : status === 500 ? 'internal_error' : 'forbidden', message: status === 404 ? 'Trip not found.' : status === 500 ? 'Failed to authorize trip.' : 'You cannot access this trip.' } },
+      { status }
+    )
+  }
   const ownerPlan = await getOwnerPlan(id, supabase)
   const payload = await getTripWeather({
     tripId: id,
     supabase,
     userId: auth.userId,
     requestedUnit: parseUnit(request.nextUrl.searchParams.get('unit')),
-    forceRefresh: request.nextUrl.searchParams.get('refresh') === 'true',
+    forceRefresh,
     includePacking: ownerPlan === 'pro',
   })
 
@@ -74,6 +86,14 @@ export async function POST(
 
   const { id } = await params
   const supabase = await createUserScopedClient(auth.userId)
+  const access = await resolveTripWriteAccess({ supabase, tripId: id, userId: auth.userId })
+  if (!access.allowed) {
+    const status = access.reason === 'not_found' ? 404 : access.reason === 'internal_error' ? 500 : 403
+    return NextResponse.json(
+      { error: { code: status === 404 ? 'not_found' : status === 500 ? 'internal_error' : 'forbidden', message: status === 404 ? 'Trip not found.' : status === 500 ? 'Failed to authorize trip.' : 'You cannot refresh this trip.' } },
+      { status }
+    )
+  }
   const rate = checkRateLimit(`${auth.keyHash}:${id}:weather-refresh`)
   if (!rate.allowed || rate.remaining < 99) {
     const { data: cacheRow } = await supabase

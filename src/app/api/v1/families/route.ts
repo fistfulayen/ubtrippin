@@ -116,52 +116,23 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { data: family, error: familyError } = await auth.supabase
-    .from('families')
-    .insert({
-      name,
-      created_by: auth.userId,
-    })
-    .select('id, name, created_by, created_at, updated_at')
-    .single()
+  const secret = createSecretClient()
+  const { data: familyRows, error: familyError } = await secret.rpc(
+    'create_family_with_admin_for_user',
+    { p_user_id: auth.userId, p_name: name }
+  )
+  const family = (familyRows as Array<{
+    id: string
+    name: string
+    created_by: string
+    created_at: string
+    updated_at: string
+  }> | null)?.[0]
 
   if (familyError || !family) {
     console.error('[v1/families POST] create failed', familyError)
     return NextResponse.json(
       { error: { code: 'internal_error', message: 'Failed to create family.' } },
-      { status: 500 }
-    )
-  }
-
-  const invitedEmail = (profile?.email || '').trim().toLowerCase()
-  if (!invitedEmail) {
-    const secret = createSecretClient()
-    await secret.from('families').delete().eq('id', family.id)
-    return NextResponse.json(
-      { error: { code: 'internal_error', message: 'Could not determine your account email.' } },
-      { status: 500 }
-    )
-  }
-
-  // RLS allows this because the policy includes: invited_by = auth.uid()
-  const { error: memberError } = await auth.supabase
-    .from('family_members')
-    .insert({
-      family_id: family.id,
-      user_id: auth.userId,
-      role: 'admin',
-      invited_email: invitedEmail,
-      invited_by: auth.userId,
-      accepted_at: new Date().toISOString(),
-      invite_token: null,
-    })
-
-  if (memberError) {
-    console.error('[v1/families POST] bootstrap member failed', memberError)
-    const secret = createSecretClient()
-    await secret.from('families').delete().eq('id', family.id)
-    return NextResponse.json(
-      { error: { code: 'internal_error', message: 'Failed to create family membership.' } },
       { status: 500 }
     )
   }
