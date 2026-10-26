@@ -24,6 +24,7 @@ export interface Database {
           created_at: string
           updated_at: string
           // Billing columns (added in 20260228000001_stripe_billing)
+          billing_email: string | null
           subscription_tier: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null

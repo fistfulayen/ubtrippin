@@ -8,14 +8,13 @@
  *  2. Create Supabase auth user (service role — only acceptable use here)
  *  3. Insert profile row
  *  4. Mark invite used
- *  5. Notify inviter by email (fire-and-forget)
+ *  5. Send a mailbox verification link before the account can sign in
  *
- * Returns: { user_id, message: "Account created" }
+ * Returns: { user_id, verification_required: true, message }
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createSecretClient } from '@/lib/supabase/service'
-import { sendInviteJoinedEmail } from '@/lib/email/invite-joined'
 import { consumePublicRateLimit } from '@/lib/api/durable-rate-limit'
 
 function isValidEmail(value: string): boolean {
@@ -114,11 +113,11 @@ export async function POST(request: NextRequest) {
       .is('invitee_id', null)
   }
 
-  // 2. Create auth user — service role is required here to create auth users
+  // An invitation proves admission, not ownership of the supplied mailbox.
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email,
     password,
-    email_confirm: true,
+    email_confirm: false,
     user_metadata: { full_name: fullName },
   })
 
@@ -193,22 +192,30 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // 5. Notify inviter — fire-and-forget, no await
-  void Promise.resolve(
-    supabase
-      .from('profiles')
-      .select('email, full_name')
-      .eq('id', invite.inviter_id)
-      .single()
-      .then(({ data: inviter }) => {
-        if (!inviter?.email) return
-        void Promise.resolve(sendInviteJoinedEmail({
-          to: inviter.email,
-          inviterName: inviter.full_name?.split(' ')[0] ?? 'there',
-          inviteeName: fullName,
-        })).catch((err: unknown) => console.error('[register] invite notification email failed:', err))
-      })
-  ).catch((err: unknown) => console.error('[register] inviter lookup failed:', err))
+  // Supabase sends a single-use verification token through the configured
+  // transactional SMTP sender. Never return the token to this caller.
+  let verificationFailed = false
+  try {
+    const { error } = await supabase.auth.resend({ type: 'signup', email })
+    verificationFailed = Boolean(error)
+  } catch {
+    verificationFailed = true
+  }
+  if (verificationFailed) {
+    // Release only this account's finalized claim, allowing a safe retry.
+    await supabase.from('invites')
+      .update({ invitee_id: null, used_at: null, email_used: null })
+      .eq('id', invite.id).eq('used_at', claimedAt).eq('invitee_id', userId)
+    await supabase.auth.admin.deleteUser(userId)
+    return NextResponse.json(
+      { error: { code: 'verification_unavailable', message: 'Could not send verification. Please try again.' } },
+      { status: 503 }
+    )
+  }
 
-  return NextResponse.json({ user_id: userId, message: 'Account created' }, { status: 201 })
+  return NextResponse.json({
+    user_id: userId,
+    verification_required: true,
+    message: 'Check your email to verify your address before signing in.',
+  }, { status: 202 })
 }

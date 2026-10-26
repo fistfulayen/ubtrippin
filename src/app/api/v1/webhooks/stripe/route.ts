@@ -21,6 +21,7 @@ function maskStripeId(id: string | null | undefined): string {
 interface ProfileBillingRow {
   id: string
   email: string | null
+  billing_email: string | null
   subscription_tier: string | null
   stripe_customer_id: string | null
   stripe_subscription_id: string | null
@@ -30,7 +31,7 @@ interface ProfileBillingRow {
 
 type ProfilePatch = Partial<Pick<
   ProfileBillingRow,
-  | 'email'
+  | 'billing_email'
   | 'subscription_tier'
   | 'stripe_customer_id'
   | 'stripe_subscription_id'
@@ -125,7 +126,7 @@ async function getProfileById(supabase: ReturnType<typeof createSecretClient>, i
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
+      'id, email, billing_email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
     )
     .eq('id', id)
     .maybeSingle()
@@ -148,7 +149,7 @@ async function getProfileByCustomerId(
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
+      'id, email, billing_email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
     )
     .eq('stripe_customer_id', customerId)
     .maybeSingle()
@@ -171,7 +172,7 @@ async function getProfileBySubscriptionId(
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
+      'id, email, billing_email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
     )
     .eq('stripe_subscription_id', subscriptionId)
     .maybeSingle()
@@ -194,7 +195,7 @@ async function getProfileByEmail(
   const { data, error } = await supabase
     .from('profiles')
     .select(
-      'id, email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
+      'id, email, billing_email, subscription_tier, stripe_customer_id, stripe_subscription_id, subscription_current_period_end, subscription_grace_until'
     )
     .ilike('email', email)
     .maybeSingle()
@@ -337,11 +338,8 @@ async function handleCustomerUpdated(
   }
 
   const email = normalizeEmail(customer.email)
-  let profile = await getProfileByCustomerId(supabase, customer.id)
-
-  if (!profile && email) {
-    profile = await getProfileByEmail(supabase, email)
-  }
+  // Updates belong to the linked customer ID, never a newly edited email.
+  const profile = await getProfileByCustomerId(supabase, customer.id)
 
   if (!profile) {
     console.log('[stripe webhook] customer.updated no matching profile', { customerId: maskStripeId(customer.id) })
@@ -353,7 +351,7 @@ async function handleCustomerUpdated(
     profile,
     {
       stripe_customer_id: customer.id,
-      email: email ?? undefined,
+      billing_email: email,
     },
     'customer.updated'
   )

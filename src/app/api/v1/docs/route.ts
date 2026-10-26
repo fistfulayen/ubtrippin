@@ -779,7 +779,7 @@ Register with an invite code. No auth required.
 
 \`\`\`
 201 Created
-{ "user_id": "uuid", "message": "Account created" }
+{ "user_id": "uuid", "verification_required": true, "message": "Check your email to verify your address before signing in." }
 \`\`\`
 
 ---

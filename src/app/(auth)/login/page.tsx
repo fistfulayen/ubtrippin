@@ -105,6 +105,11 @@ function LoginContent() {
               {callbackErrorMessage}
             </p>
           ) : null}
+          {searchParams.get('verification_required') === '1' ? (
+            <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+              Check your email and verify your address before signing in. The link expires in one hour.
+            </p>
+          ) : null}
           {googleError ? (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {googleError}
@@ -143,7 +148,7 @@ function LoginContent() {
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
-          <EmailForm redirectPath={redirectPath} />
+          <EmailForm redirectPath={redirectPath} initialEmail={searchParams.get('email') ?? ''} />
 
           <p className="text-center text-xs text-slate-500">
             By signing in, you agree to our <Link href="/terms" className="underline hover:text-slate-700">Terms of Service</Link>{' '}

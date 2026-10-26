@@ -1,10 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { buildOAuthCallbackUrl } from '@/lib/supabase/auth'
 
-type Mode = 'sign_in' | 'magic_link' | 'forgot_password'
+type Mode = 'sign_in' | 'magic_link' | 'forgot_password' | 'verify_email'
 
 type FieldErrors = {
   email?: string
@@ -35,15 +35,22 @@ function validateEmail(email: string): string | undefined {
 interface EmailFormProps {
   redirectPath: string
   referralCode?: string | null
+  initialEmail?: string
 }
 
-export function EmailForm({ redirectPath }: EmailFormProps) {
+export function EmailForm({ redirectPath, initialEmail = '' }: EmailFormProps) {
   const [mode, setMode] = useState<Mode>('sign_in')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(initialEmail)
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<FieldErrors>({})
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [verificationCooldown, setVerificationCooldown] = useState(0)
+  useEffect(() => {
+    if (!verificationCooldown) return
+    const timer = window.setTimeout(() => setVerificationCooldown(value => value - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [verificationCooldown])
 
   const submitLabel = useMemo(() => {
     switch (mode) {
@@ -53,10 +60,12 @@ export function EmailForm({ redirectPath }: EmailFormProps) {
         return 'Send Magic Link'
       case 'forgot_password':
         return 'Send Reset Email'
+      case 'verify_email':
+        return verificationCooldown ? `Try again in ${verificationCooldown}s` : 'Resend Verification'
       default:
         return 'Continue'
     }
-  }, [mode])
+  }, [mode, verificationCooldown])
 
   function resetStatus() {
     setErrors({})
@@ -91,6 +100,17 @@ export function EmailForm({ redirectPath }: EmailFormProps) {
     const supabase = createClient()
 
     try {
+      if (mode === 'verify_email') {
+        if (verificationCooldown) return
+        const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() })
+        if (error) {
+          setErrors({ form: getFriendlyAuthError(error.message) })
+          return
+        }
+        setVerificationCooldown(60)
+        setSuccessMessage('If your account needs verification, check your email for a new link.')
+        return
+      }
       if (mode === 'sign_in') {
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
@@ -209,12 +229,17 @@ export function EmailForm({ redirectPath }: EmailFormProps) {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || (mode === 'verify_email' && verificationCooldown > 0)}
           className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-400"
         >
           {submitting ? 'Please wait...' : submitLabel}
         </button>
       </form>
+
+      <button type="button" onClick={() => switchMode('verify_email')}
+        className="w-full text-sm text-indigo-700 underline">
+        Need a new email verification link?
+      </button>
 
       <p className="text-center text-xs text-slate-500">
         Don&apos;t have an account? You need an invite link to sign up.

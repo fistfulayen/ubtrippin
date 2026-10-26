@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateApiKey, isAuthError } from '@/lib/api/auth'
-import { createUserScopedClient } from '@/lib/supabase/user-scoped'
+import { createSecretClient } from '@/lib/supabase/service'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,12 +27,12 @@ export async function GET(request: NextRequest) {
     )
   }
 
-    const supabase = await createUserScopedClient(auth.userId)
-
-  // Look up user email for admin check
-  const { data: profile } = await supabase.from('profiles').select('email').eq('id', auth.userId).single()
-  const email = profile?.email?.toLowerCase().trim()
-  if (!email || !allowedEmails.has(email)) {
+  const supabase = createSecretClient()
+  // API keys identify a user ID. Resolve that ID's verified Auth identity;
+  // a Stripe billing contact or mutable profile must never grant admin access.
+  const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(auth.userId)
+  const email = user?.email?.toLowerCase().trim()
+  if (userError || user?.id !== auth.userId || !user?.email_confirmed_at || !email || !allowedEmails.has(email)) {
     return NextResponse.json(
       { error: { code: 'forbidden', message: 'Admin access only.' } },
       { status: 403 }

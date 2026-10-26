@@ -100,8 +100,7 @@ export default function JoinPage() {
         return
       }
 
-      // Success — redirect to login with email pre-filled
-      router.push(`/login?email=${encodeURIComponent(form.email)}&registered=1`)
+      router.push(`/login?email=${encodeURIComponent(form.email)}&verification_required=1`)
     } catch {
       setError('Network error. Please check your connection and try again.')
     } finally {
