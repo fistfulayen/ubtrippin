@@ -778,7 +778,7 @@ Register with an invite code. No auth required.
 \`\`\`
 
 \`\`\`
-201 Created
+202 Accepted
 { "user_id": "uuid", "verification_required": true, "message": "Check your email to verify your address before signing in." }
 \`\`\`
 

@@ -41,7 +41,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       // Supabase Storage — cover images, feedback images, ticket attachments
-      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: 'cqijgtijuselspyzpphf.supabase.co' },
       // Unsplash — guide cover images
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'plus.unsplash.com' },
