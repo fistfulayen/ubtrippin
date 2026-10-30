@@ -5,6 +5,22 @@ import { checkRateLimit } from '@/lib/api/rate-limit'
 import { isSessionAuthError, requireSessionAuth } from '@/lib/api/session-auth'
 import { canRefreshWeather, getTripWeather } from '@/lib/weather/service'
 import type { TemperatureUnit } from '@/lib/weather/types'
+import { resolveTripReadAccess, resolveTripWriteAccess } from '@/lib/trips/access'
+import { isValidUUID } from '@/lib/validation'
+
+async function authorizeTrip(auth: Awaited<ReturnType<typeof requireSessionAuth>>, id: string, write: boolean) {
+  if (isSessionAuthError(auth)) return auth
+  if (!isValidUUID(id)) {
+    return NextResponse.json({ error: { code: 'invalid_param', message: 'Invalid trip ID.' } }, { status: 400 })
+  }
+  // API-key fallback uses a service client; RLS alone cannot authorize this route.
+  const access = await (write ? resolveTripWriteAccess : resolveTripReadAccess)({
+    supabase: auth.supabase, tripId: id, userId: auth.userId,
+  })
+  if (access.allowed) return null
+  const status = access.reason === 'internal_error' ? 500 : access.reason === 'not_found' ? 404 : 403
+  return NextResponse.json({ error: { code: status === 500 ? 'internal_error' : status === 404 ? 'not_found' : 'forbidden', message: 'Trip is not accessible.' } }, { status })
+}
 
 function parseUnit(value: string | null): TemperatureUnit | undefined {
   if (value === 'celsius') return 'celsius'
@@ -40,13 +56,16 @@ export async function GET(
   if (isSessionAuthError(auth)) return auth
 
   const { id } = await params
+  const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true'
+  const denied = await authorizeTrip(auth, id, forceRefresh)
+  if (denied) return denied
   const ownerPlan = await getOwnerPlan(id, auth.supabase)
   const payload = await getTripWeather({
     tripId: id,
     supabase: auth.supabase,
     userId: auth.userId,
     requestedUnit: parseUnit(request.nextUrl.searchParams.get('unit')),
-    forceRefresh: request.nextUrl.searchParams.get('refresh') === 'true',
+    forceRefresh,
     includePacking: ownerPlan === 'pro',
   })
 
@@ -65,6 +84,8 @@ export async function POST(
   if (isSessionAuthError(auth)) return auth
 
   const { id } = await params
+  const denied = await authorizeTrip(auth, id, true)
+  if (denied) return denied
   const key = `${auth.userId}:${id}:weather-refresh`
   const rate = checkRateLimit(key)
   if (!rate.allowed || rate.remaining < 99) {
