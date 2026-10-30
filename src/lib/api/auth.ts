@@ -81,6 +81,20 @@ export async function validateApiKey(
     )
   }
 
+  // A valid key proves possession, while admission is a separate requirement.
+  // Recheck it on every use, including keys created through the database API.
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('admitted_at')
+    .eq('id', apiKey.user_id)
+    .maybeSingle()
+  if (profileError || !profile?.admitted_at) {
+    return NextResponse.json(
+      { error: { code: 'forbidden', message: 'This account has not been admitted.' } },
+      { status: 403 }
+    )
+  }
+
   // Fire-and-forget: update last_used_at (don't block the response)
   supabase
     .from('api_keys')

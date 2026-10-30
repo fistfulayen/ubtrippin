@@ -160,9 +160,10 @@ export async function POST(request: NextRequest) {
     const { data: allowedSender, error: senderLookupError } = mailAuthentication.authenticated
       ? await supabase
       .from('allowed_senders')
-      .select('user_id, profiles(id, email, full_name)')
+      .select('user_id, profiles!inner(id, email, full_name, admitted_at)')
       .eq('email', fromEmail.toLowerCase())
       .eq('verified', true)
+      .not('profiles.admitted_at', 'is', null)
       .maybeSingle()
       : { data: null, error: null }
 
