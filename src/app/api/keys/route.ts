@@ -40,6 +40,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('admitted_at')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profileError || !profile?.admitted_at) {
+    return NextResponse.json({ error: 'This account has not been admitted.' }, { status: 403 })
+  }
+
   const body = await req.json().catch(() => ({}))
   const name = (body.name ?? '').trim()
 
