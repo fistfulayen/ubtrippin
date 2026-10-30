@@ -7,7 +7,6 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createSecretClient } from '@/lib/supabase/service'
 import { isValidUUID } from '@/lib/validation'
 
 interface StoredAttachment {
@@ -23,9 +22,9 @@ export async function GET(
   { params }: { params: Promise<{ emailId: string; index: string }> }
 ) {
   const { emailId, index: indexStr } = await params
-  const index = parseInt(indexStr, 10)
+  const index = /^\d+$/.test(indexStr) ? Number(indexStr) : NaN
 
-  if (!isValidUUID(emailId) || isNaN(index) || index < 0) {
+  if (!isValidUUID(emailId) || !Number.isSafeInteger(index) || index < 0) {
     return NextResponse.json({ error: 'Invalid parameters' }, { status: 400 })
   }
 
@@ -40,6 +39,7 @@ export async function GET(
     .from('source_emails')
     .select('id, attachments_json')
     .eq('id', emailId)
+    .eq('user_id', user.id)
     .single()
 
   if (!email) {
@@ -52,17 +52,23 @@ export async function GET(
   }
 
   const attachment = attachments[index]
-  if (!attachment.storage_path) {
+  if (!attachment || typeof attachment.storage_path !== 'string' || !attachment.storage_path) {
     return NextResponse.json(
       { error: 'Attachment not stored (pre-dates attachment storage feature)' },
       { status: 404 }
     )
   }
 
-  const service = createSecretClient()
-  const { data, error } = await service.storage
+  // Metadata must never confer access to another account's storage object.
+  const storagePath = attachment.storage_path
+  if (!storagePath.startsWith(`${user.id}/`) || storagePath.split('/').some((part) => part === '.' || part === '..')) {
+    return NextResponse.json({ error: 'Attachment does not belong to this account' }, { status: 403 })
+  }
+
+  // Preserve owner-prefix storage RLS when creating the capability URL.
+  const { data, error } = await supabase.storage
     .from('email-attachments')
-    .createSignedUrl(attachment.storage_path, 3600)
+    .createSignedUrl(storagePath, 3600)
 
   if (error || !data) {
     console.error('Failed to create signed URL for attachment:', error)

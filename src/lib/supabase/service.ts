@@ -6,8 +6,9 @@
  * - Cross-user data access is explicitly required (webhook delivery, API key lookup)
  * - Admin operations that intentionally need RLS bypass
  *
- * Do NOT use in user-facing API routes — use createUserScopedClient() instead.
- * This code is security-audited monthly.
+ * Every user-facing operation using this client, including through the legacy
+ * createUserScopedClient helper, requires explicit object authorization.
+ * Use the session client when storage or database RLS must remain authoritative.
  */
 import { createServerClient } from '@supabase/ssr'
 
