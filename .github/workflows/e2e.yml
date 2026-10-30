@@ -1,33 +1,55 @@
 name: E2E Tests
 
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   e2e:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'fistfulayen/ubtrippin' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - name: Check required secrets
         id: check
+        env:
+          STAGING_URL: ${{ secrets.STAGING_URL }}
+          STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
+          STAGING_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.STAGING_SUPABASE_PUBLISHABLE_KEY }}
         run: |
-          if [ -z "${{ secrets.STAGING_SUPABASE_URL }}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::E2E skipped — staging secrets not configured. Add STAGING_SUPABASE_URL and other required secrets to GitHub Settings > Secrets."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const keys = ['STAGING_URL', 'STAGING_SUPABASE_URL', 'STAGING_SECRET_KEY', 'STAGING_SUPABASE_PUBLISHABLE_KEY'];
+          let configured = keys.every(key => Boolean(process.env[key]?.trim()));
+          if (configured) {
+            const app = new URL(process.env.STAGING_URL);
+            const db = new URL(process.env.STAGING_SUPABASE_URL);
+            configured = app.protocol === 'https:' && db.protocol === 'https:'
+              && !app.username && !app.password && !db.username && !db.password
+              && !['ubtrippin.xyz', 'www.ubtrippin.xyz'].includes(app.hostname)
+              && db.hostname !== 'cqijgtijuselspyzpphf.supabase.co';
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `configured=${configured}\n`);
+          if (!configured) console.log('::warning::E2E skipped: dedicated non-production staging configuration is required.');
+          NODE
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         if: steps.check.outputs.configured == 'true'
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         if: steps.check.outputs.configured == 'true'
         with:
           node-version: '24'
@@ -35,7 +57,7 @@ jobs:
 
       - name: Install dependencies
         if: steps.check.outputs.configured == 'true'
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Install Playwright browsers
         if: steps.check.outputs.configured == 'true'
@@ -45,7 +67,7 @@ jobs:
         if: steps.check.outputs.configured == 'true'
         run: pnpm run test:e2e
         env:
-          PLAYWRIGHT_BASE_URL: ${{ secrets.STAGING_URL || 'https://www.ubtrippin.xyz' }}
+          PLAYWRIGHT_BASE_URL: ${{ secrets.STAGING_URL }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
@@ -58,7 +80,7 @@ jobs:
           TEST_SHARE_TOKEN: ${{ secrets.TEST_SHARE_TOKEN }}
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: steps.check.outputs.configured == 'true' && always()
         with:
           name: playwright-report
